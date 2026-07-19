@@ -1,0 +1,2316 @@
+<!DOCTYPE html>
+<html lang="th" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENV//MONITOR — AIoT</title>
+<script>
+(function(){
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const lang = (navigator.language || 'th').startsWith('th') ? 'th' : 'en';
+  document.documentElement.lang = lang;
+  window._LANG = lang;
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ── FONT: ลอง load จาก path สัมพัทธ์และ fallback ── */
+@font-face {
+  font-family: 'Anakotmai';
+  src: url('./font/anakotmai-light.woff2') format('woff2'),
+       url('/font/anakotmai-light.woff2') format('woff2');
+  font-weight: 300; font-display: swap;
+}
+@font-face {
+  font-family: 'Anakotmai';
+  src: url('./font/anakotmai-medium.woff2') format('woff2'),
+       url('/font/anakotmai-medium.woff2') format('woff2');
+  font-weight: 500; font-display: swap;
+}
+@font-face {
+  font-family: 'Anakotmai';
+  src: url('./font/anakotmai-bold.woff2') format('woff2'),
+       url('/font/anakotmai-bold.woff2') format('woff2');
+  font-weight: 700; font-display: swap;
+}
+
+/* ══ TOKENS — DARK ══ */
+:root,[data-theme="dark"]{
+  --bg:#060912; --bg2:#0b1120; --bg3:#0f1830;
+  --glass:rgba(255,255,255,0.035); --glass2:rgba(255,255,255,0.065); --glass3:rgba(255,255,255,0.10);
+  --gb:rgba(255,255,255,0.08); --gb2:rgba(255,255,255,0.14);
+  --sh:0 8px 32px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.08);
+  --sh2:0 20px 60px rgba(0,0,0,0.65),inset 0 1px 0 rgba(255,255,255,0.12);
+  --teal:#00e8cc; --teal2:#00b8a6; --teal-g:rgba(0,232,204,.18);
+  --blue:#4db8ff; --blue-g:rgba(77,184,255,.18);
+  --violet:#b98bfc; --violet-g:rgba(185,139,252,.18);
+  --amber:#f5bc45; --amber-g:rgba(245,188,69,.18);
+  --rose:#ff6b8a; --rose-g:rgba(255,107,138,.18);
+  --lime:#8edd52; --lime-g:rgba(142,221,82,.18);
+  --txt:rgba(255,255,255,.88); --txt2:rgba(255,255,255,.55);
+  --txt3:rgba(255,255,255,.28); --txt4:rgba(255,255,255,.12);
+  --circ:590.62px;
+  --ring-size:clamp(160px,min(28vw,210px),210px);
+  --hdr-pad-x:clamp(12px,3vw,22px);
+  --page-pad-x:clamp(12px,3vw,18px);
+  --gap:clamp(8px,1.4vw,11px);
+  --r:20px; --r2:12px; --r3:8px;
+  --font-main:'Anakotmai','Noto Sans Thai',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --hdr-bg:color-mix(in srgb,var(--bg) 72%,transparent);
+}
+/* ══ TOKENS — LIGHT ══ */
+[data-theme="light"]{
+  --bg:#eef2f8; --bg2:#e2e9f4; --bg3:#d8e2f0;
+  --glass:rgba(255,255,255,0.55); --glass2:rgba(255,255,255,0.72); --glass3:rgba(255,255,255,0.88);
+  --gb:rgba(0,0,0,0.06); --gb2:rgba(0,0,0,0.12);
+  --sh:0 8px 32px rgba(0,0,40,0.10),inset 0 1px 0 rgba(255,255,255,0.80);
+  --sh2:0 20px 60px rgba(0,0,40,0.15),inset 0 1px 0 rgba(255,255,255,0.90);
+  --txt:rgba(10,20,50,.88); --txt2:rgba(10,20,50,.55); --txt3:rgba(10,20,50,.35); --txt4:rgba(10,20,50,.10);
+  --teal:#007a6e; --teal2:#009688; --blue:#1a6fbf; --violet:#7c3aed;
+  --amber:#b45309; --rose:#be1945; --lime:#4a8a00;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--txt);font-family:var(--font-main);font-weight:300;min-height:100vh;overflow-x:hidden;position:relative}
+
+/* ══ AURORA ══ */
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(130px);animation:orb-float 24s ease-in-out infinite alternate;mix-blend-mode:screen}
+[data-theme="light"] .orb{mix-blend-mode:multiply;opacity:.18}
+.orb1{width:800px;height:800px;left:-20%;top:-20%;background:radial-gradient(circle,rgba(0,232,204,.22),transparent 65%);animation-duration:28s}
+.orb2{width:700px;height:700px;right:-15%;top:20%;background:radial-gradient(circle,rgba(77,184,255,.20),transparent 65%);animation-duration:20s;animation-delay:-7s}
+.orb3{width:600px;height:600px;left:25%;bottom:-15%;background:radial-gradient(circle,rgba(185,139,252,.18),transparent 65%);animation-duration:32s;animation-delay:-14s}
+.orb4{width:400px;height:400px;right:20%;bottom:10%;background:radial-gradient(circle,rgba(245,188,69,.12),transparent 65%);animation-duration:22s;animation-delay:-4s}
+@keyframes orb-float{0%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-40px) scale(1.06)}66%{transform:translate(-20px,20px) scale(.97)}100%{transform:translate(15px,-15px) scale(1.03)}}
+.noise{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");opacity:.028}
+[data-theme="light"] .noise{opacity:.04}
+canvas#pts{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* ══ LAYOUT ══ */
+.wrap{position:relative;z-index:1;max-width:min(1480px,100%);margin:0 auto;padding:0 var(--page-pad-x) 64px}
+
+/* ══ HEADER (full-bleed, no double border with content) ══ */
+.site-hdr{display:flex;align-items:center;gap:14px;padding:10px var(--hdr-pad-x);position:sticky;top:0;z-index:400;width:100%;background:var(--hdr-bg);backdrop-filter:blur(48px) saturate(180%);-webkit-backdrop-filter:blur(48px) saturate(180%);box-shadow:0 1px 0 var(--gb);border:none;margin:0;transition:background .3s,box-shadow .3s}
+[data-theme="light"]{--hdr-bg:color-mix(in srgb,var(--bg) 82%,transparent)}
+.logo{display:flex;align-items:center;gap:11px;text-decoration:none;flex-shrink:0}
+.logo-hex{width:38px;height:38px;position:relative;display:flex;align-items:center;justify-content:center}
+.logo-hex svg{width:38px;height:38px}
+.logo-txt{line-height:1.1}
+.logo-name{font-family:var(--font-main);font-weight:700;font-size:14px;letter-spacing:.3px;color:var(--teal)}
+.logo-sub{font-family:var(--font-mono);font-size:8px;color:var(--txt3);letter-spacing:2.5px;margin-top:1px}
+.hdr-mid{flex:1;display:flex;align-items:center;gap:10px;padding:0 16px}
+.dev-sel{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:9px;color:var(--txt3)}
+.dev-sel select{background:var(--glass);border:1px solid var(--gb);color:var(--txt);font-family:var(--font-mono);font-size:9px;padding:4px 12px;border-radius:7px;cursor:pointer;outline:none;appearance:none;transition:border-color .2s,background .2s}
+.dev-sel select:hover{background:var(--glass2);border-color:rgba(0,232,204,.3)}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.pill{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-family:var(--font-mono);font-size:8.5px;letter-spacing:.8px;background:var(--glass);border:1px solid var(--gb);color:var(--txt3);transition:all .3s}
+.pill.live{background:var(--teal-g);border-color:rgba(0,232,204,.25);color:var(--teal)}
+.pill.warn{background:var(--amber-g);border-color:rgba(245,188,69,.25);color:var(--amber)}
+.pill.err{background:var(--rose-g);border-color:rgba(255,107,138,.25);color:var(--rose)}
+.dot{width:5px;height:5px;border-radius:50%;background:var(--txt3);flex-shrink:0;transition:all .3s}
+.dot.live{background:var(--teal);box-shadow:0 0 8px var(--teal);animation:blink 2s ease-in-out infinite}
+.dot.warn{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+.dot.err{background:var(--rose);box-shadow:0 0 8px var(--rose)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+#clock{font-family:var(--font-mono);font-size:11px;color:rgba(0,232,204,.65);letter-spacing:2px;min-width:72px}
+.hbtn{background:var(--glass);border:1px solid var(--gb);color:var(--txt2);font-family:var(--font-mono);font-size:9px;padding:5px 11px;border-radius:7px;cursor:pointer;letter-spacing:.8px;transition:all .2s}
+.hbtn:hover{background:var(--glass2);border-color:rgba(0,232,204,.3);color:var(--teal)}
+.theme-btn{width:30px;height:30px;border-radius:8px;background:var(--glass);border:1px solid var(--gb);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:all .2s;flex-shrink:0}
+.theme-btn:hover{background:var(--glass2)}
+
+/* ══ ALERT BAR ══ */
+.alert-bar{display:none;padding:9px var(--hdr-pad-x);font-family:var(--font-mono);font-size:10.5px;letter-spacing:.5px;color:var(--rose);background:rgba(255,107,138,.07);box-shadow:0 1px 0 rgba(255,107,138,.18)}
+.alert-bar.show{display:flex;align-items:center;gap:11px;animation:alert-pulse 2s ease-in-out infinite}
+@keyframes alert-pulse{0%,100%{background:rgba(255,107,138,.07)}50%{background:rgba(255,107,138,.13)}}
+
+/* ══ HERO ══ */
+.hero{display:grid;grid-template-columns:var(--ring-size) 1fr auto;gap:clamp(14px,2.5vw,20px);padding:22px 0 18px;align-items:center}
+.ring-wrap{position:relative;width:var(--ring-size);height:var(--ring-size);flex-shrink:0}
+.ring-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring-track{fill:none;stroke:var(--gb);stroke-width:9}
+.ring-glow{fill:none;stroke-width:22;stroke-linecap:round;opacity:.07;stroke-dasharray:var(--circ);stroke-dashoffset:var(--circ);transition:stroke-dashoffset 1.8s cubic-bezier(.34,1.56,.64,1),stroke 1s}
+.ring-fill{fill:none;stroke-width:9;stroke-linecap:round;stroke-dasharray:var(--circ);stroke-dashoffset:var(--circ);transition:stroke-dashoffset 1.8s cubic-bezier(.34,1.56,.64,1),stroke 1s}
+.ring-ticks{fill:none}
+.ring-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.ring-emoji{font-size:24px;filter:drop-shadow(0 0 14px rgba(0,232,204,.7));line-height:1}
+.ring-num{font-family:var(--font-main);font-weight:700;font-size:54px;line-height:1;color:var(--teal);letter-spacing:-2px;transition:color 1s;text-shadow:0 0 40px rgba(0,232,204,.35)}
+.ring-label{font-family:var(--font-mono);font-size:7.5px;color:var(--txt3);letter-spacing:3px;margin-top:3px}
+.hero-body{display:flex;flex-direction:column;justify-content:center;gap:10px;min-width:0}
+.hero-title{font-family:var(--font-main);font-weight:700;font-size:21px;line-height:1.35;transition:color .4s}
+.hero-ts{font-family:var(--font-mono);font-size:8.5px;color:var(--txt3);letter-spacing:1.5px}
+.reco-list{display:flex;flex-direction:column;gap:6px;max-height:130px;overflow-y:auto}
+.reco-list::-webkit-scrollbar{width:2px}
+.reco-list::-webkit-scrollbar-thumb{background:var(--gb);border-radius:2px}
+.reco{padding:8px 13px;border-radius:9px;font-size:12.5px;line-height:1.6;border-left:2px solid var(--teal);background:var(--teal-g);animation:slide-in .3s ease}
+.reco.warning{border-color:var(--amber);background:var(--amber-g)}
+.reco.danger{border-color:var(--rose);background:var(--rose-g)}
+.reco.info{border-color:var(--blue);background:var(--blue-g)}
+@keyframes slide-in{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+.hero-badges{display:flex;flex-direction:column;gap:7px;min-width:160px}
+.hbadge{display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:9px;background:var(--glass);border:1px solid var(--gb);font-family:var(--font-mono);font-size:8.5px;letter-spacing:.5px;transition:background .6s,border-color .6s,color .6s;white-space:nowrap}
+.hbadge.ok{background:var(--lime-g);border-color:rgba(142,221,82,.2);color:var(--lime)}
+.hbadge.info{background:var(--blue-g);border-color:rgba(77,184,255,.2);color:var(--blue)}
+.hbadge.warning{background:var(--amber-g);border-color:rgba(245,188,69,.2);color:var(--amber)}
+.hbadge.danger{background:var(--rose-g);border-color:rgba(255,107,138,.2);color:var(--rose)}
+.hbdot{width:4px;height:4px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* ══ SENSOR CARDS ══ */
+.sensor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--gap);margin-bottom:var(--gap)}
+.scard{border-radius:var(--r);padding:16px 16px 12px;position:relative;overflow:hidden;background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--gb);box-shadow:var(--sh);transition:transform .22s,border-color .3s,box-shadow .3s;cursor:default;contain:layout style;display:flex;flex-direction:column;min-height:clamp(168px,26vh,200px)}
+.scard:hover{transform:translateY(-4px) scale(1.01);border-color:var(--gb2);box-shadow:var(--sh2)}
+.scard::before{content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;background:radial-gradient(ellipse at 50% -10%,rgba(255,255,255,.09),transparent 55%)}
+.scard::after{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;border-radius:var(--r) var(--r) 0 0}
+.scard.t::after{background:linear-gradient(90deg,#ff8c42,#ffb347)}
+.scard.h::after{background:linear-gradient(90deg,#4db8ff,#6ec6ff)}
+.scard.g::after{background:linear-gradient(90deg,#ff6b8a,#ff8fab)}
+.scard.f::after{background:linear-gradient(90deg,#b98bfc,#d0abff)}
+.scard-tag{font-family:var(--font-mono);font-size:8px;letter-spacing:2.5px;color:var(--txt3);text-transform:uppercase;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px}
+.scard-live{font-family:var(--font-main);font-weight:700;font-size:13px;letter-spacing:-.3px;color:var(--txt);white-space:nowrap}
+.scard-live small{font-weight:300;font-size:10px;color:var(--txt3);margin-left:2px}
+.scard-icon{font-size:12px;opacity:.75;margin-left:4px}
+.scard-badge{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:2px 9px;border-radius:20px;font-family:var(--font-mono);font-size:7.5px;letter-spacing:1px;background:var(--teal-g);color:var(--teal);border:1px solid rgba(0,232,204,.2);transition:background .6s,color .6s,border-color .6s}
+.scard-badge.warn{background:var(--amber-g);color:var(--amber);border-color:rgba(245,188,69,.2)}
+.scard-badge.danger{background:var(--rose-g);color:var(--rose);border-color:rgba(255,107,138,.2)}
+.scard-badge.nodata{background:var(--glass);color:var(--txt3);border-color:var(--gb)}
+
+/* ══ WEBCAM STRIP ══ */
+.wstrip{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:11px}
+.wcard{border-radius:var(--r);padding:15px 18px;display:flex;align-items:center;gap:14px;background:var(--violet-g);border:1px solid rgba(185,139,252,.15);box-shadow:var(--sh);position:relative;overflow:hidden;transition:transform .2s,border-color .3s}
+.wcard:hover{transform:translateY(-3px);border-color:rgba(185,139,252,.28)}
+.wcard::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(185,139,252,.7),transparent)}
+.wcard-icon{font-size:22px;flex-shrink:0}
+.wcard-label{font-family:var(--font-mono);font-size:7.5px;letter-spacing:2px;color:var(--txt3);margin-bottom:4px}
+.wcard-val{font-family:var(--font-main);font-weight:700;font-size:22px;color:var(--violet)}
+.wcard-sub{font-family:var(--font-mono);font-size:8.5px;color:var(--txt3);margin-top:2px}
+.eye-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-family:var(--font-mono);font-size:8px;letter-spacing:1px;background:var(--violet-g);color:var(--violet);border:1px solid rgba(185,139,252,.25)}
+.eye-dot{width:5px;height:5px;border-radius:50%;background:var(--violet)}
+.eye-dot.open{background:var(--lime);box-shadow:0 0 6px var(--lime)}
+.eye-dot.drowsy{background:var(--amber);box-shadow:0 0 6px var(--amber)}
+.eye-dot.closed{background:var(--rose);box-shadow:0 0 6px var(--rose)}
+
+/* ══ CHARTS ══ */
+.charts-grid{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(220px,1fr);gap:var(--gap);margin-bottom:var(--gap);align-items:stretch}
+.charts-side{display:flex;flex-direction:column;gap:var(--gap);min-height:0}
+.cpanel{border-radius:var(--r);padding:16px 18px 14px;background:var(--glass);backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);border:1px solid var(--gb);box-shadow:var(--sh);display:flex;flex-direction:column;min-height:0}
+.cpanel-main{min-height:clamp(280px,42vh,380px)}
+.cpanel-hdr{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:10px;flex-shrink:0}
+.cpanel-hdr-left{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cpanel-hdr .cpanel-meta{margin-left:auto;white-space:nowrap}
+.chart-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:5px;flex:1;justify-content:center;min-width:min(100%,280px)}
+.range-pill{font-family:var(--font-mono);font-size:8px;letter-spacing:.4px;padding:4px 11px;border-radius:20px;border:1px solid var(--gb);background:var(--glass);color:var(--txt3);cursor:pointer;transition:background .2s,border-color .2s,color .2s}
+.range-pill:hover{background:var(--glass2);color:var(--txt2)}
+.range-pill.active{background:var(--teal-g);border-color:rgba(0,232,204,.35);color:var(--teal)}
+.chart-opt{font-family:var(--font-mono);font-size:8px;padding:4px 8px;border-radius:7px;border:1px solid var(--gb);background:var(--glass);color:var(--txt2);cursor:pointer;outline:none}
+.chart-stage{position:relative;flex:1;min-height:0;width:100%}
+.chart-stage-lg{min-height:clamp(200px,32vh,300px)}
+.chart-stage-md{min-height:clamp(120px,18vh,165px)}
+.chart-stage-sm{min-height:clamp(100px,14vh,140px);display:flex;align-items:center;justify-content:center}
+.scard-chart-wrap{position:relative;flex:1;min-height:clamp(92px,15vh,118px);margin:4px 0 6px}
+.log-panel,.ai-panel{background:var(--glass);backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%)}
+.ai-body,.chat-msgs,.log-body{background:transparent}
+.ai-hdr,.log-hdr,.ai-tabs,.chat-input-row{background:var(--glass2)}
+.chat-input{background:rgba(255,255,255,.04)}
+[data-theme="light"] .chat-input{background:rgba(255,255,255,.45)}
+.cpanel-title{font-family:var(--font-mono);font-size:7.5px;letter-spacing:3px;color:var(--txt3);text-transform:uppercase}
+.cpanel-meta{font-family:var(--font-mono);font-size:8.5px;color:var(--txt3)}
+/* ══ STATS ══ */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);margin-bottom:var(--gap)}
+.stat-chip{border-radius:var(--r2);padding:15px 16px;background:var(--glass);border:1px solid var(--gb);font-family:var(--font-mono)}
+.stat-lbl{font-size:7.5px;letter-spacing:2px;color:var(--txt3);text-transform:uppercase;margin-bottom:9px}
+.stat-vals{display:flex;gap:14px}
+.stat-item{font-size:11px;color:var(--txt2)}
+.sl{color:var(--txt3);font-size:7.5px;display:block;margin-bottom:2px;letter-spacing:1px}
+
+/* ══ BOTTOM ROW ══ */
+.bottom{display:grid;grid-template-columns:1fr minmax(280px,340px);gap:var(--gap)}
+.log-panel,.ai-panel{border-radius:var(--r);overflow:hidden;background:var(--glass);border:1px solid var(--gb);box-shadow:var(--sh)}
+.log-hdr,.ai-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid var(--gb);font-family:var(--font-mono);font-size:7.5px;letter-spacing:2px;color:var(--txt3);text-transform:uppercase}
+.ai-hdr{border-bottom-color:rgba(185,139,252,.12)}
+.ai-hdr-left{display:flex;align-items:center;gap:7px;color:var(--violet)}
+.ai-hdr-dot{width:5px;height:5px;border-radius:50%;background:var(--violet);box-shadow:0 0 6px var(--violet);animation:blink 2s ease-in-out infinite}
+.ai-src{font-size:7px;color:var(--txt3);background:var(--violet-g);padding:2px 7px;border-radius:20px;border:1px solid rgba(185,139,252,.2);letter-spacing:1px}
+.lbtn{background:var(--glass);border:1px solid var(--gb);color:var(--txt3);font-family:var(--font-mono);font-size:7.5px;padding:3px 8px;border-radius:6px;cursor:pointer;letter-spacing:.8px;transition:all .2s}
+.lbtn:hover{background:var(--glass2);color:var(--txt)}
+.log-body{height:240px;overflow-y:auto;padding:4px 0;font-family:var(--font-mono);font-size:9.5px}
+.log-body::-webkit-scrollbar{width:2px}
+.log-body::-webkit-scrollbar-thumb{background:var(--gb);border-radius:2px}
+.log-row{display:grid;grid-template-columns:88px 44px 1fr;padding:2.5px 14px;border-bottom:1px solid rgba(255,255,255,.015);animation:fadein .2s ease}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.log-ts{color:var(--txt3);font-size:8.5px}
+.log-lv{font-size:7.5px;letter-spacing:1px}
+.log-lv.ok{color:var(--lime)}
+.log-lv.info{color:var(--blue)}
+.log-lv.warn{color:var(--amber)}
+.log-lv.err{color:var(--rose)}
+.log-msg{color:var(--txt3)}
+.log-msg.ok{color:var(--txt2)}
+
+/* ══ AI PANEL (combined: recs + chat tabs) ══ */
+.ai-tabs{display:flex;border-bottom:1px solid rgba(185,139,252,.12)}
+.ai-tab{flex:1;padding:8px 0;font-family:var(--font-mono);font-size:8px;letter-spacing:1.5px;text-align:center;cursor:pointer;color:var(--txt3);border-bottom:2px solid transparent;transition:all .2s}
+.ai-tab.active{color:var(--violet);border-bottom-color:var(--violet)}
+.ai-tab:hover:not(.active){color:var(--txt2)}
+.ai-pane{display:none}
+.ai-pane.active{display:flex;flex-direction:column}
+
+/* Recs pane */
+.ai-body{height:240px;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:7px}
+.ai-body::-webkit-scrollbar{width:2px}
+.ai-body::-webkit-scrollbar-thumb{background:rgba(185,139,252,.3);border-radius:2px}
+.ai-rec{padding:9px 12px;border-radius:7px;border-left:2px solid var(--violet);background:var(--violet-g);font-size:12px;line-height:1.65;animation:slide-in .3s ease}
+.ai-rec.warning{border-color:var(--amber);background:var(--amber-g)}
+.ai-rec.danger{border-color:var(--rose);background:var(--rose-g)}
+.ai-rec.ok,.ai-rec.info{border-color:var(--blue);background:var(--blue-g)}
+.ai-thinking{display:flex;align-items:center;gap:8px;padding:9px 12px;font-family:var(--font-mono);font-size:9.5px;color:var(--txt3)}
+.ai-dots span{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--violet);margin:0 2px;animation:bounce 1.2s ease-in-out infinite}
+.ai-dots span:nth-child(2){animation-delay:.2s}
+.ai-dots span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+
+/* Force Gemini button */
+.gemini-btn{margin:8px 12px 2px;padding:7px 0;border-radius:8px;border:1px solid rgba(185,139,252,.3);background:var(--violet-g);color:var(--violet);font-family:var(--font-mono);font-size:8.5px;letter-spacing:1.2px;cursor:pointer;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:6px}
+.gemini-btn:hover{background:rgba(185,139,252,.25);border-color:rgba(185,139,252,.5);transform:translateY(-1px)}
+.gemini-btn:active{transform:translateY(0)}
+.gemini-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.gemini-cd{font-family:var(--font-mono);font-size:7.5px;color:var(--txt3);text-align:center;padding:2px 0 6px;letter-spacing:.5px}
+
+/* Chat pane */
+.chat-msgs{flex:1;height:192px;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.chat-msgs::-webkit-scrollbar{width:2px}
+.chat-msgs::-webkit-scrollbar-thumb{background:rgba(185,139,252,.3);border-radius:2px}
+.chat-msg{max-width:92%;animation:slide-in .25s ease}
+.chat-msg.user{align-self:flex-end}
+.chat-msg.bot{align-self:flex-start}
+.chat-bubble{padding:8px 12px;border-radius:12px;font-size:12px;line-height:1.6}
+.chat-msg.user .chat-bubble{background:rgba(0,232,204,.12);border:1px solid rgba(0,232,204,.2);border-radius:12px 12px 3px 12px;color:var(--txt)}
+.chat-msg.bot .chat-bubble{background:var(--violet-g);border:1px solid rgba(185,139,252,.2);border-radius:12px 12px 12px 3px;color:var(--txt)}
+.chat-msg-time{font-family:var(--font-mono);font-size:7px;color:var(--txt3);margin-top:3px}
+.chat-msg.user .chat-msg-time{text-align:right}
+.chat-input-row{display:flex;gap:6px;padding:8px 10px;border-top:1px solid rgba(185,139,252,.1)}
+.chat-input{flex:1;background:var(--glass);border:1px solid var(--gb);color:var(--txt);font-family:var(--font-main);font-size:12px;padding:7px 11px;border-radius:8px;outline:none;transition:border-color .2s;resize:none}
+.chat-input:focus{border-color:rgba(185,139,252,.4)}
+.chat-send{width:34px;height:34px;border-radius:8px;border:1px solid rgba(185,139,252,.3);background:var(--violet-g);color:var(--violet);cursor:pointer;font-size:14px;transition:all .2s;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.chat-send:hover{background:rgba(185,139,252,.25);transform:translateY(-1px)}
+.chat-send:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.chat-empty{color:var(--txt3);font-family:var(--font-mono);font-size:9px;letter-spacing:.5px;text-align:center;padding:20px 0;line-height:1.8}
+
+/* ══ MODAL ══ */
+.modal-ov{position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.65);backdrop-filter:blur(18px);display:none;align-items:center;justify-content:center}
+.modal-ov.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--gb2);border-radius:22px;padding:26px;width:440px;max-width:94vw;box-shadow:0 32px 80px rgba(0,0,0,.55)}
+.modal h3{font-family:var(--font-main);font-weight:700;font-size:15px;margin-bottom:18px}
+.field{margin-bottom:11px}
+.field label{display:block;font-family:var(--font-mono);font-size:7.5px;letter-spacing:2px;color:var(--txt3);margin-bottom:5px}
+.field input{width:100%;background:var(--glass);border:1px solid var(--gb);color:var(--txt);font-family:var(--font-mono);font-size:10.5px;padding:8px 11px;border-radius:7px;outline:none;transition:border-color .2s}
+.field input:focus{border-color:rgba(0,232,204,.4)}
+.modal-foot{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
+.btn{padding:8px 18px;border-radius:7px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.8px;cursor:pointer;border:none;transition:all .2s}
+.btn-ghost{background:var(--glass);border:1px solid var(--gb);color:var(--txt2)}
+.btn-ghost:hover{background:var(--glass2)}
+.btn-primary{background:linear-gradient(135deg,var(--teal-g),var(--blue-g));border:1px solid rgba(0,232,204,.3);color:var(--teal)}
+.btn-primary:hover{background:linear-gradient(135deg,rgba(0,232,204,.25),rgba(77,184,255,.25))}
+
+/* ══ MICRO ANIMATIONS ══ */
+@keyframes num-pop{0%{transform:scale(1.12)}100%{transform:scale(1)}}
+.num-pop{animation:num-pop .4s cubic-bezier(.34,1.56,.64,1)}
+
+/* ══ RESPONSIVE ══ */
+@media(max-width:1100px){.hero{grid-template-columns:var(--ring-size) 1fr}.hero-badges{display:none}.sensor-grid{grid-template-columns:repeat(2,1fr)}.charts-grid{grid-template-columns:1fr}.charts-side{flex-direction:row;flex-wrap:wrap}.charts-side .cpanel{flex:1;min-width:min(100%,280px)}.cpanel-hdr .cpanel-meta{margin-left:0;width:100%}.stats-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.hero{grid-template-columns:1fr}.ring-wrap{margin:0 auto}.bottom{grid-template-columns:1fr}.wstrip{grid-template-columns:1fr}.sensor-grid{grid-template-columns:1fr}}
+
+#poll-flash{position:fixed;bottom:18px;right:18px;z-index:500;width:8px;height:8px;border-radius:50%;background:var(--teal);box-shadow:0 0 12px var(--teal);opacity:0;transition:opacity .2s;pointer-events:none}
+#poll-flash.on{opacity:1}
+
+/* ══ FOCUS SECTION ══ */
+.focus-section{margin-bottom:var(--gap)}
+.focus-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--gap);flex-wrap:wrap;gap:8px}
+.focus-title-row{display:flex;align-items:center;gap:10px}
+.focus-section-title{font-family:var(--font-mono);font-size:10px;letter-spacing:3px;color:var(--txt3);text-transform:uppercase}
+.focus-live-dot{width:6px;height:6px;border-radius:50%;background:var(--violet);box-shadow:0 0 8px var(--violet);animation:blink 2s ease-in-out infinite;flex-shrink:0}
+.focus-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.focus-threshold-wrap{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9px;color:var(--txt3)}
+.focus-threshold-input{width:52px;background:var(--glass);border:1px solid var(--gb);color:var(--txt);font-family:var(--font-mono);font-size:10px;padding:4px 8px;border-radius:7px;outline:none;text-align:center;transition:border-color .2s}
+.focus-threshold-input:focus{border-color:rgba(185,139,252,.4)}
+.focus-legend{display:flex;align-items:center;gap:12px;font-family:var(--font-mono);font-size:8px;color:var(--txt3)}
+.focus-legend-item{display:flex;align-items:center;gap:5px}
+.focus-legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+
+.focus-grid{display:grid;grid-template-columns:minmax(0,2.5fr) minmax(220px,1fr);gap:var(--gap)}
+.focus-main{display:flex;flex-direction:column;gap:var(--gap)}
+.focus-chart-panel{border-radius:var(--r);padding:16px 18px 14px;background:var(--glass);backdrop-filter:blur(16px) saturate(140%);-webkit-backdrop-filter:blur(16px) saturate(140%);border:1px solid var(--gb);box-shadow:var(--sh)}
+.focus-chart-title{font-family:var(--font-mono);font-size:7.5px;letter-spacing:3px;color:var(--txt3);text-transform:uppercase;margin-bottom:4px}
+.focus-chart-sub{font-family:var(--font-mono);font-size:8px;color:var(--txt3);margin-bottom:10px}
+.focus-chart-stage{position:relative;height:clamp(180px,28vh,260px)}
+
+.focus-cards{display:flex;flex-direction:column;gap:var(--gap)}
+.fcard{border-radius:var(--r);padding:14px 16px;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--gb);box-shadow:var(--sh)}
+.fcard::after{content:'';position:absolute;display:none}
+.fcard-label{font-family:var(--font-mono);font-size:7.5px;letter-spacing:2.5px;color:var(--txt3);text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.fcard-val{font-family:var(--font-main);font-weight:700;font-size:28px;color:var(--violet);line-height:1}
+.fcard-sub{font-family:var(--font-mono);font-size:8px;color:var(--txt3);margin-top:5px;line-height:1.5}
+.fcard-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-family:var(--font-mono);font-size:8px;letter-spacing:1px;background:var(--violet-g);color:var(--violet);border:1px solid rgba(185,139,252,.25);transition:all .4s}
+.fcard-badge.alert{background:var(--rose-g);color:var(--rose);border-color:rgba(255,107,138,.3)}
+.fcard-badge.ok{background:var(--lime-g);color:var(--lime);border-color:rgba(142,221,82,.25)}
+
+.dir-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.dir-item{display:flex;flex-direction:column;gap:2px}
+.dir-lbl{font-family:var(--font-mono);font-size:7px;letter-spacing:1.5px;color:var(--txt3)}
+.dir-val{font-family:var(--font-main);font-weight:500;font-size:15px;color:var(--txt2)}
+.dir-bar{height:3px;border-radius:2px;background:var(--gb2);margin-top:2px;overflow:hidden}
+.dir-fill{height:100%;border-radius:2px;background:var(--violet);transition:width .5s ease}
+
+.focus-glossary{border-radius:var(--r);padding:14px 16px;background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid var(--gb);box-shadow:var(--sh)}
+.glossary-title{font-family:var(--font-mono);font-size:7.5px;letter-spacing:2px;color:var(--txt3);text-transform:uppercase;margin-bottom:10px}
+.glossary-list{display:flex;flex-direction:column;gap:7px}
+.glossary-row{display:grid;grid-template-columns:100px 1fr;gap:8px;font-size:11.5px;line-height:1.55}
+.glossary-key{font-family:var(--font-mono);font-size:9px;color:var(--violet);letter-spacing:.5px}
+.glossary-desc{color:var(--txt2)}
+
+.focus-alert-bar{display:none;padding:7px var(--hdr-pad-x);font-family:var(--font-mono);font-size:10px;letter-spacing:.5px;color:var(--rose);background:rgba(255,107,138,.07);border-radius:var(--r2);border:1px solid rgba(255,107,138,.2);margin-bottom:8px}
+.focus-alert-bar.show{display:flex;align-items:center;gap:9px}
+
+@media(max-width:1100px){.focus-grid{grid-template-columns:1fr}.focus-cards{flex-direction:row;flex-wrap:wrap}.focus-cards .fcard{flex:1;min-width:min(100%,200px)}}
+@media(max-width:640px){.focus-cards{flex-direction:column}}
+</style>
+</head>
+<body>
+
+<div class="aurora">
+  <div class="orb orb1"></div><div class="orb orb2"></div>
+  <div class="orb orb3"></div><div class="orb orb4"></div>
+</div>
+<div class="noise"></div>
+<canvas id="pts"></canvas>
+<div id="poll-flash"></div>
+
+<!-- HEADER (full width — avoids odd inset border inside .wrap) -->
+<header class="site-hdr">
+  <div class="logo">
+    <div class="logo-hex">
+      <svg viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="19,2 34,10.5 34,27.5 19,36 4,27.5 4,10.5" stroke="rgba(0,232,204,0.5)" stroke-width=".8" fill="rgba(0,232,204,0.06)"/>
+        <polygon points="19,8 29,13.5 29,24.5 19,30 9,24.5 9,13.5" stroke="rgba(0,232,204,0.25)" stroke-width=".5" fill="none"/>
+        <circle cx="19" cy="19" r="3.5" fill="rgba(0,232,204,0.8)"/>
+        <line x1="19" y1="13" x2="19" y2="15.5" stroke="rgba(0,232,204,0.5)" stroke-width="1" stroke-linecap="round"/>
+        <line x1="19" y1="22.5" x2="19" y2="25" stroke="rgba(0,232,204,0.5)" stroke-width="1" stroke-linecap="round"/>
+        <line x1="13" y1="19" x2="15.5" y2="19" stroke="rgba(0,232,204,0.5)" stroke-width="1" stroke-linecap="round"/>
+        <line x1="22.5" y1="19" x2="25" y2="19" stroke="rgba(0,232,204,0.5)" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="logo-txt">
+      <div class="logo-name">ENV//MONITOR</div>
+      <div class="logo-sub">DEPA AIoT · ROOM HEALTH</div>
+    </div>
+  </div>
+
+  <div class="hdr-mid">
+    <div class="dev-sel">
+      <span>DEVICE</span>
+      <select id="deviceSel" onchange="switchDevice(this.value)" aria-label="เลือกอุปกรณ์"></select>
+    </div>
+    <span id="data-age" style="font-family:var(--font-mono);font-size:8px;color:var(--txt3);letter-spacing:.5px"></span>
+  </div>
+
+  <div class="hdr-right">
+    <div class="pill" id="db-pill">
+      <div class="dot" id="db-dot"></div>
+      <span id="db-lbl">SUPABASE</span>
+    </div>
+    <div id="clock">--:--:--</div>
+    <button class="hbtn" onclick="refresh()" title="Refresh">↺</button>
+    <button class="hbtn" onclick="openModal()" title="Settings">⚙</button>
+    <div class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle theme"></div>
+  </div>
+</header>
+
+<div class="alert-bar" id="alertBar">
+  <span>⚠</span><span id="alertMsg">GAS CRITICAL</span>
+</div>
+
+<div class="wrap">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="ring-wrap">
+    <svg viewBox="0 0 210 210">
+      <g class="ring-ticks" id="ring-ticks"></g>
+      <circle class="ring-track" cx="105" cy="105" r="88"/>
+      <circle class="ring-glow" id="ring-glow" cx="105" cy="105" r="88" stroke="var(--teal)"/>
+      <circle class="ring-fill" id="ring-fill" cx="105" cy="105" r="88" stroke="var(--teal)"/>
+    </svg>
+    <div class="ring-inner">
+      <div class="ring-emoji" id="ring-emoji">💤</div>
+      <div class="ring-num" id="score-num">--</div>
+      <div class="ring-label">HEALTH SCORE</div>
+    </div>
+  </div>
+
+  <div class="hero-body">
+    <div class="hero-title" id="hero-status">กำลังรอข้อมูล...</div>
+    <div class="hero-ts" id="hero-ts">LAST UPDATE: --</div>
+    <div class="reco-list" id="reco-list">
+      <div class="reco info">⏳ กำลังเชื่อมต่อ Arduino UNO Q</div>
+    </div>
+  </div>
+
+  <div class="hero-badges" id="hero-badges">
+    <div class="hbadge" id="badge-temp"><div class="hbdot"></div><span>TEMP — --</span></div>
+    <div class="hbadge" id="badge-hum"><div class="hbdot"></div><span>HUMID — --</span></div>
+    <div class="hbadge" id="badge-gas"><div class="hbdot"></div><span>GAS — --</span></div>
+  </div>
+</section>
+
+<!-- SENSOR CARDS (rendered from SENSORS config) -->
+<section class="sensor-grid" id="sensor-grid"></section>
+
+<!-- WEBCAM STRIP -->
+<section class="wstrip" id="wstrip" style="display:none">
+  <div class="wcard">
+    <div class="wcard-icon">👁️</div>
+    <div>
+      <div class="wcard-label">FOCUS SCORE</div>
+      <div class="wcard-val" id="wc-focus">--<span style="font-size:12px;color:var(--txt3)">%</span></div>
+      <div class="wcard-sub">วิเคราะห์จากกล้อง</div>
+    </div>
+  </div>
+  <div class="wcard">
+    <div class="wcard-icon">😑</div>
+    <div>
+      <div class="wcard-label">EYE STATE</div>
+      <div style="margin-top:5px">
+        <span class="eye-badge" id="wc-eye">
+          <span class="eye-dot" id="eye-dot"></span>
+          <span id="eye-txt">--</span>
+        </span>
+      </div>
+      <div class="wcard-sub" id="wc-eye-desc">--</div>
+    </div>
+  </div>
+  <div class="wcard">
+    <div class="wcard-icon">✨</div>
+    <div>
+      <div class="wcard-label">BLINK RATE</div>
+      <div class="wcard-val" id="wc-blink">--<span style="font-size:12px;color:var(--txt3)">/min</span></div>
+      <div class="wcard-sub" id="wc-blink-st">--</div>
+    </div>
+  </div>
+</section>
+
+<!-- CHARTS -->
+<div class="charts-grid">
+  <div class="cpanel cpanel-main">
+    <div class="cpanel-hdr">
+      <div class="cpanel-hdr-left">
+        <div class="cpanel-title">ข้อมูลย้อนหลัง</div>
+        <div class="cpanel-meta" id="chart-range-lbl">24 ชม.</div>
+      </div>
+      <div class="chart-toolbar" id="chart-range-bar" aria-label="ช่วงเวลา"></div>
+      <div class="cpanel-meta" id="reading-count">0 readings</div>
+    </div>
+    <div class="chart-stage chart-stage-lg"><canvas id="histChart"></canvas></div>
+  </div>
+  <div class="charts-side">
+    <div class="cpanel">
+      <div class="cpanel-hdr">
+        <div class="cpanel-hdr-left">
+          <div class="cpanel-title">Health Score</div>
+          <div class="cpanel-meta" id="score-avg-lbl">--</div>
+        </div>
+      </div>
+      <div class="chart-stage chart-stage-md"><canvas id="scoreChart"></canvas></div>
+    </div>
+    <div class="cpanel">
+      <div class="cpanel-hdr">
+        <div class="cpanel-hdr-left">
+          <div class="cpanel-title">ดัชนีคุณภาพอากาศ</div>
+          <div class="cpanel-meta" id="aqi-lbl">--</div>
+        </div>
+      </div>
+      <div class="chart-stage chart-stage-sm">
+        <canvas id="gaugeChart" style="max-height:100%;max-width:100%"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS (rendered from SENSORS + score config) -->
+<div class="stats-row" id="stats-row"></div>
+
+<!-- ══ FOCUS SECTION ══ -->
+<section class="focus-section" id="focus-section">
+  <div class="focus-hdr">
+    <div class="focus-title-row">
+      <div class="focus-live-dot" id="focus-live-dot"></div>
+      <div class="focus-section-title">👁 Focus Monitor — ตรวจจับการจดจ่อจากกล้อง</div>
+    </div>
+    <div class="focus-controls">
+      <div class="focus-threshold-wrap">
+        <span>⚠ alert เมื่อ movement/นาที &gt;</span>
+        <input type="number" class="focus-threshold-input" id="focus-threshold" value="8" min="1" max="99" title="Threshold">
+        <span>ครั้ง</span>
+      </div>
+      <div class="focus-legend">
+        <div class="focus-legend-item"><div class="focus-legend-dot" style="background:rgba(185,139,252,.7)"></div>ปกติ</div>
+        <div class="focus-legend-item"><div class="focus-legend-dot" style="background:rgba(255,107,138,.85)"></div>เกิน threshold</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="focus-alert-bar" id="focus-alert-bar">
+    <span>⚠</span><span id="focus-alert-msg">Movement สูงผิดปกติ!</span>
+  </div>
+
+  <div class="focus-grid">
+    <div class="focus-main">
+      <div class="focus-chart-panel">
+        <div class="focus-chart-title">Movement per Minute (รวม 4 ช่วง × 15 วินาที)</div>
+        <div class="focus-chart-sub" id="focus-chart-sub">— รอข้อมูล —</div>
+        <div class="focus-chart-stage"><canvas id="focusChart"></canvas></div>
+      </div>
+      <div class="focus-glossary">
+        <div class="glossary-title">📖 ความหมายข้อมูล (Focus Table)</div>
+        <div class="glossary-list">
+          <div class="glossary-row"><span class="glossary-key">person</span><span class="glossary-desc">ID หน้าของบุคคลที่ตรวจจับ (Face ID) — ใช้ระบุว่าเป็นคนเดิมหรือไม่</span></div>
+          <div class="glossary-row"><span class="glossary-key">movement</span><span class="glossary-desc">จำนวนครั้งที่หัวหัน/ขยับภายใน 15 วินาที — ค่าสูง = เสียสมาธิ</span></div>
+          <div class="glossary-row"><span class="glossary-key">direction</span><span class="glossary-desc">ทิศทางที่หัน: Left / Right / Up / Down — ตัวเลขคือจำนวนครั้งต่อ 15s</span></div>
+          <div class="glossary-row"><span class="glossary-key">face_count</span><span class="glossary-desc">จำนวนใบหน้าที่ตรวจพบในกล้องขณะนั้น — &gt;1 คน = มีคนอื่นในห้อง</span></div>
+          <div class="glossary-row"><span class="glossary-key">created_at</span><span class="glossary-desc">เวลาที่บันทึก (ทุก 15 วินาที) — กราฟรวม 4 ช่วง = 1 นาที</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="focus-cards">
+      <div class="fcard">
+        <div class="fcard-label">
+          <span>MOVEMENT / นาที</span>
+          <span class="fcard-badge" id="focus-mv-badge">—</span>
+        </div>
+        <div class="fcard-val" id="focus-mv-val">--</div>
+        <div class="fcard-sub">รวม 4 ช่วง × 15s ล่าสุด<br>threshold: <span id="focus-th-display">8</span> ครั้ง/นาที</div>
+      </div>
+      <div class="fcard">
+        <div class="fcard-label"><span>FACE COUNT</span></div>
+        <div class="fcard-val" id="focus-face-val" style="color:var(--blue)">--</div>
+        <div class="fcard-sub" id="focus-face-sub">จำนวนใบหน้าที่ตรวจพบล่าสุด</div>
+      </div>
+      <div class="fcard">
+        <div class="fcard-label"><span>DIRECTION (15s ล่าสุด)</span></div>
+        <div class="dir-grid" id="focus-dir-grid">
+          <div class="dir-item"><div class="dir-lbl">LEFT ←</div><div class="dir-val" id="dir-L">--</div><div class="dir-bar"><div class="dir-fill" id="dir-L-bar" style="width:0%"></div></div></div>
+          <div class="dir-item"><div class="dir-lbl">RIGHT →</div><div class="dir-val" id="dir-R">--</div><div class="dir-bar"><div class="dir-fill" id="dir-R-bar" style="width:0%"></div></div></div>
+          <div class="dir-item"><div class="dir-lbl">UP ↑</div><div class="dir-val" id="dir-U">--</div><div class="dir-bar"><div class="dir-fill" id="dir-U-bar" style="width:0%"></div></div></div>
+          <div class="dir-item"><div class="dir-lbl">DOWN ↓</div><div class="dir-val" id="dir-D">--</div><div class="dir-bar"><div class="dir-fill" id="dir-D-bar" style="width:0%"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BOTTOM -->
+<div class="bottom">
+  <div class="log-panel">
+    <div class="log-hdr">
+      <span>System Log</span>
+      <div style="display:flex;gap:7px">
+        <button class="lbtn" onclick="clearLogs()">CLEAR</button>
+        <button class="lbtn" onclick="fetchDashboard(true)">REFRESH</button>
+      </div>
+    </div>
+    <div class="log-body" id="log-body"></div>
+  </div>
+
+  <!-- AI PANEL: tabs for Recs + Chat -->
+  <div class="ai-panel">
+    <div class="ai-hdr">
+      <div class="ai-hdr-left">
+        <div class="ai-hdr-dot"></div>
+        <span>AI วิเคราะห์</span>
+      </div>
+      <span class="ai-src" id="ai-src">—</span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="ai-tabs">
+      <div class="ai-tab active" id="tab-recs" onclick="switchAiTab('recs')">📊 ANALYSIS</div>
+      <div class="ai-tab" id="tab-chat" onclick="switchAiTab('chat')">💬 CHAT</div>
+    </div>
+
+    <!-- Recs pane -->
+    <div class="ai-pane active" id="pane-recs">
+      <div class="ai-body" id="ai-body">
+        <div class="ai-rec info">🤖 รอข้อมูลจากเซ็นเซอร์...</div>
+      </div>
+      <!-- Force Gemini button -->
+      <button class="gemini-btn" id="gemini-force-btn" onclick="forceGemini()" title="วิเคราะห์ด้วย Gemini ทันที">
+        <span>✨</span> <span>GEMINI ANALYZE NOW</span>
+      </button>
+      <div class="gemini-cd" id="gemini-cd-lbl"></div>
+    </div>
+
+    <!-- Chat pane -->
+    <div class="ai-pane" id="pane-chat">
+      <div class="chat-msgs" id="chat-msgs">
+        <div class="chat-empty">💬 ถามเกี่ยวกับสภาพแวดล้อมในห้อง<br>ข้อมูลเซ็นเซอร์จะถูกแนบไปอัตโนมัติ</div>
+      </div>
+      <div class="chat-input-row">
+        <textarea class="chat-input" id="chat-input" placeholder="ถามเกี่ยวกับสภาพแวดล้อม..." rows="1"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+        <button class="chat-send" id="chat-send-btn" onclick="sendChat()" title="ส่ง">↑</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+</div><!-- /wrap -->
+
+<!-- MODAL -->
+<div class="modal-ov" id="cfgModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <h3>⚙ ตั้งค่าเซิร์ฟเวอร์</h3>
+    <div class="field">
+      <label>API BASE URL</label>
+      <input type="text" id="cfg-base">
+    </div>
+    <div class="field">
+      <label>GEMINI API KEY (ไม่บังคับ — override เซิร์ฟเวอร์)</label>
+      <input type="password" id="cfg-gemini" placeholder="ว่างไว้ = ใช้ GEMINI_API_KEY บนโฮสต์">
+    </div>
+    <p style="font-family:var(--font-mono);font-size:8px;color:var(--txt3);margin:0 0 10px;line-height:1.7">
+      Mock ต้องมี 3 ค่า: <code style="color:var(--teal)">temperature</code>,
+      <code style="color:var(--teal)">humidity</code>, <code style="color:var(--teal)">gas_ppm</code>
+      (หรือ <code>temp</code>, <code>hum</code>, <code>gas</code>) — ถ้าขาดอุณหภูมิ ระบบจะวิเคราะห์ผิด
+    </p>
+    <div class="field">
+      <label>ความถี่ Poll (วินาที)</label>
+      <input type="number" id="cfg-interval" min="3" max="60" value="5">
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="applyConfig()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ══ THEME ══
+function updateThemeBtn(){
+  const dark = document.documentElement.getAttribute('data-theme')==='dark';
+  document.getElementById('themeBtn').textContent = dark ? '☀️' : '🌙';
+}
+function toggleTheme(){
+  const dark = document.documentElement.getAttribute('data-theme')==='dark';
+  document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+  localStorage.setItem('theme', dark ? 'light' : 'dark');
+  updateThemeBtn();
+  rebuildCharts();
+  onViewportResize();
+}
+(function(){
+  const saved = localStorage.getItem('theme');
+  if(saved) document.documentElement.setAttribute('data-theme', saved);
+  updateThemeBtn();
+})();
+
+// ══ PARTICLES (paused when tab hidden / reduced on small screens) ══
+(function(){
+  const cvs = document.getElementById('pts');
+  const ctx = cvs.getContext('2d');
+  let W = 0, H = 0, raf = 0, active = true;
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  const COLS = ['rgba(0,232,204', 'rgba(77,184,255', 'rgba(185,139,252', 'rgba(245,188,69'];
+  const N = Math.min(90, innerWidth < 640 ? 48 : 72);
+  const pts = [];
+
+  function resize(){
+    W = cvs.width = innerWidth;
+    H = cvs.height = innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize, {passive: true});
+
+  for(let i = 0; i < N; i++){
+    const angle = i * PHI * 2 * Math.PI;
+    const radius = Math.sqrt(i / N) * Math.min(W, H) * 0.45;
+    pts.push({
+      x: W / 2 + Math.cos(angle) * radius * (Math.random() * 1.6 + 0.3),
+      y: H / 2 + Math.sin(angle) * radius * (Math.random() * 1.6 + 0.3),
+      vx: (Math.random() - 0.5) * 0.26,
+      vy: (Math.random() - 0.5) * 0.26,
+      r: Math.random() * 1.2 + 0.45,
+      a: Math.random() * 0.45 + 0.12,
+      col: COLS[i % COLS.length],
+    });
+  }
+
+  function draw(){
+    if(!active){ raf = requestAnimationFrame(draw); return; }
+    ctx.clearRect(0, 0, W, H);
+    for(let i = 0; i < pts.length; i++){
+      const pi = pts[i];
+      for(let j = i + 1; j < pts.length; j++){
+        const pj = pts[j];
+        const dx = pi.x - pj.x, dy = pi.y - pj.y, d = dx * dx + dy * dy;
+        if(d < 9000){
+          ctx.beginPath();
+          ctx.moveTo(pi.x, pi.y);
+          ctx.lineTo(pj.x, pj.y);
+          ctx.strokeStyle = `rgba(0,232,204,${0.05 * (1 - d / 9000)})`;
+          ctx.lineWidth = 0.35;
+          ctx.stroke();
+        }
+      }
+      pi.x += pi.vx;
+      pi.y += pi.vy;
+      if(pi.x < 0 || pi.x > W) pi.vx *= -1;
+      if(pi.y < 0 || pi.y > H) pi.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(pi.x, pi.y, pi.r, 0, Math.PI * 2);
+      ctx.fillStyle = pi.col + ',' + pi.a + ')';
+      ctx.fill();
+    }
+    raf = requestAnimationFrame(draw);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    active = !document.hidden;
+  });
+  draw();
+})();
+
+// ══ RING TICKS ══
+(function(){
+  const g = document.getElementById('ring-ticks');
+  const CX=105,CY=105,R=88;
+  for(let i=0;i<20;i++){
+    const a=(i/20)*Math.PI*2-Math.PI/2,big=i%5===0,r1=R+4,r2=R+(big?10:6);
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',CX+Math.cos(a)*r1);line.setAttribute('y1',CY+Math.sin(a)*r1);
+    line.setAttribute('x2',CX+Math.cos(a)*r2);line.setAttribute('y2',CY+Math.sin(a)*r2);
+    line.setAttribute('stroke',big?'rgba(0,232,204,.4)':'rgba(255,255,255,.12)');
+    line.setAttribute('stroke-width',big?'1.5':'.8');line.setAttribute('stroke-linecap','round');
+    g.appendChild(line);
+    if(big){
+      const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');
+      dot.setAttribute('cx',CX+Math.cos(a)*(R+14));dot.setAttribute('cy',CY+Math.sin(a)*(R+14));
+      dot.setAttribute('r','1.5');dot.setAttribute('fill','rgba(0,232,204,.3)');g.appendChild(dot);
+    }
+  }
+})();
+
+// ══ CONFIG ══
+const ROOT = '';
+const INVALID_DEVICES = new Set(['', 'unknown', 'null', 'none', 'undefined', 'auto', '*']);
+
+function normalizeDeviceId(id){
+  const v = String(id ?? '').trim();
+  return INVALID_DEVICES.has(v.toLowerCase()) ? null : v;
+}
+
+let BASE       = localStorage.getItem('api_base') || `${location.protocol}//${location.host}${ROOT}`;
+let POLL_MS    = parseInt(localStorage.getItem('poll_ms') || '5000', 10);
+let pollTimer  = null;
+let knownDevices = [];
+let currentDevice = normalizeDeviceId(localStorage.getItem('device_id'));
+let CLIENT_GEMINI_KEY = localStorage.getItem('gemini_key') || '';
+let serverGemini = false;
+let resizeRaf = null;
+const CIRC_BASE = 590.62;
+
+const SENSOR_RANGE = {
+  temp:  [-10, 50],
+  hum:   [0, 100],
+  gas:   [0, 2000],
+  score: [0, 100],
+};
+
+/** Single source of truth — cards, charts, stats, badges */
+const SENSORS = [
+  {
+    id: 'temp', cls: 't', label: 'อุณหภูมิ', icon: '🌡️', field: 'temperature', hist: 'temp',
+    unit: '°C', dp: 1, color: '#ff8c42', fill: 'rgba(255,140,66,.14)', badge: 'TEMP',
+    level: v => v < 16 || v > 32 ? 'danger' : v < 20 || v > 28 ? 'warning' : '',
+    text: v => v < 16 ? 'เย็นจัด' : v < 20 ? 'เย็น' : v > 32 ? 'ร้อนจัด' : v > 28 ? 'ค่อนข้างร้อน' : 'สมบูรณ์',
+    statLabel: 'อุณหภูมิ 24 ชม.', statKey: 'temperature',
+  },
+  {
+    id: 'hum', cls: 'h', label: 'ความชื้น', icon: '💧', field: 'humidity', hist: 'hum',
+    unit: '%', dp: 1, color: '#4db8ff', fill: 'rgba(77,184,255,.12)', badge: 'HUMID',
+    level: v => v < 25 || v > 75 ? 'danger' : v < 40 || v > 65 ? 'warning' : '',
+    text: v => v < 25 ? 'แห้งมาก' : v < 40 ? 'ค่อนข้างแห้ง' : v > 75 ? 'ชื้นเกิน' : v > 65 ? 'ชื้น' : 'เหมาะสม',
+    statLabel: 'ความชื้น 24 ชม.', statKey: 'humidity',
+  },
+  {
+    id: 'gas', cls: 'g', label: 'MQ2 คุณภาพอากาศ', icon: '🌫️', field: 'gas_ppm', hist: 'gas',
+    unit: 'ppm', dp: 0, color: '#ff6b8a', fill: 'rgba(255,107,138,.10)', badge: 'GAS',
+    level: v => v > 300 ? 'danger' : v > 150 ? 'warning' : '',
+    text: v => v > 600 ? '⚠️ อันตราย' : v > 300 ? 'แย่มาก' : v > 150 ? 'ไม่ดี' : v > 80 ? 'พอใช้' : 'บริสุทธิ์',
+    statLabel: 'ก๊าซ 24 ชม.', statKey: 'gas_ppm',
+  },
+];
+
+const STAT_METRICS = [
+  ...SENSORS.map(s => ({ id: s.id, label: s.statLabel, key: s.statKey, dp: s.dp })),
+  { id: 'score', label: 'Health Score 24 ชม.', key: 'health_score', dp: 0 },
+];
+
+const sensorCharts = {};
+const sensorChartSig = {};
+
+document.getElementById('cfg-base').value      = BASE;
+document.getElementById('cfg-gemini').value    = CLIENT_GEMINI_KEY;
+document.getElementById('cfg-interval').value  = POLL_MS / 1000;
+
+function apiHeaders(){
+  const h = {'Content-Type': 'application/json'};
+  if(CLIENT_GEMINI_KEY) h['X-Gemini-Key'] = CLIENT_GEMINI_KEY;
+  return h;
+}
+
+function clampSensor(v, [lo, hi]){
+  const n = Number(v);
+  if(!Number.isFinite(n) || n < lo || n > hi) return null;
+  return n;
+}
+
+/** Moving average O(n) — ignores nulls */
+function smoothSeries(arr, window = 5){
+  const out = new Array(arr.length);
+  let sum = 0, count = 0;
+  const q = [];
+  for(let i = 0; i < arr.length; i++){
+    const v = arr[i];
+    q.push(v);
+    if(v != null){ sum += v; count++; }
+    if(q.length > window){
+      const old = q.shift();
+      if(old != null){ sum -= old; count--; }
+    }
+    out[i] = count ? sum / count : null;
+  }
+  return out;
+}
+
+function sanitizeHist(){
+  SENSORS.forEach(s => {
+    hist[s.hist] = hist[s.hist].map(v => clampSensor(v, SENSOR_RANGE[s.hist]));
+  });
+  hist.score = hist.score.map(v => clampSensor(v, SENSOR_RANGE.score));
+}
+
+function applyLayoutVars(){
+  const ringPx = Math.round(
+    Math.min(210, Math.max(150, Math.min(window.innerWidth * 0.28, 210)))
+  );
+  document.documentElement.style.setProperty('--ring-size', ringPx + 'px');
+  document.documentElement.style.setProperty('--circ', (CIRC_BASE * ringPx / 210) + 'px');
+}
+
+function onViewportResize(){
+  if(resizeRaf) cancelAnimationFrame(resizeRaf);
+  resizeRaf = requestAnimationFrame(()=>{
+    applyLayoutVars();
+    [histChart, scoreChart, gaugeChart, ...Object.values(sensorCharts)].forEach(c => c?.resize());
+  });
+}
+applyLayoutVars();
+window.addEventListener('resize', onViewportResize, {passive: true});
+
+// ══ CLOCK ══
+function tickClock(){
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+tickClock(); setInterval(tickClock, 1000);
+
+// ══ SCORE COLOR ══
+function scoreColor(s){
+  if(s>=85)return '#00e8cc';if(s>=70)return '#8edd52';
+  if(s>=50)return '#f5bc45';if(s>=30)return '#ff8c42';return '#ff6b8a';
+}
+
+// ══ LAST DATA (for chat + force gemini) ══
+let lastData = null;
+let pollInFlight = false;
+let historyLoaded = false;
+
+// ══ AI TABS ══
+function switchAiTab(tab){
+  document.getElementById('tab-recs').classList.toggle('active', tab==='recs');
+  document.getElementById('tab-chat').classList.toggle('active', tab==='chat');
+  document.getElementById('pane-recs').classList.toggle('active', tab==='recs');
+  document.getElementById('pane-chat').classList.toggle('active', tab==='chat');
+  onViewportResize();
+}
+
+// ══ GEMINI (server-side key from host env) ══
+function updateGeminiBtn(){
+  const lbl = document.getElementById('gemini-cd-lbl');
+  if(CLIENT_GEMINI_KEY){
+    lbl.textContent = 'ใช้ Gemini key จากเบราว์เซอร์ (override)';
+  } else if(serverGemini){
+    lbl.textContent = 'วิเคราะห์ผ่านเซิร์ฟเวอร์ (GEMINI_API_KEY)';
+  } else {
+    lbl.textContent = 'โหมด local — ตั้ง GEMINI_API_KEY บนโฮสต์ หรือใส่ key ใน Settings';
+  }
+}
+
+function activeDeviceId(){
+  return currentDevice || normalizeDeviceId(lastData?.device_id) || knownDevices[0] || null;
+}
+
+async function ensureDeviceId(){
+  if(activeDeviceId()) return activeDeviceId();
+  await refreshDevices();
+  return activeDeviceId();
+}
+
+const CHART_RANGES = [
+  { h: 1, label: '1 ชม.' },
+  { h: 6, label: '6 ชม.' },
+  { h: 12, label: '12 ชม.' },
+  { h: 24, label: '24 ชม.' },
+  { h: 72, label: '3 วัน' },
+];
+const chartView = {
+  hours: Math.min(168, Math.max(1, parseInt(localStorage.getItem('chart_hours') || '24', 10))),
+  smooth: Math.min(15, Math.max(1, parseInt(localStorage.getItem('chart_smooth') || '5', 10))),
+  maxPoints: 200,
+};
+
+function dashboardQuery(){
+  const q = new URLSearchParams({
+    history_limit: String(chartView.maxPoints),
+    hours: String(chartView.hours),
+  });
+  const dev = activeDeviceId();
+  if(dev) q.set('device_id', dev);
+  return q.toString();
+}
+
+function parseChartTs(v){
+  const t = Date.parse(v);
+  return Number.isFinite(t) ? t : Date.now();
+}
+
+function formatAxisLabel(ms, spanHours){
+  const d = new Date(ms);
+  if(spanHours <= 6){
+    return d.toLocaleTimeString('th-TH', {hour: '2-digit', minute: '2-digit', hour12: false});
+  }
+  if(spanHours <= 48){
+    return d.toLocaleTimeString('th-TH', {hour: '2-digit', minute: '2-digit', hour12: false});
+  }
+  return d.toLocaleDateString('th-TH', {day: '2-digit', month: '2-digit'}) + ' '
+    + d.toLocaleTimeString('th-TH', {hour: '2-digit', minute: '2-digit', hour12: false});
+}
+
+function formatTooltipTime(ts){
+  return new Date(parseChartTs(ts)).toLocaleString('th-TH', {
+    hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+}
+
+function getHistView(){
+  const cutoff = Date.now() - chartView.hours * 3600000;
+  const view = {labels: [], timestamps: [], temp: [], hum: [], gas: [], score: []};
+  for(let i = 0; i < hist.timestamps.length; i++){
+    if(parseChartTs(hist.timestamps[i]) < cutoff) continue;
+    view.timestamps.push(hist.timestamps[i]);
+    view.temp.push(hist.temp[i]);
+    view.hum.push(hist.hum[i]);
+    view.gas.push(hist.gas[i]);
+    view.score.push(hist.score[i]);
+  }
+  if(!view.timestamps.length && hist.timestamps.length){
+    const start = Math.max(0, hist.timestamps.length - 40);
+    for(let i = start; i < hist.timestamps.length; i++){
+      view.timestamps.push(hist.timestamps[i]);
+      view.temp.push(hist.temp[i]);
+      view.hum.push(hist.hum[i]);
+      view.gas.push(hist.gas[i]);
+      view.score.push(hist.score[i]);
+    }
+  }
+  view.labels = view.timestamps.map(ts => formatAxisLabel(parseChartTs(ts), chartView.hours));
+  return view;
+}
+
+function chartLayoutPad(extraBottom = 0){
+  return {top: 6, right: 10, bottom: 8 + extraBottom, left: 2};
+}
+
+function timeAxisOpts(pointCount){
+  const rotate = pointCount > 14;
+  return {
+    display: true,
+    grid: {color: GRID_C(), drawBorder: false},
+    border: {display: false},
+    ticks: {
+      color: TICK_C(),
+      maxTicksLimit: Math.min(10, Math.max(4, Math.ceil(pointCount / 6))),
+      maxRotation: rotate ? 40 : 0,
+      minRotation: rotate ? 25 : 0,
+      autoSkip: true,
+      padding: 5,
+      font: {size: 9, family: "'JetBrains Mono',monospace"},
+    },
+  };
+}
+
+function chartTooltipOpts(getTs){
+  return {
+    backgroundColor: isDark() ? 'rgba(11,17,32,.92)' : 'rgba(238,242,248,.95)',
+    borderColor: 'rgba(255,255,255,.12)',
+    borderWidth: 1,
+    callbacks: {
+      title(items){
+        const i = items[0]?.dataIndex;
+        const ts = getTs?.(i);
+        return ts ? formatTooltipTime(ts) : (items[0]?.label || '');
+      },
+    },
+  };
+}
+
+function buildChartToolbar(){
+  const bar = document.getElementById('chart-range-bar');
+  if(!bar) return;
+  const pills = CHART_RANGES.map(r =>
+    `<button type="button" class="range-pill${chartView.hours === r.h ? ' active' : ''}" data-h="${r.h}" onclick="setChartRange(${r.h})">${r.label}</button>`
+  ).join('');
+  const smoothOpts = [[1, 'ดิบ'], [3, 'เบา'], [5, 'กลาง'], [9, 'ลื่น']]
+    .map(([v, lbl]) => `<option value="${v}"${chartView.smooth === v ? ' selected' : ''}>${lbl}</option>`)
+    .join('');
+  bar.innerHTML = pills
+    + `<select class="chart-opt" id="chart-smooth" title="ความลื่นของเส้น" onchange="setChartSmooth(+this.value)" aria-label="ความลื่น">${smoothOpts}</select>`;
+  const lbl = document.getElementById('chart-range-lbl');
+  if(lbl) lbl.textContent = (CHART_RANGES.find(r => r.h === chartView.hours) || {label: chartView.hours + ' ชม.'}).label;
+}
+
+function setChartRange(hours){
+  if(chartView.hours === hours) return;
+  chartView.hours = hours;
+  localStorage.setItem('chart_hours', String(hours));
+  buildChartToolbar();
+  chartSig = '';
+  Object.keys(sensorChartSig).forEach(k => delete sensorChartSig[k]);
+  historyLoaded = false;
+  fetchDashboard(true);
+}
+
+function setChartSmooth(n){
+  chartView.smooth = Math.min(15, Math.max(1, n));
+  localStorage.setItem('chart_smooth', String(chartView.smooth));
+  chartSig = '';
+  Object.keys(sensorChartSig).forEach(k => delete sensorChartSig[k]);
+  updateCharts();
+}
+
+function showDataWarnings(d){
+  const ab = document.getElementById('alertBar');
+  const msg = document.getElementById('alertMsg');
+  if((d.gas_ppm || 0) > 300) return;
+
+  const warns = d._data_warnings || [];
+  const suspectZero = (d.temperature === 0 || d.temperature === 0.0) &&
+    ((d.humidity > 15) || (d.gas_ppm > 15));
+
+  if(warns.length){
+    ab.classList.add('show');
+    msg.textContent = '⚠ ' + warns[0];
+    return;
+  }
+  if(suspectZero){
+    ab.classList.add('show');
+    msg.textContent = '⚠ อุณหภูมิ 0°C — ข้อมูลไม่ครบ ต้องมี temperature หรือ temp';
+    return;
+  }
+  ab.classList.remove('show');
+}
+
+function updateDataAge(createdAt){
+  const el = document.getElementById('data-age');
+  if(!el) return;
+  if(!createdAt){ el.textContent = ''; return; }
+  const mins = Math.round((Date.now() - Date.parse(createdAt)) / 60000);
+  if(!Number.isFinite(mins)){ el.textContent = ''; return; }
+  el.textContent = mins <= 1 ? '● LIVE' : `● ${mins} นาทีที่แล้ว`;
+  el.style.color = mins <= 3 ? 'var(--teal)' : mins <= 15 ? 'var(--amber)' : 'var(--rose)';
+}
+
+function ingestPayload(data, source = 'poll'){
+  if(!data || data.error) return;
+  const sig = [data.id, data.created_at, data.temperature, data.humidity, data.gas_ppm, data.health_score].join('|');
+  if(sig === prevState.sig && source === 'poll') return;
+  prevState.sig = sig;
+  const appendChart = source === 'poll' && historyLoaded;
+  updateUI(data, appendChart);
+}
+
+function applyServerSensorPatch(patch){
+  if(!patch || !lastData) return;
+  lastData.temperature  = patch.temperature ?? lastData.temperature;
+  lastData.humidity     = patch.humidity ?? lastData.humidity;
+  lastData.gas_ppm      = patch.gas_ppm ?? lastData.gas_ppm;
+  lastData.health_score = patch.health_score ?? lastData.health_score;
+}
+
+async function forceGemini(){
+  const btn = document.getElementById('gemini-force-btn');
+  const lbl = document.getElementById('gemini-cd-lbl');
+  btn.disabled = true;
+  lbl.textContent = 'กำลังวิเคราะห์...';
+  showAiThinking();
+  addLog('ดึงข้อมูลล่าสุดจาก DB แล้ววิเคราะห์...', 'info');
+
+  const d = lastData || {};
+  try{
+    const r = await fetch(`${BASE}/api/gemini-analyze`, {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({
+        device_id:    await ensureDeviceId(),
+        temperature:  d.temperature,
+        humidity:     d.humidity,
+        gas_ppm:      d.gas_ppm,
+        health_score: d.ai_analysis?.score ?? d.health_score ?? null,
+      }),
+    });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const parsed = await r.json();
+    if(parsed.sensor) applyServerSensorPatch(parsed.sensor);
+    const src = (parsed.source && parsed.source !== 'local') ? 'GEMINI' : 'LOCAL';
+    renderAiRecs(parsed.recommendations, src);
+    if(parsed.summary){
+      const el = document.createElement('div');
+      el.className = 'reco info';
+      el.textContent = '🤖 ' + parsed.summary;
+      document.getElementById('reco-list').prepend(el);
+    }
+    if(lastData) ingestPayload(lastData, 'gemini');
+    addLog('Analyze ✓ (' + src + ')', 'ok');
+  } catch(e){
+    addLog('Analyze error: ' + e.message, 'err');
+    renderAiRecs(d.ai_analysis?.recommendations, 'LOCAL');
+  } finally {
+    btn.disabled = false;
+    updateGeminiBtn();
+  }
+}
+
+function showAiThinking(){
+  document.getElementById('ai-src').textContent = 'GEMINI';
+  document.getElementById('ai-body').innerHTML =
+    `<div class="ai-thinking"><div class="ai-dots"><span></span><span></span><span></span></div>Gemini วิเคราะห์...</div>`;
+}
+
+function renderAiRecs(recs, src){
+  document.getElementById('ai-src').textContent = src || 'LOCAL';
+  const body = document.getElementById('ai-body');
+  body.innerHTML = '';
+  if(!recs?.length){
+    body.innerHTML = `<div class="ai-rec info">✨ สภาพแวดล้อมดีมาก</div>`; return;
+  }
+  recs.forEach(r => {
+    const el = document.createElement('div');
+    el.className = 'ai-rec '+(r.level||'info');
+    el.textContent = r.text;
+    body.appendChild(el);
+  });
+}
+
+// ══ CHAT (server /api/chat — key from host env) ══
+const chatHistory = [];
+
+async function sendChat(){
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim();
+  if(!msg) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  appendChatMsg('user', msg);
+  chatHistory.push({role: 'user', content: msg});
+
+  const sendBtn = document.getElementById('chat-send-btn');
+  sendBtn.disabled = true;
+
+  const typingId = 'typing-' + Date.now();
+  appendChatMsg('bot', '...', typingId, true);
+
+  try{
+    const r = await fetch(`${BASE}/api/chat`, {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({
+        message:   msg,
+        history:   chatHistory.slice(0, -1).slice(-10).map(m => ({role: m.role, content: m.content})),
+        device_id: await ensureDeviceId(),
+      }),
+    });
+    const data = await r.json();
+    document.getElementById(typingId)?.remove();
+    if(!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+    appendChatMsg('bot', data.reply || '—');
+    chatHistory.push({role: 'assistant', content: data.reply});
+    if(chatHistory.length > 20) chatHistory.splice(0, 2);
+  } catch(e){
+    document.getElementById(typingId)?.remove();
+    appendChatMsg('bot', '⚠️ ขออภัย เกิดข้อผิดพลาด: ' + e.message);
+    addLog('Chat error: ' + e.message, 'err');
+  }
+
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+function appendChatMsg(role, text, id, isTyping=false){
+  const msgs = document.getElementById('chat-msgs');
+  // Remove empty placeholder
+  msgs.querySelector('.chat-empty')?.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = `chat-msg ${role}`;
+  if(id) wrap.id = id;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble';
+  if(isTyping){
+    bubble.innerHTML = '<div class="ai-dots"><span></span><span></span><span></span></div>';
+  } else {
+    bubble.textContent = text;
+  }
+
+  const time = document.createElement('div');
+  time.className = 'chat-msg-time';
+  time.textContent = new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
+
+  wrap.appendChild(bubble);
+  if(!isTyping) wrap.appendChild(time);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ══ SENSOR CARDS + MINI CHARTS ══
+function buildSensorDom(){
+  const grid = document.getElementById('sensor-grid');
+  grid.innerHTML = SENSORS.map(s => `
+    <div class="scard ${s.cls}" id="card-${s.id}">
+      <div class="scard-tag">
+        <span>${s.label}</span>
+        <span class="scard-live" id="live-${s.id}">--<small>${s.unit}</small><span class="scard-icon">${s.icon}</span></span>
+      </div>
+      <div class="scard-chart-wrap"><canvas id="chart-${s.id}"></canvas></div>
+      <div class="scard-badge nodata" id="st-${s.id}">WAITING</div>
+    </div>`).join('');
+
+  const stats = document.getElementById('stats-row');
+  stats.innerHTML = STAT_METRICS.map(m => `
+    <div class="stat-chip">
+      <div class="stat-lbl">${m.label}</div>
+      <div class="stat-vals">
+        <div class="stat-item" id="s-${m.id}-avg"><span class="sl">AVG</span>--</div>
+        <div class="stat-item" id="s-${m.id}-min"><span class="sl">MIN</span>--</div>
+        <div class="stat-item" id="s-${m.id}-max"><span class="sl">MAX</span>--</div>
+      </div>
+    </div>`).join('');
+}
+
+function miniChartOptions(s){
+  const [lo, hi] = SENSOR_RANGE[s.hist] || [0, 100];
+  return {
+    responsive: true, maintainAspectRatio: false, animation: {duration: 220},
+    layout: {padding: chartLayoutPad(4)},
+    interaction: {mode: 'index', intersect: false},
+    scales: {
+      x: timeAxisOpts(24),
+      y: {
+        display: true, grid: {color: GRID_C(), drawBorder: false},
+        ticks: {color: TICK_C(), maxTicksLimit: 4, font: {size: 8}},
+        ...(lo < 0 ? {} : {suggestedMin: lo}),
+        suggestedMax: hi,
+      },
+    },
+    plugins: {
+      legend: {display: false},
+      tooltip: {
+        ...chartTooltipOpts(i => getHistView().timestamps[i]),
+        callbacks: {
+          title(items){
+            const i = items[0]?.dataIndex;
+            const ts = getHistView().timestamps[i];
+            return ts ? formatTooltipTime(ts) : (items[0]?.label || '');
+          },
+          label: ctx => `${ctx.parsed.y?.toFixed(ctx.dataset.dp ?? 1)} ${ctx.dataset.unit || ''}`,
+        },
+      },
+    },
+  };
+}
+
+function initSensorCharts(){
+  SENSORS.forEach(s => {
+    const ctx = document.getElementById('chart-' + s.id)?.getContext('2d');
+    if(!ctx) return;
+    sensorCharts[s.id] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [], unit: s.unit, dp: s.dp,
+          borderColor: s.color, backgroundColor: s.fill,
+          tension: .42, pointRadius: 0, borderWidth: 2, fill: true, spanGaps: true,
+        }],
+      },
+      options: miniChartOptions(s),
+    });
+  });
+}
+
+function updateSensorCharts(){
+  const view = getHistView();
+  if(!view.timestamps.length) return;
+  SENSORS.forEach(s => {
+    const chart = sensorCharts[s.id];
+    if(!chart) return;
+    const raw = view[s.hist];
+    const sig = view.timestamps.length + '|' + view.timestamps[view.timestamps.length - 1] + '|' + chartView.hours;
+    if(sig === sensorChartSig[s.id]) return;
+    sensorChartSig[s.id] = sig;
+
+    const data = smoothSeries(raw, Math.min(chartView.smooth, 7));
+    chart.data.labels = view.labels;
+    chart.data.datasets[0].data = data;
+    chart.options.scales.x = timeAxisOpts(view.labels.length);
+    chart.options.scales.x.ticks.color = TICK_C();
+    chart.options.scales.x.grid.color = GRID_C();
+    chart.options.scales.y.grid.color = GRID_C();
+    chart.options.scales.y.ticks.color = TICK_C();
+    chart.update('none');
+  });
+}
+
+function formatSensorValue(val, dp){
+  if(val == null) return '--';
+  return (+val).toFixed(dp);
+}
+
+function updateSensorCards(d){
+  SENSORS.forEach(s => {
+    const raw = d[s.field];
+    const fmt = raw != null ? formatSensorValue(raw, s.dp) : '--';
+    const liveKey = 'live-' + s.id;
+    const liveHtml = `${fmt}<small>${s.unit}</small><span class="scard-icon">${s.icon}</span>`;
+    setInnerHTMLIfChanged(liveKey, liveHtml);
+    setBadge('st-' + s.id, raw, s.level, s.text);
+  });
+}
+
+function updateHeroBadges(ai){
+  if(!ai.issues?.length) return;
+  const map = Object.fromEntries(ai.issues.map(i => [i.sensor, i]));
+  SENSORS.forEach(s => {
+    const b = document.getElementById('badge-' + s.id);
+    if(!b) return;
+    const iss = map[s.id];
+    b.className = 'hbadge ' + (iss?.level || '');
+    b.querySelector('span').textContent = `${s.badge} — ${iss?.msg || 'OK'}`;
+  });
+}
+
+// ══ CHARTS ══
+let histChart, scoreChart, gaugeChart;
+const isDark = ()=>document.documentElement.getAttribute('data-theme')==='dark';
+const GRID_C = ()=>isDark()?'rgba(255,255,255,.03)':'rgba(0,0,0,.05)';
+const TICK_C = ()=>isDark()?'rgba(255,255,255,.3)':'rgba(0,0,20,.35)';
+
+function initCharts(){
+  Chart.defaults.font.family = "'JetBrains Mono',monospace";
+  Chart.defaults.font.size = 9;
+  const hCtx = document.getElementById('histChart').getContext('2d');
+  histChart = new Chart(hCtx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: SENSORS.map(s => ({
+        label: s.id === 'gas' ? 'Gas÷10' : `${s.label} ${s.unit}`,
+        data: [],
+        borderColor: s.color,
+        backgroundColor: s.fill,
+        tension: .45,
+        pointRadius: 0,
+        borderWidth: s.id === 'gas' ? 1.6 : 2,
+        borderDash: s.id === 'gas' ? [5, 4] : [],
+        spanGaps: true,
+        fill: s.id !== 'gas',
+      })),
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: {duration: 280},
+      layout: {padding: chartLayoutPad(6)},
+      interaction: {mode: 'index', intersect: false},
+      scales: {
+        x: timeAxisOpts(24),
+        y: {grid: {color: GRID_C(), drawBorder: false}, ticks: {color: TICK_C()}, suggestedMin: 0},
+      },
+      plugins: {
+        legend: {display: true, position: 'top', labels: {color: TICK_C(), boxWidth: 10, padding: 8, usePointStyle: true, font: {size: 9}}},
+        tooltip: {
+          ...chartTooltipOpts(i => getHistView().timestamps[i]),
+          mode: 'index',
+          intersect: false,
+        },
+      },
+    },
+  });
+
+  const sCtx = document.getElementById('scoreChart').getContext('2d');
+  scoreChart = new Chart(sCtx, {
+    type: 'line',
+    data: {labels: [], datasets: [{label:'Health', data:[], borderColor:'#00e8cc', backgroundColor:'rgba(0,232,204,.12)', tension:.42, pointRadius:0, borderWidth:2, fill:true, spanGaps:true}]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: {duration: 280},
+      layout: {padding: chartLayoutPad(4)},
+      interaction: {mode: 'index', intersect: false},
+      scales: {
+        x: timeAxisOpts(24),
+        y: {min: 0, max: 100, grid: {color: GRID_C(), drawBorder: false}, ticks: {color: TICK_C(), stepSize: 20}},
+      },
+      plugins: {
+        legend: {display: false},
+        tooltip: chartTooltipOpts(i => getHistView().timestamps[i]),
+      },
+    },
+  });
+
+  const gCtx = document.getElementById('gaugeChart').getContext('2d');
+  gaugeChart = new Chart(gCtx, {
+    type: 'doughnut',
+    data: {labels: ['Clean','Moderate','Poor','Danger'], datasets: [{data:[100,0,0,0], backgroundColor:['#8edd52','#f5bc45','#ff8c42','#ff6b8a'], borderWidth:0, hoverOffset:6}]},
+    options: {responsive: true, maintainAspectRatio: false, animation: {duration: 350}, cutout:'72%', rotation:-90, circumference:180,
+      plugins: {legend: {display:true, position:'bottom', labels:{color:TICK_C(), boxWidth:9, font:{size:8}, padding:8}}}},
+  });
+}
+
+function rebuildCharts(){
+  [histChart, scoreChart, gaugeChart, ...Object.values(sensorCharts)].forEach(c => c?.destroy());
+  Object.keys(sensorCharts).forEach(k => delete sensorCharts[k]);
+  Object.keys(sensorChartSig).forEach(k => delete sensorChartSig[k]);
+  buildChartToolbar();
+  initCharts();
+  initSensorCharts();
+  updateCharts();
+}
+
+const hist = {timestamps: [], temp: [], hum: [], gas: [], score: []};
+
+let chartSig = '';
+let statsSig = '';
+
+function updateCharts(){
+  if(!histChart) return;
+  sanitizeHist();
+  const view = getHistView();
+  const sig = view.timestamps.length + '|' + view.timestamps[view.timestamps.length - 1]
+    + '|' + chartView.hours + '|' + chartView.smooth;
+  if(sig === chartSig) return;
+  chartSig = sig;
+
+  const sm = chartView.smooth;
+  const smooth = {
+    temp: smoothSeries(view.temp, sm),
+    hum: smoothSeries(view.hum, sm),
+    gas: smoothSeries(view.gas, sm).map(v => v != null ? v / 10 : null),
+    score: smoothSeries(view.score, sm),
+  };
+
+  const xOpts = timeAxisOpts(view.labels.length);
+  histChart.data.labels = view.labels;
+  SENSORS.forEach((s, i) => {
+    histChart.data.datasets[i].data = s.hist === 'gas' ? smooth.gas : smooth[s.hist];
+  });
+  histChart.options.scales.x = xOpts;
+  histChart.options.scales.x.ticks.color = TICK_C();
+  histChart.options.scales.x.grid.color = GRID_C();
+  histChart.options.scales.y.grid.color = GRID_C();
+  histChart.options.scales.y.ticks.color = TICK_C();
+  histChart.update('none');
+
+  scoreChart.data.labels = view.labels;
+  scoreChart.data.datasets[0].data = smooth.score;
+  scoreChart.options.scales.x = timeAxisOpts(view.labels.length);
+  scoreChart.options.scales.x.ticks.color = TICK_C();
+  scoreChart.options.scales.x.grid.color = GRID_C();
+  scoreChart.options.scales.y.grid.color = GRID_C();
+  scoreChart.options.scales.y.ticks.color = TICK_C();
+  scoreChart.update('none');
+
+  const n = view.timestamps.length;
+  const total = hist.timestamps.length;
+  document.getElementById('reading-count').textContent =
+    n === total ? `${n} จุด` : `${n} / ${total} จุด`;
+  const scores = view.score.filter(s => s != null);
+  if(scores.length){
+    document.getElementById('score-avg-lbl').textContent =
+      'AVG ' + (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(0);
+  }
+  updateSensorCharts();
+}
+
+function updateGauge(gas){
+  if(!gaugeChart) return;
+  let c=0,m=0,p=0,d=0;
+  if(gas<=80)c=100; else if(gas<=150){c=60;m=40} else if(gas<=300){m=40;p=60} else{p=30;d=70}
+  gaugeChart.data.datasets[0].data=[c,m,p,d];gaugeChart.update('none');
+  document.getElementById('aqi-lbl').textContent=gas<=80?'Clean':gas<=150?'Moderate':gas<=300?'Poor':'DANGER';
+}
+
+function trimHist(){
+  const max = chartView.maxPoints;
+  Object.keys(hist).forEach(k => {
+    if(hist[k].length > max) hist[k].splice(0, hist[k].length - max);
+  });
+}
+
+// ══ BADGE HELPER ══
+function setBadge(id,val,levelFn,textFn){
+  const el=document.getElementById(id);if(!el)return;
+  if(val==null){el.className='scard-badge nodata';el.textContent='NO DATA';return}
+  const lv=levelFn(+val);
+  el.className='scard-badge '+(lv||'');
+  el.textContent=textFn(+val).toUpperCase();
+}
+
+// ══ SMOOTH SETTER (only update DOM when value changes) ══
+function setTextIfChanged(id, newText){
+  const el=document.getElementById(id);
+  if(el && el.textContent !== newText) el.textContent = newText;
+}
+function setInnerHTMLIfChanged(id, newHtml){
+  const el=document.getElementById(id);
+  if(el && el.innerHTML !== newHtml) el.innerHTML = newHtml;
+}
+
+// ══ PREV STATE (for diff) ══
+const prevState = {score:null,gasVal:null,emoji:null,msg:null,ts:null,sig:null,recoStr:null,sensorHash:null};
+
+// ══ UPDATE UI — diff-based, smooth transitions ══
+function updateUI(d, appendHistory = true){
+  if(!d) return;
+  lastData = d;
+  updateDataAge(d.created_at);
+  showDataWarnings(d);
+  const ai = d.ai_analysis || {};
+  const score = ai.score ?? d.health_score ?? 0;
+  const col = scoreColor(score);
+  const circEl = getComputedStyle(document.documentElement).getPropertyValue('--circ').trim();
+  const CIRC = parseFloat(circEl) || CIRC_BASE;
+
+  // ── Score ring (only update if changed) ──
+  if(prevState.score !== score){
+    prevState.score = score;
+    const off = CIRC*(1-score/100);
+    ['ring-fill','ring-glow'].forEach(id=>{
+      const el=document.getElementById(id);
+      el.style.strokeDashoffset=off;el.style.stroke=col;
+    });
+    const numEl=document.getElementById('score-num');
+    numEl.textContent=score;numEl.style.color=col;
+    numEl.style.textShadow=`0 0 40px ${col}55`;
+    numEl.classList.remove('num-pop');void numEl.offsetWidth;numEl.classList.add('num-pop');
+  }
+
+  const newEmoji = ai.emoji||'💤';
+  if(prevState.emoji !== newEmoji){
+    prevState.emoji = newEmoji;
+    document.getElementById('ring-emoji').textContent = newEmoji;
+  }
+
+  const newMsg = ai.msg || 'กำลังรอข้อมูลจากเซ็นเซอร์...';
+  if(prevState.msg !== newMsg){
+    prevState.msg = newMsg;
+    document.getElementById('hero-status').textContent = newMsg;
+  }
+
+  const at = d.created_at ? new Date(d.created_at) : new Date();
+  const newTs = 'LAST UPDATE: ' + at.toLocaleString('th-TH', {hour12:false, day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  setTextIfChanged('hero-ts', newTs);
+
+  // Hero recs (only rebuild if recommendations changed)
+  if(ai.recommendations?.length){
+    const recoStr = JSON.stringify(ai.recommendations);
+    if(prevState.recoStr !== recoStr){
+      prevState.recoStr = recoStr;
+      const rl=document.getElementById('reco-list');rl.innerHTML='';
+      ai.recommendations.forEach(r=>{
+        const el=document.createElement('div');el.className='reco '+(r.level||'');
+        el.textContent=r.text;rl.appendChild(el);
+      });
+    }
+  }
+
+  // Badges + sensor cards (graph + live value + status)
+  updateHeroBadges(ai);
+  updateSensorCards(d);
+
+  const gasVal = d.gas_ppm != null ? +d.gas_ppm : null;
+  if(gasVal != null && prevState.gasVal !== gasVal){
+    prevState.gasVal = gasVal;
+    updateGauge(gasVal);
+  }
+
+  // Alert bar
+  const ab=document.getElementById('alertBar');
+  if((d.gas_ppm||0)>300){
+    ab.classList.add('show');
+    document.getElementById('alertMsg').textContent =
+      d.gas_ppm>600
+        ? `☣️ GAS CRITICAL (${(+d.gas_ppm).toFixed(0)}ppm) — ออกจากห้องทันที!`
+        : `⚠️ GAS HIGH (${(+d.gas_ppm).toFixed(0)}ppm) — เปิดหน้าต่างระบายอากาศ`;
+  } else ab.classList.remove('show');
+
+  if(appendHistory){
+    hist.timestamps.push(d.created_at || new Date().toISOString());
+    SENSORS.forEach(s => hist[s.hist].push(clampSensor(d[s.field], SENSOR_RANGE[s.hist])));
+    hist.score.push(clampSensor(score, SENSOR_RANGE.score));
+    trimHist();
+    chartSig = '';
+    Object.keys(sensorChartSig).forEach(k => delete sensorChartSig[k]);
+    updateCharts();
+    addLog(`[${d.device_id||'?'}] T=${(+d.temperature||0).toFixed(1)}°C H=${(+d.humidity||0).toFixed(1)}% Gas=${(+d.gas_ppm||0).toFixed(0)}ppm Score=${score}`,'ok');
+  }
+
+  // AI panel — updated from server analysis on each new reading
+  const sensorHash = `${(+d.temperature||0).toFixed(0)}_${(+d.humidity||0).toFixed(0)}_${(+d.gas_ppm||0).toFixed(0)}`;
+  if(sensorHash !== prevState.sensorHash){
+    prevState.sensorHash = sensorHash;
+    const src = (ai.ai_source && ai.ai_source !== 'local') ? 'GEMINI' : 'LOCAL';
+    renderAiRecs(ai.recommendations, src);
+  }
+}
+
+// ══ LOG ══
+const MAX_LOGS = 120;
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function addLog(msg,lv=''){
+  const body=document.getElementById('log-body');
+  const el=document.createElement('div');el.className='log-row';
+  const ts=new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const lvLbl = ({ok:'OK',info:'INFO',warn:'WARN',err:'ERR'}[lv])||'';
+  el.innerHTML=`<span class="log-ts">${ts}</span><span class="log-lv ${lv}">${lvLbl}</span><span class="log-msg ${lv}">${esc(msg)}</span>`;
+  body.prepend(el);
+  while(body.children.length>MAX_LOGS)body.removeChild(body.lastChild);
+}
+function clearLogs(){document.getElementById('log-body').innerHTML=''}
+
+// ══ DEVICE — dynamic from /api/devices + dashboard ══
+function pickActiveDevice(serverActive){
+  const saved = normalizeDeviceId(localStorage.getItem('device_id'));
+  if(serverActive && knownDevices.includes(serverActive)) return serverActive;
+  if(currentDevice && knownDevices.includes(currentDevice)) return currentDevice;
+  if(saved && knownDevices.includes(saved)) return saved;
+  return knownDevices[0] || serverActive || null;
+}
+
+function setActiveDevice(devId, persist = true){
+  const next = normalizeDeviceId(devId);
+  if(!next) return false;
+  currentDevice = next;
+  if(persist) localStorage.setItem('device_id', next);
+  const sel = document.getElementById('deviceSel');
+  if(sel && [...sel.options].some(o => o.value === next)) sel.value = next;
+  return true;
+}
+
+function syncDeviceSelect(){
+  const sel = document.getElementById('deviceSel');
+  if(!sel) return;
+  const prev = currentDevice;
+  sel.innerHTML = '';
+  knownDevices.forEach(id => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = id;
+    sel.appendChild(opt);
+  });
+  if(!knownDevices.length){
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '— รอข้อมูลจาก DB —';
+    sel.appendChild(opt);
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  const next = pickActiveDevice(prev);
+  if(next) setActiveDevice(next, true);
+}
+
+function applyDevicePack(pack){
+  if(pack?.devices?.length){
+    knownDevices = [...new Set(pack.devices.map(normalizeDeviceId).filter(Boolean))];
+    syncDeviceSelect();
+  }
+  const resolved = normalizeDeviceId(pack?.device_id);
+  if(resolved) setActiveDevice(resolved, true);
+}
+
+async function refreshDevices(){
+  try{
+    const pref = activeDeviceId();
+    const q = pref ? `?active=${encodeURIComponent(pref)}&hours=168` : '?hours=168';
+    const r = await fetch(`${BASE}/api/devices${q}`, {cache: 'no-store'});
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    knownDevices = [...new Set((d.devices || []).map(normalizeDeviceId).filter(Boolean))];
+    syncDeviceSelect();
+    const next = pickActiveDevice(normalizeDeviceId(d.active));
+    if(next && next !== currentDevice) setActiveDevice(next, true);
+    return knownDevices;
+  }catch(e){
+    addLog('Devices GET: ' + e.message, 'warn');
+    syncDeviceSelect();
+    return knownDevices;
+  }
+}
+
+function switchDevice(devId){
+  currentDevice = normalizeDeviceId(devId);
+  localStorage.setItem('device_id', currentDevice);
+  Object.keys(hist).forEach(k => hist[k] = []);
+  Object.keys(prevState).forEach(k => { prevState[k] = null; });
+  chartSig = '';
+  statsSig = '';
+  Object.keys(sensorChartSig).forEach(k => delete sensorChartSig[k]);
+  lastData = null;
+  historyLoaded = false;
+  fetchDashboard(true);
+  addLog('Device: ' + devId, 'info');
+}
+
+function applyHistoryRows(rows){
+  Object.keys(hist).forEach(k => hist[k] = []);
+  chartSig = '';
+  Object.keys(sensorChartSig).forEach(k => delete sensorChartSig[k]);
+  rows.slice().reverse().forEach(row => {
+    hist.timestamps.push(row.created_at || new Date().toISOString());
+    SENSORS.forEach(s => hist[s.hist].push(clampSensor(row[s.field], SENSOR_RANGE[s.hist])));
+    hist.score.push(clampSensor(row.health_score, SENSOR_RANGE.score));
+  });
+  trimHist();
+  updateCharts();
+}
+
+function applyStats(d){
+  if(!d || d.error) return;
+  const sig = STAT_METRICS.map(m => d[m.key]?.median).join('|');
+  if(sig === statsSig) return;
+  statsSig = sig;
+  const fill = (id, val, dp) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    const sl = el.querySelector('.sl');
+    const lbl = sl ? sl.outerHTML : '';
+    el.innerHTML = lbl + (val != null ? (+val).toFixed(dp) : '--');
+  };
+  STAT_METRICS.forEach(m => {
+    const block = d[m.key];
+    const avg = block?.median ?? block?.avg;
+    fill(`s-${m.id}-avg`, avg, m.dp);
+    fill(`s-${m.id}-min`, block?.min, m.dp);
+    fill(`s-${m.id}-max`, block?.max, m.dp);
+  });
+}
+
+// ══ POLL — one GET /api/dashboard (latest + history + stats) ══
+async function fetchDashboardLegacy(devId){
+  const dev = encodeURIComponent(devId);
+  const [latestR, histR, statsR] = await Promise.all([
+    fetch(`${BASE}/api/latest?device_id=${dev}`, {cache: 'no-store'}),
+    fetch(`${BASE}/api/history?device_id=${dev}&limit=${chartView.maxPoints}&hours=${chartView.hours}`, {cache: 'no-store'}),
+    fetch(`${BASE}/api/stats?device_id=${dev}&hours=${chartView.hours}`, {cache: 'no-store'}),
+  ]);
+  if(!latestR.ok && latestR.status !== 404) throw new Error('HTTP ' + latestR.status);
+  const latest = latestR.ok ? await latestR.json() : null;
+  const history = histR.ok ? await histR.json() : {data: [], count: 0};
+  const stats = statsR.ok ? await statsR.json() : null;
+  return {
+    device_id: devId,
+    latest: latest?.error ? null : latest,
+    history,
+    stats: stats?.error ? null : stats,
+  };
+}
+
+async function fetchDashboard(reloadHistory = false){
+  if(pollInFlight) return;
+  pollInFlight = true;
+  try{
+    if(!knownDevices.length) await refreshDevices();
+
+    let r = await fetch(`${BASE}/api/dashboard?${dashboardQuery()}`, {cache: 'no-store'});
+    let pack;
+    if(r.status === 404){
+      addLog('Dashboard route missing — using /api/latest + /api/history', 'warn');
+      const devId = activeDeviceId();
+      if(!devId) throw new Error('no device in DB');
+      pack = await fetchDashboardLegacy(devId);
+    } else {
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      pack = await r.json();
+    }
+
+    document.getElementById('poll-flash').classList.add('on');
+    setTimeout(() => document.getElementById('poll-flash').classList.remove('on'), 280);
+
+    applyDevicePack(pack);
+    if(pack.stats) applyStats(pack.stats);
+
+    if((reloadHistory || !historyLoaded) && pack.history?.data?.length){
+      applyHistoryRows(pack.history.data);
+      historyLoaded = true;
+      if(reloadHistory) addLog('History: ' + pack.history.count + ' records', 'info');
+    }
+
+    if(pack.latest && !pack.latest.error){
+      const src = (reloadHistory || !historyLoaded) ? 'history' : 'poll';
+      ingestPayload(pack.latest, src);
+    }
+  } catch(e){
+    addLog('Dashboard GET error: ' + e.message, 'err');
+  } finally {
+    pollInFlight = false;
+  }
+}
+
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  const tick = () => {
+    if(document.hidden) return;
+    fetchDashboard(false);
+  };
+  tick();
+  pollTimer = setInterval(tick, POLL_MS);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if(!document.hidden) fetchDashboard(false);
+});
+
+// ══ DB HEALTH ══
+async function checkDB(){
+  try{
+    const r=await fetch(`${BASE}/api/health`);const d=await r.json();
+    const dot=document.getElementById('db-dot'),lbl=document.getElementById('db-lbl'),pill=document.getElementById('db-pill');
+    if(d.supabase_ok){dot.className='dot live';lbl.textContent='SUPABASE';pill.className='pill live'}
+    else{dot.className='dot warn';lbl.textContent='DB WARN';pill.className='pill warn'}
+    serverGemini = !!d.gemini_enabled;
+    updateGeminiBtn();
+    const devs = d.devices || d.devices_online;
+    if(devs?.length){
+      knownDevices = [...new Set(devs.map(normalizeDeviceId).filter(Boolean))];
+      syncDeviceSelect();
+      if(!currentDevice) setActiveDevice(pickActiveDevice(normalizeDeviceId(d.active_device)), true);
+    }
+  }catch(e){
+    document.getElementById('db-dot').className='dot err';
+    document.getElementById('db-lbl').textContent='DB ERROR';
+    document.getElementById('db-pill').className='pill err';
+  }
+}
+
+// ══ MODAL ══
+function openModal(){
+  document.getElementById('cfg-base').value = BASE;
+  document.getElementById('cfg-gemini').value = CLIENT_GEMINI_KEY;
+  document.getElementById('cfg-interval').value = POLL_MS / 1000;
+  document.getElementById('cfgModal').classList.add('open');
+}
+function closeModal(){document.getElementById('cfgModal').classList.remove('open')}
+function applyConfig(){
+  BASE = document.getElementById('cfg-base').value.trim() || `${location.protocol}//${location.host}`;
+  CLIENT_GEMINI_KEY = document.getElementById('cfg-gemini').value.trim();
+  POLL_MS = Math.max(3000, parseInt(document.getElementById('cfg-interval').value, 10) || 5) * 1000;
+  localStorage.setItem('api_base', BASE);
+  localStorage.setItem('gemini_key', CLIENT_GEMINI_KEY);
+  localStorage.setItem('poll_ms', String(POLL_MS));
+  closeModal();
+  addLog(`Config saved — poll ${POLL_MS/1000}s`, 'info');
+  refresh();
+}
+
+async function refresh(){
+  historyLoaded = false;
+  await checkDB();
+  await refreshDevices();
+  await fetchDashboard(true);
+  startPolling();
+}
+
+// ══ INIT (GET /api/dashboard + /api/health) ══
+buildSensorDom();
+buildChartToolbar();
+initCharts();
+initSensorCharts();
+updateGeminiBtn();
+addLog('ENV//MONITOR v3.7 — devices auto from DB','info');
+addLog(`API: ${BASE}  poll: ${POLL_MS/1000}s`,'info');
+(async function bootstrap(){
+  await checkDB();
+  await refreshDevices();
+  addLog('Device: ' + (activeDeviceId() || 'auto'), 'info');
+  await fetchDashboard(true);
+  startPolling();
+})();
+setInterval(async () => { await refreshDevices(); await checkDB(); }, 30000);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',e=>{
+  if(!localStorage.getItem('theme')){document.documentElement.setAttribute('data-theme',e.matches?'dark':'light');updateThemeBtn();rebuildCharts()}
+});
+
+// ══════════════════════════════════════════════
+// FOCUS MONITOR — Supabase direct (table: focus)
+// ══════════════════════════════════════════════
+(function(){
+  'use strict';
+
+  const FOCUS_URL = 'https://mzdkicucpknnluzxzbpd.supabase.co';
+  const FOCUS_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16ZGtpY3VjcGtubmx1enh6YnBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0NDc0MDIsImV4cCI6MjA5NTAyMzQwMn0.dHSEfHMaImHzuUpbVWsliQJYpJbwRL_8Z7MlfPPTmFc';
+  const FOCUS_TABLE = 'focus';
+  const FETCH_LIMIT = 120; // ~30 minutes of 15s rows
+
+  // --- state ---
+  const focusRows = []; // newest-first sorted
+  let focusChart = null;
+  let focusRealtimeCh = null;
+  let focusViewBuckets = []; // last rendered buckets (for tooltip lookup)
+  let focusThreshold = parseInt(localStorage.getItem('focus_threshold') || '8', 10);
+
+  // --- helpers ---
+  function getFocusThreshold(){
+    return parseInt(document.getElementById('focus-threshold')?.value || focusThreshold, 10) || 8;
+  }
+
+  // Group rows into 1-minute buckets by flooring created_at to the minute
+  function bucketByMinute(rows) {
+    const map = new Map();
+    rows.forEach(r => {
+      const ts = new Date(r.created_at);
+      const minKey = new Date(Math.floor(ts.getTime() / 60000) * 60000).toISOString();
+      if(!map.has(minKey)) map.set(minKey, { ts: minKey, movement: 0, face_count: 0, count: 0, direction: null, person: null });
+      const b = map.get(minKey);
+      b.movement += (r.movement || 0);
+      b.face_count = Math.max(b.face_count, r.face_count || 0);
+      b.count++;
+      // Keep direction from latest row in bucket
+      if(r.direction) b.direction = r.direction;
+      if(r.person != null) b.person = r.person;
+    });
+    return Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([, v]) => v);
+  }
+
+  function initFocusChart(){
+    const ctx = document.getElementById('focusChart')?.getContext('2d');
+    if(!ctx || focusChart) return;
+    focusChart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: [], datasets: [{
+        label: 'Movement / นาที',
+        data: [],
+        backgroundColor: [],
+        borderColor: [],
+        borderWidth: 1.5,
+        borderRadius: 4,
+      }]},
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 320 },
+        layout: { padding: { top:8, right:10, bottom:8, left:2 } },
+        scales: {
+          x: {
+            grid: { color: GRID_C(), drawBorder: false },
+            ticks: { color: TICK_C(), maxTicksLimit: 10, maxRotation: 35, minRotation: 20,
+                     font: { size: 9, family: "'JetBrains Mono',monospace" } },
+          },
+          y: {
+            min: 0,
+            grid: { color: GRID_C(), drawBorder: false },
+            ticks: { color: TICK_C(), font: { size: 9, family: "'JetBrains Mono',monospace" } },
+          },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: isDark() ? 'rgba(11,17,32,.92)' : 'rgba(238,242,248,.95)',
+            borderColor: 'rgba(255,255,255,.12)', borderWidth: 1,
+            padding: 10,
+            callbacks: {
+              title: items => {
+                const i = items[0]?.dataIndex;
+                const b = focusViewBuckets[i];
+                const threshold = getFocusThreshold();
+                const over = b && b.movement > threshold ? ' ⚠ เกิน!' : '';
+                return `🕐 ${items[0]?.label || ''}${over}`;
+              },
+              label: ctx => {
+                const b = focusViewBuckets[ctx.dataIndex];
+                if(!b) return `Movement: ${ctx.parsed.y} ครั้ง`;
+                const threshold = getFocusThreshold();
+                const lines = [
+                  `📊 Movement: ${b.movement} ครั้ง/นาที  (threshold: ${threshold})`,
+                  `👤 Face count: ${b.face_count} คน`,
+                  `🔢 Readings: ${b.count} ช่วง × 15s`,
+                ];
+                if(b.direction){
+                  const d = b.direction;
+                  lines.push(`↔ Left ${d.Left||0}  Right ${d.Right||0}  Up ${d.Up||0}  Down ${d.Down||0}`);
+                }
+                if(b.person != null) lines.push(`🪪 Person ID: ${b.person}`);
+                return lines;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function renderFocusChart(buckets){
+    if(!focusChart) initFocusChart();
+    if(!focusChart) return;
+    const threshold = getFocusThreshold();
+    // Only show last 30 buckets
+    const view = buckets.slice(-30);
+    focusViewBuckets = view;
+    const labels = view.map(b => {
+      const d = new Date(b.ts);
+      return d.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit', hour12:false });
+    });
+    const data = view.map(b => b.movement);
+    const bg = data.map(v => v > threshold ? 'rgba(255,107,138,.65)' : 'rgba(185,139,252,.55)');
+    const bc = data.map(v => v > threshold ? 'rgba(255,107,138,.9)' : 'rgba(185,139,252,.8)');
+
+    focusChart.data.labels = labels;
+    focusChart.data.datasets[0].data = data;
+    focusChart.data.datasets[0].backgroundColor = bg;
+    focusChart.data.datasets[0].borderColor = bc;
+    // Dynamic threshold line via annotation-less approach — update y scale max hint
+    focusChart.options.scales.y.suggestedMax = Math.max(threshold * 1.5, Math.max(...data, 10));
+    focusChart.options.scales.x.ticks.color = TICK_C();
+    focusChart.options.scales.x.grid.color = GRID_C();
+    focusChart.options.scales.y.grid.color = GRID_C();
+    focusChart.options.scales.y.ticks.color = TICK_C();
+    focusChart.update('none');
+
+    // Sub label
+    const sub = document.getElementById('focus-chart-sub');
+    if(sub) sub.textContent = `${view.length} นาที · ${buckets.length} นาทีทั้งหมด · threshold ${threshold} ครั้ง/นาที`;
+  }
+
+  function updateFocusCards(rows, buckets){
+    const threshold = getFocusThreshold();
+    // 1-min movement = last bucket
+    const lastBucket = buckets[buckets.length - 1];
+    const mv1min = lastBucket ? lastBucket.movement : null;
+
+    const mvVal = document.getElementById('focus-mv-val');
+    const mvBadge = document.getElementById('focus-mv-badge');
+    const mvAlert = document.getElementById('focus-alert-bar');
+    const mvAlertMsg = document.getElementById('focus-alert-msg');
+    const thDisplay = document.getElementById('focus-th-display');
+    if(thDisplay) thDisplay.textContent = threshold;
+
+    if(mvVal) mvVal.textContent = mv1min != null ? mv1min : '--';
+    if(mv1min != null && mvBadge){
+      if(mv1min > threshold){
+        mvBadge.className = 'fcard-badge alert';
+        mvBadge.textContent = 'สูงเกิน!';
+        if(mvAlert){ mvAlert.classList.add('show'); mvAlertMsg.textContent = `⚠ Movement ${mv1min} ครั้ง/นาที — เกิน threshold ${threshold} ครั้ง!`; }
+      } else {
+        mvBadge.className = 'fcard-badge ok';
+        mvBadge.textContent = 'ปกติ';
+        if(mvAlert) mvAlert.classList.remove('show');
+      }
+    }
+
+    // Face count from latest row
+    const latest = rows[0];
+    const faceVal = document.getElementById('focus-face-val');
+    const faceSub = document.getElementById('focus-face-sub');
+    if(faceVal && latest){
+      const fc = latest.face_count ?? 0;
+      faceVal.textContent = fc;
+      if(faceSub) faceSub.textContent = fc === 0 ? 'ไม่พบใบหน้า' : fc === 1 ? 'ตรวจพบ 1 คน' : `ตรวจพบ ${fc} คน`;
+      faceVal.style.color = fc > 1 ? 'var(--amber)' : fc === 0 ? 'var(--rose)' : 'var(--blue)';
+    }
+
+    // Direction from latest row
+    if(latest?.direction){
+      const d = latest.direction;
+      const total = (d.Left||0)+(d.Right||0)+(d.Up||0)+(d.Down||0) || 1;
+      const set = (id, barId, val) => {
+        const el = document.getElementById(id);
+        const bar = document.getElementById(barId);
+        if(el) el.textContent = val;
+        if(bar) bar.style.width = Math.round((val/total)*100) + '%';
+      };
+      set('dir-L','dir-L-bar', d.Left||0);
+      set('dir-R','dir-R-bar', d.Right||0);
+      set('dir-U','dir-U-bar', d.Up||0);
+      set('dir-D','dir-D-bar', d.Down||0);
+    }
+
+    // Live dot
+    const dot = document.getElementById('focus-live-dot');
+    if(dot) dot.style.opacity = '1';
+  }
+
+  function processFocusData(rows){
+    // rows should be newest-first; reverse for chronological buckets
+    const chrono = [...rows].reverse();
+    const buckets = bucketByMinute(chrono);
+    renderFocusChart(buckets);
+    updateFocusCards(rows, buckets);
+    addLog(`[FOCUS] ${rows.length} rows · ${buckets.length} นาที`, 'info');
+  }
+
+  // --- Supabase REST fetch ---
+  async function fetchFocusHistory(){
+    try{
+      const url = `${FOCUS_URL}/rest/v1/${FOCUS_TABLE}?select=*&order=created_at.desc&limit=${FETCH_LIMIT}`;
+      const r = await fetch(url, {
+        headers: {
+          'apikey': FOCUS_KEY,
+          'Authorization': 'Bearer ' + FOCUS_KEY,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store',
+      });
+      if(!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      // Merge into focusRows (newest first, deduplicate by id)
+      const ids = new Set(focusRows.map(r => r.id));
+      let added = 0;
+      data.forEach(row => {
+        if(!ids.has(row.id)){ focusRows.push(row); ids.add(row.id); added++; }
+      });
+      // Keep sorted newest first, trim
+      focusRows.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+      while(focusRows.length > FETCH_LIMIT * 2) focusRows.pop();
+      processFocusData(focusRows);
+    }catch(e){
+      addLog('[FOCUS] fetch error: ' + e.message, 'err');
+    }
+  }
+
+  // --- Supabase Realtime via WebSocket ---
+  function initFocusRealtime(){
+    if(focusRealtimeCh) return;
+    try{
+      // Use Supabase Realtime v2 protocol
+      const wsUrl = `wss://mzdkicucpknnluzxzbpd.supabase.co/realtime/v1/websocket?apikey=${FOCUS_KEY}&vsn=1.0.0`;
+      const ws = new WebSocket(wsUrl);
+      let heartbeat = null;
+      let joined = false;
+
+      ws.onopen = () => {
+        addLog('[FOCUS] Realtime connected', 'ok');
+        // Join the channel
+        ws.send(JSON.stringify({
+          topic: 'realtime:public:focus',
+          event: 'phx_join',
+          payload: {
+            config: { broadcast: { self: false }, presence: { key: '' },
+              postgres_changes: [{ event: 'INSERT', schema: 'public', table: FOCUS_TABLE }]
+            }
+          },
+          ref: '1',
+        }));
+        heartbeat = setInterval(() => {
+          ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: null }));
+        }, 25000);
+      };
+
+      ws.onmessage = ev => {
+        try{
+          const msg = JSON.parse(ev.data);
+          if(msg.event === 'phx_reply' && !joined){
+            joined = true;
+            document.getElementById('focus-live-dot')?.style.setProperty('box-shadow','0 0 8px var(--lime)');
+          }
+          if(msg.event === 'postgres_changes' || (msg.payload?.data?.type === 'INSERT')){
+            const row = msg.payload?.data?.record || msg.payload?.record;
+            if(row && row.id){
+              if(!focusRows.find(r => r.id === row.id)){
+                focusRows.unshift(row);
+                while(focusRows.length > FETCH_LIMIT * 2) focusRows.pop();
+                processFocusData(focusRows);
+                addLog(`[FOCUS RT] person=${row.person} mv=${row.movement}`, 'ok');
+              }
+            }
+          }
+        }catch(_){}
+      };
+
+      ws.onerror = () => addLog('[FOCUS] Realtime WS error', 'warn');
+      ws.onclose = () => {
+        clearInterval(heartbeat);
+        focusRealtimeCh = null;
+        addLog('[FOCUS] Realtime disconnected — retry in 15s', 'warn');
+        setTimeout(initFocusRealtime, 15000);
+      };
+      focusRealtimeCh = ws;
+    }catch(e){
+      addLog('[FOCUS] Realtime init error: ' + e.message, 'warn');
+    }
+  }
+
+  // --- threshold input handler ---
+  function onThresholdChange(){
+    const v = parseInt(document.getElementById('focus-threshold')?.value || '8', 10);
+    if(Number.isFinite(v) && v > 0){
+      focusThreshold = v;
+      localStorage.setItem('focus_threshold', String(v));
+      const thDisplay = document.getElementById('focus-th-display');
+      if(thDisplay) thDisplay.textContent = v;
+      // Re-render chart with new threshold colors
+      const chrono = [...focusRows].reverse();
+      const buckets = bucketByMinute(chrono);
+      renderFocusChart(buckets);
+      updateFocusCards(focusRows, buckets);
+    }
+  }
+
+  // --- init ---
+  function initFocus(){
+    // Restore threshold
+    const saved = parseInt(localStorage.getItem('focus_threshold') || '8', 10);
+    const inp = document.getElementById('focus-threshold');
+    if(inp){ inp.value = saved; inp.addEventListener('input', onThresholdChange); }
+    focusThreshold = saved;
+
+    initFocusChart();
+    fetchFocusHistory();
+    // Poll every 20s as backup
+    setInterval(fetchFocusHistory, 20000);
+    // Realtime
+    setTimeout(initFocusRealtime, 1000);
+  }
+
+  // Run after DOM ready (we're at end of script)
+  initFocus();
+})();
+
+</script>
+</body>
+</html>
