@@ -42,7 +42,7 @@ const config = {
 
   /** StreeFlood app itself — env-monitor consumes its /api/gov feed. */
   streeflood: {
-    baseUrl: str('STREEFLOOD_BASE_URL', 'http://localhost:3001'),
+    baseUrl: str('STREEFLOOD_BASE_URL', 'https://streeflood.vercel.app'),
     govPath: str('STREEFLOOD_GOV_PATH', '/api/gov'),
     timeoutMs: num('STREEFLOOD_TIMEOUT_MS', 30000),
   },
