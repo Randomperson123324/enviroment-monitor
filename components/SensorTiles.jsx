@@ -7,7 +7,10 @@ import { SENSORS } from '@/config/sensors';
 import { CHART_COLORS } from '@/config/client';
 import { buildHistView, smoothSeries, gradientFill, tooltipOptions } from '@/lib/chart-utils';
 
-const MINI_SMOOTH_CAP = 7;
+// Mini sparklines read as a trend, not a data table — smooth harder than the
+// main chart so raw sensor jitter doesn't look ragged (flows like the flood card).
+const MINI_SMOOTH_MIN = 7;
+const MINI_SMOOTH_CAP = 9;
 
 function SensorTile({ sensor, latest, view, smooth, colors }) {
   const raw = latest?.[sensor.field];
@@ -20,10 +23,10 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
       labels: view.labels,
       datasets: [
         {
-          data: smoothSeries(view[sensor.id], Math.min(smooth, MINI_SMOOTH_CAP)),
+          data: smoothSeries(view[sensor.id], Math.min(Math.max(smooth, MINI_SMOOTH_MIN), MINI_SMOOTH_CAP)),
           borderColor: color,
-          backgroundColor: gradientFill(color, 0.3),
-          tension: 0.4,
+          backgroundColor: gradientFill(color, 0.42),
+          tension: 0.5,
           pointRadius: 0,
           borderWidth: 2,
           fill: true,
@@ -94,12 +97,18 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
           />
         )}
       </div>
+      <div className="tile-gauge-scale">
+        <span>{bar.min}</span>
+        <span>
+          เหมาะสม {bar.comfort[0]}–{bar.comfort[1]}
+        </span>
+        <span>
+          {bar.max} {sensor.unit}
+        </span>
+      </div>
       <div className="tile-foot">
         <span className={`badge ${value == null ? 'nodata' : level || ''}`}>
           {value == null ? 'รอข้อมูล' : sensor.text(value)}
-        </span>
-        <span className="tile-range">
-          {bar.min}–{bar.max} {sensor.unit}
         </span>
       </div>
     </div>
