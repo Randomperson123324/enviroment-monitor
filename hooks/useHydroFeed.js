@@ -35,7 +35,10 @@ export default function useHydroFeed({ url, refreshMs, label, addLog }) {
   useEffect(() => {
     setLoading(true);
     load();
-    const timer = setInterval(load, refreshMs);
+    // Background polls pause while the tab is hidden (same as the dashboard loop).
+    const timer = setInterval(() => {
+      if (!document.hidden) load();
+    }, refreshMs);
     return () => clearInterval(timer);
   }, [load, refreshMs]);
 

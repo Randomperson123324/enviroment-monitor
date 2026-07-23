@@ -104,7 +104,8 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
     // is populated the moment it becomes visible. Polls stay hidden-gated.
     fetchDashboard();
     checkHealth();
-    const poll = setInterval(tick, Math.max(serverCfg.pollMsMin, settings.pollMs));
+    const pollMs = Math.min(serverCfg.pollMsMax, Math.max(serverCfg.pollMsMin, settings.pollMs));
+    const poll = setInterval(tick, pollMs);
     const healthPoll = setInterval(checkHealth, serverCfg.healthPollMs);
     const onVisible = () => {
       if (!document.hidden) fetchDashboard();
@@ -115,7 +116,7 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
       clearInterval(healthPoll);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [fetchDashboard, checkHealth, settings.pollMs, serverCfg.pollMsMin, serverCfg.healthPollMs]);
+  }, [fetchDashboard, checkHealth, settings.pollMs, serverCfg.pollMsMin, serverCfg.pollMsMax, serverCfg.healthPollMs]);
 
   const setDevice = useCallback(
     (id) => {

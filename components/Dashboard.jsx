@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Leaf, Eye, Waves } from 'lucide-react';
+import { Leaf, Eye, Waves, Gauge } from 'lucide-react';
 import { STORAGE, TABS } from '@/config/client';
 import useTheme from '@/hooks/useTheme';
 import useSettings from '@/hooks/useSettings';
@@ -10,11 +10,12 @@ import useServerConfig from '@/hooks/useServerConfig';
 import useDashboard from '@/hooks/useDashboard';
 import Header from '@/components/Header';
 import AlertBar from '@/components/AlertBar';
+import SectionHeader from '@/components/SectionHeader';
 import Overview from '@/components/Overview';
 import WebcamStrip from '@/components/WebcamStrip';
 import SensorTiles from '@/components/SensorTiles';
 import ChartsSection from '@/components/ChartsSection';
-import StatsRow from '@/components/StatsRow';
+import StatsTable from '@/components/StatsTable';
 import DiseasePanel from '@/components/DiseasePanel';
 import FocusSection from '@/components/FocusSection';
 import HydroSection from '@/components/HydroSection';
@@ -77,19 +78,31 @@ export default function Dashboard() {
 
       {tab === 'environment' && (
         <>
-          <Overview latest={dash.latest} theme={theme} />
-          <section className="tiles section-gap">
-            <SensorTiles
-              latest={dash.latest}
-              histRows={dash.histRows}
-              hours={dash.hours}
-              smooth={dash.smooth}
-              theme={theme}
-              loading={!dash.loaded && !dash.latest}
+          <section className="section-gap">
+            <SectionHeader
+              Icon={Gauge}
+              title="สถานะปัจจุบัน"
+              meta={dash.latest?.device_id ? `อุปกรณ์ ${dash.latest.device_id}` : ''}
             />
+            <Overview latest={dash.latest} theme={theme} />
+            <div className="tiles section-gap">
+              <SensorTiles
+                latest={dash.latest}
+                histRows={dash.histRows}
+                hours={dash.hours}
+                smooth={dash.smooth}
+                theme={theme}
+                loading={!dash.loaded && !dash.latest}
+              />
+            </div>
           </section>
           <ChartsSection dash={dash} theme={theme} />
-          <StatsRow stats={dash.stats} loading={!dash.loaded && !dash.stats} />
+          <StatsTable
+            stats={dash.stats}
+            latest={dash.latest}
+            theme={theme}
+            loading={!dash.loaded && !dash.stats}
+          />
           <DiseasePanel latest={dash.latest} />
         </>
       )}

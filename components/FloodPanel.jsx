@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
+import SectionHeader from '@/components/SectionHeader';
 import { CHART_COLORS, STATUS_COLORS } from '@/config/client';
 import { gradientFill } from '@/lib/chart-utils';
 import { agoTh, timeTh } from '@/lib/format';
@@ -88,7 +89,7 @@ function StationCard({ st, colors }) {
   const sev = SEVERITY[st.severity] ?? SEVERITY.normal;
   const trend = TREND[st.trend] ?? TREND.stable;
   const chartColor = noData || st.stale ? colors.tick : sev.color;
-  const pct = noData ? 0 : Math.min(100, Math.round((st.level / st.danger_level_cm) * 100));
+  const pct = noData ? 0 : Math.min(100, Math.max(0, Math.round((st.level / st.danger_level_cm) * 100)));
   const stateCls = noData ? 'nodata' : st.stale ? 'stale' : sev.cls;
 
   return (
@@ -189,20 +190,17 @@ export default function FloodPanel({ feed, theme }) {
 
   return (
     <section className="section-gap">
-      <div className="focus-hdr">
-        <div className="focus-title">
-          <span className="section-title">
-            <Waves size={19} strokeWidth={2.2} aria-hidden /> ระดับน้ำจากระบบเตือนภัยน้ำท่วม
-          </span>
-        </div>
-        <span className="panel-meta">
-          {error
+      <SectionHeader
+        Icon={Waves}
+        title="ระดับน้ำจากระบบเตือนภัยน้ำท่วม"
+        meta={
+          error
             ? 'เชื่อมต่อฐานข้อมูลน้ำท่วมไม่ได้ — แสดงข้อมูลล่าสุดที่มี'
             : data
               ? `${stations.length} จุดวัด · ข้อมูลจาก StreeFlood`
-              : ''}
-        </span>
-      </div>
+              : ''
+        }
+      />
 
       {error && !data && (
         <div className="panel flood-empty">

@@ -93,13 +93,13 @@ export const SENSORS = [
   },
 ];
 
-/** Health-score display bands (highest first). */
+/** Health-score display bands (highest first). `id` keys UI palettes (ring color). */
 export const SCORE_BANDS = [
-  { min: 85, emoji: '😊', msg: 'สภาพแวดล้อมดีเยี่ยม เหมาะกับการทำงาน' },
-  { min: 70, emoji: '🙂', msg: 'สภาพแวดล้อมดี มีจุดปรับปรุงเล็กน้อย' },
-  { min: 50, emoji: '😐', msg: 'สภาพแวดล้อมพอใช้ ควรปรับปรุงบางจุด' },
-  { min: 30, emoji: '😷', msg: 'สภาพแวดล้อมแย่ ควรแก้ไขโดยเร็ว' },
-  { min: 0, emoji: '🤢', msg: 'สภาพแวดล้อมอันตราย รีบแก้ไขทันที!' },
+  { id: 'excellent', min: 85, emoji: '😊', msg: 'สภาพแวดล้อมดีเยี่ยม เหมาะกับการทำงาน' },
+  { id: 'good', min: 70, emoji: '🙂', msg: 'สภาพแวดล้อมดี มีจุดปรับปรุงเล็กน้อย' },
+  { id: 'fair', min: 50, emoji: '😐', msg: 'สภาพแวดล้อมพอใช้ ควรปรับปรุงบางจุด' },
+  { id: 'poor', min: 30, emoji: '😷', msg: 'สภาพแวดล้อมแย่ ควรแก้ไขโดยเร็ว' },
+  { id: 'critical', min: 0, emoji: '🤢', msg: 'สภาพแวดล้อมอันตราย รีบแก้ไขทันที!' },
 ];
 
 /** Air-quality index bands derived from gas ppm (order matters: first match wins). */

@@ -5,7 +5,8 @@ import { Eye, BookOpen } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import useFocus, { movementCount } from '@/hooks/useFocus';
-import { CHART_COLORS, withAlpha } from '@/config/client';
+import SectionHeader from '@/components/SectionHeader';
+import { CHART_COLORS, CLIENT_FALLBACK, FOCUS_THRESHOLD_INPUT, withAlpha } from '@/config/client';
 import { tooltipOptions } from '@/lib/chart-utils';
 
 const GLOSSARY = [
@@ -119,25 +120,19 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
     ? DIRECTIONS.reduce((a, [k]) => a + (Number(dir[k]) || 0), 0) || 1
     : 1;
 
-  const maxBars = focusCfg?.chartBuckets ?? 30;
+  const maxBars = focusCfg?.chartBuckets ?? CLIENT_FALLBACK.focus.chartBuckets;
 
   return (
     <section className="section-gap">
-      <div className="focus-hdr">
-        <div className="focus-title">
-          <span className="live-dot" style={{ opacity: connected ? 1 : 0.35 }} />
-          <span className="section-title">
-            <Eye size={19} strokeWidth={2.2} aria-hidden /> การจดจ่อจากกล้อง
-          </span>
-        </div>
+      <SectionHeader Icon={Eye} title="การจดจ่อจากกล้อง" live={connected}>
         <div className="focus-controls">
           <label>
             แจ้งเตือนเมื่อขยับเกิน{' '}
             <input
               type="number"
               className="threshold-input"
-              min={1}
-              max={99}
+              min={FOCUS_THRESHOLD_INPUT.min}
+              max={FOCUS_THRESHOLD_INPUT.max}
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}
             />{' '}
@@ -152,7 +147,7 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
             เกินกำหนด
           </span>
         </div>
-      </div>
+      </SectionHeader>
 
       {overThreshold && (
         <div className="alert-bar" style={{ marginBottom: 10 }} role="alert">

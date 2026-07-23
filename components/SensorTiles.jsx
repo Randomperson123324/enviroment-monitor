@@ -16,7 +16,7 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
   const raw = latest?.[sensor.field];
   const value = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : null;
   const level = value != null ? sensor.level(value) : null;
-  const color = colors[sensor.id === 'temp' ? 'temp' : sensor.id === 'hum' ? 'hum' : 'gas'];
+  const color = colors[sensor.id];
 
   const data = useMemo(
     () => ({
@@ -85,19 +85,23 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
       <div className="tile-chart">
         <Line data={data} options={options} />
       </div>
-      <div className="tile-gauge" title="แถบแสดงช่วงค่าที่เหมาะสม">
+      <div className="tile-bar" title="แถบแสดงค่าปัจจุบันเทียบกับช่วงที่เหมาะสม">
         <div
-          className="tile-gauge-band"
-          style={{ left: `${comfortLeft}%`, width: `${comfortWidth}%`, background: color }}
+          className={`tile-bar-fill ${level || 'ok'}`}
+          style={{ width: `${needlePct ?? 0}%` }}
         />
-        {needlePct != null && (
-          <div
-            className={`tile-gauge-needle ${level || 'ok'}`}
-            style={{ left: `${needlePct}%` }}
-          />
-        )}
+        <div
+          className="tile-bar-mark"
+          style={{ left: `${comfortLeft}%` }}
+          title={`ช่วงเหมาะสมเริ่ม ${bar.comfort[0]} ${sensor.unit}`}
+        />
+        <div
+          className="tile-bar-mark"
+          style={{ left: `${comfortLeft + comfortWidth}%` }}
+          title={`ช่วงเหมาะสมสิ้นสุด ${bar.comfort[1]} ${sensor.unit}`}
+        />
       </div>
-      <div className="tile-gauge-scale">
+      <div className="tile-bar-scale">
         <span>{bar.min}</span>
         <span>
           เหมาะสม {bar.comfort[0]}–{bar.comfort[1]}

@@ -1,11 +1,9 @@
 import { getHistory, clampHours, clampLimit, normalizeDeviceId } from '@/lib/dashboard';
 import { decorateRow } from '@/lib/analysis';
-import { computeStats } from '@/lib/stats';
+import { computeStats, STAT_KEYS } from '@/lib/stats';
 import { jsonOk, query, withErrors } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
-
-const STAT_KEYS = ['temperature', 'humidity', 'gas_ppm', 'health_score'];
 
 /** Legacy endpoint kept for older clients. */
 export const GET = withErrors(async (request) => {

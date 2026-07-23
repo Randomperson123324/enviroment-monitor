@@ -1,18 +1,14 @@
 'use client';
 
-import { SENSORS } from '@/config/sensors';
-import { STATUS_COLORS } from '@/config/client';
+import { scoreBand } from '@/config/sensors';
+import { SCORE_BAND_COLORS } from '@/config/client';
 
 const RING = { size: 176, radius: 78 };
 const CIRC = 2 * Math.PI * RING.radius;
 
-/** Ring/score color by band — status palette, plus the score green when excellent. */
+/** Ring/score color — band cutoffs come from SCORE_BANDS, palette from config. */
 function scoreColor(score, theme) {
-  if (score >= 85) return theme === 'dark' ? '#1baf7a' : '#157a57';
-  if (score >= 70) return STATUS_COLORS.good;
-  if (score >= 50) return theme === 'dark' ? STATUS_COLORS.warning : '#8a5a00';
-  if (score >= 30) return STATUS_COLORS.serious;
-  return STATUS_COLORS.critical;
+  return SCORE_BAND_COLORS[scoreBand(score).id]?.[theme] ?? 'var(--muted)';
 }
 
 export default function Overview({ latest, theme }) {
@@ -31,8 +27,6 @@ export default function Overview({ latest, theme }) {
         second: '2-digit',
       })
     : '--';
-
-  const issueBySensor = Object.fromEntries((ai?.issues ?? []).map((i) => [i.sensor, i]));
 
   return (
     <section className="overview">
@@ -75,20 +69,6 @@ export default function Overview({ latest, theme }) {
             )
           )}
         </div>
-      </div>
-
-      <div className="ov-badges">
-        {SENSORS.map((s) => {
-          const issue = issueBySensor[s.id];
-          return (
-            <div key={s.id} className={`ov-badge ${issue?.level ?? ''}`}>
-              <span className="dot" />
-              <span>
-                {s.label} · {issue?.level ? issue.msg : 'ปกติ'}
-              </span>
-            </div>
-          );
-        })}
       </div>
     </section>
   );

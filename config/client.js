@@ -52,7 +52,23 @@ export const LOG_MAX_ROWS = 120;
 export const GOV_COLLAPSED_ROWS = 3;
 export const CHAT_MAX_TURNS = 20;
 
-/** Fallbacks if GET /api/config is unreachable (server values win). */
+/** Header freshness indicator: minutes before the reading turns amber/red. */
+export const DATA_AGE = {
+  freshMin: 3,
+  staleMin: 15,
+  /** Re-render cadence of the age label */
+  tickMs: 10000,
+};
+
+/** Bounds for the focus "movement per minute" threshold input. */
+export const FOCUS_THRESHOLD_INPUT = { min: 1, max: 99 };
+
+/**
+ * Fallbacks if GET /api/config is unreachable (server values win).
+ * `focus` mirrors the server-side defaults in config/index.js so components
+ * never need their own inline `?? n` fallbacks; without supabaseUrl/key from
+ * the server the focus feed simply stays disconnected.
+ */
 export const CLIENT_FALLBACK = {
   pollMsDefault: 5000,
   pollMsMin: 3000,
@@ -61,7 +77,15 @@ export const CLIENT_FALLBACK = {
   floodRefreshMs: 60000,
   govRefreshMs: 300000,
   geminiEnabled: false,
-  focus: null,
+  focus: {
+    fetchLimit: 120,
+    pollMs: 20000,
+    realtimeRetryMs: 15000,
+    realtimeHeartbeatMs: 25000,
+    thresholdDefault: 8,
+    bucketMs: 60000,
+    chartBuckets: 30,
+  },
   streefloodUrl: '',
 };
 
@@ -101,6 +125,19 @@ export const STATUS_COLORS = {
   warning: '#fab219',
   serious: '#ec835a',
   critical: '#d03b3b',
+};
+
+/**
+ * Health-score ring palette, keyed by SCORE_BANDS id (thresholds live there —
+ * never restate cutoffs in UI code). Light mode darkens the two mid tones for
+ * contrast on the pale surface.
+ */
+export const SCORE_BAND_COLORS = {
+  excellent: { light: '#157a57', dark: '#1baf7a' },
+  good: { light: STATUS_COLORS.good, dark: STATUS_COLORS.good },
+  fair: { light: '#8a5a00', dark: STATUS_COLORS.warning },
+  poor: { light: STATUS_COLORS.serious, dark: STATUS_COLORS.serious },
+  critical: { light: STATUS_COLORS.critical, dark: STATUS_COLORS.critical },
 };
 
 /** Hex → rgba with alpha (for chart fills). */

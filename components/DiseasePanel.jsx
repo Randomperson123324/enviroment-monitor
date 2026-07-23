@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Activity, ShieldCheck, ExternalLink, ShieldAlert, TriangleAlert } from 'lucide-react';
+import SectionHeader from '@/components/SectionHeader';
 import { assessDiseases } from '@/lib/disease';
 
 const WORST = {
@@ -22,14 +23,11 @@ export default function DiseasePanel({ latest }) {
 
   return (
     <section className="section-gap">
-      <div className="focus-hdr">
-        <div className="focus-title">
-          <span className="section-title">
-            <Activity size={19} strokeWidth={2.2} aria-hidden /> ความเสี่ยงโรคจากสภาพแวดล้อม
-          </span>
-        </div>
-        <span className="panel-meta">วิเคราะห์จากอุณหภูมิ · ความชื้น · คุณภาพอากาศ</span>
-      </div>
+      <SectionHeader
+        Icon={Activity}
+        title="ความเสี่ยงโรคจากสภาพแวดล้อม"
+        meta="วิเคราะห์จากอุณหภูมิ · ความชื้น · คุณภาพอากาศ"
+      />
 
       <div className="panel disease-hero">
         <div className="disease-hero-icon" style={{ color: head.color }}>

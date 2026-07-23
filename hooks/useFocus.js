@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { STORAGE } from '@/config/client';
+import { STORAGE, CLIENT_FALLBACK, FOCUS_THRESHOLD_INPUT } from '@/config/client';
 
 /** Normalize movement whether stored as a number or an object of counts. */
 export function movementCount(m) {
@@ -48,13 +48,16 @@ export default function useFocus({ focusCfg, addLog }) {
     if (Number.isFinite(saved) && saved > 0) setThresholdState(saved);
   }, []);
 
-  const effectiveThreshold = threshold ?? focusCfg?.thresholdDefault ?? 8;
+  const effectiveThreshold =
+    threshold ?? focusCfg?.thresholdDefault ?? CLIENT_FALLBACK.focus.thresholdDefault;
 
   const setThreshold = useCallback((v) => {
     const n = Number(v);
     if (!Number.isFinite(n) || n <= 0) return;
-    setThresholdState(n);
-    localStorage.setItem(STORAGE.focusThreshold, String(n));
+    // Input min/max are advisory only — typed values must be clamped here too.
+    const clamped = Math.min(FOCUS_THRESHOLD_INPUT.max, Math.max(FOCUS_THRESHOLD_INPUT.min, n));
+    setThresholdState(clamped);
+    localStorage.setItem(STORAGE.focusThreshold, String(clamped));
   }, []);
 
   const mergeRows = useCallback((incoming, keepLimit) => {
@@ -135,6 +138,8 @@ export default function useFocus({ focusCfg, addLog }) {
           })
         );
         heartbeat = setInterval(() => {
+          // A closing socket throws on send — let onclose handle the retry.
+          if (ws.readyState !== WebSocket.OPEN) return;
           ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: null }));
         }, focusCfg.realtimeHeartbeatMs);
       };

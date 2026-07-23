@@ -10,6 +10,7 @@
   --page: #eaf6fb;
   --surface: rgba(255, 255, 255, 0.55);
   --surface-2: rgba(255, 255, 255, 0.75);
+  --hdr-bg: rgba(255, 255, 255, 0.45);
   --ink: #091e2c;
   --ink-2: #335261;
   --muted: #567586;
@@ -38,6 +39,7 @@
   --page: #07111c;
   --surface: rgba(20, 38, 54, 0.4);
   --surface-2: rgba(26, 48, 68, 0.6);
+  --hdr-bg: rgba(26, 48, 68, 0.45);
   --ink: #e8f4fa;
   --ink-2: #9ebecd;
   --muted: #7f9dac;
@@ -144,8 +146,10 @@ textarea {
   overflow: hidden;
   background-color: var(--surface);
   border: 1px solid var(--line);
+  /* NOTE: never hand-write -webkit-backdrop-filter here — Lightning CSS
+     dedupes it against the standard property and keeps only the last one,
+     which Chrome ignores. Prefixes are auto-generated at build time. */
   backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   box-shadow: var(--glass-shadow);
   transition: background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.3s ease;
 }
@@ -224,7 +228,32 @@ textarea {
   padding: 10px 20px;
   margin-top: 10px;
   border-radius: 1.25rem;
-  background-color: var(--surface-2);
+  /* Mostly transparent + heavy blur: content scrolling under the sticky bar
+     smears into frosted glass instead of being covered by an opaque fill.
+     Chromium quirk: backdrop-filter directly on a sticky element can
+     silently no-op, so the blur lives on the ::after layer below instead. */
+  background-color: var(--hdr-bg);
+  backdrop-filter: none;
+}
+
+.hdr::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  backdrop-filter: blur(40px) saturate(160%);
+}
+
+/* Desktop: wrapper collapses so hdr-mid / hdr-right lay out directly in the
+   header flow, exactly as before the burger was introduced. */
+.hdr-collapse {
+  display: contents;
+}
+
+/* Doubled selector out-specifies `.icon-btn { display: grid }`, which sits
+   later in the file and would otherwise re-show the burger on desktop. */
+.hdr .hdr-burger {
+  display: none;
 }
 
 .brand {
@@ -280,7 +309,6 @@ textarea {
   padding: 7px 12px;
   border-radius: 12px;
   outline: none;
-  backdrop-filter: blur(8px);
 }
 
 .dev-select select:focus {
@@ -453,7 +481,6 @@ textarea {
   /* Floats above busy content — needs the strong glass, not the see-through one. */
   background-color: color-mix(in srgb, var(--surface-2) 100%, transparent);
   backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
 }
 
 .ai-float-title {
@@ -510,10 +537,9 @@ textarea {
 /* ═══ OVERVIEW ═══ */
 .overview {
   display: grid;
-  grid-template-columns: auto 1fr 230px;
+  grid-template-columns: auto 1fr;
   gap: 24px;
   align-items: center;
-  margin-top: 16px;
   border-radius: 1.75rem;
   padding: 22px 26px;
 }
@@ -619,53 +645,6 @@ textarea {
   border-color: color-mix(in srgb, var(--lv-info) 18%, transparent);
 }
 
-.ov-badges {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-
-.ov-badge {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  font-size: 13.5px;
-  color: var(--ink-2);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ov-badge .dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--lv-ok);
-  flex-shrink: 0;
-}
-
-.ov-badge.warning {
-  color: var(--lv-warning);
-  background: color-mix(in srgb, var(--lv-warning) 12%, transparent);
-}
-
-.ov-badge.warning .dot {
-  background: var(--lv-warning);
-}
-
-.ov-badge.danger {
-  color: var(--lv-danger);
-  background: color-mix(in srgb, var(--lv-danger) 12%, transparent);
-}
-
-.ov-badge.danger .dot {
-  background: var(--lv-danger);
-}
-
 /* ═══ WEBCAM STRIP ═══ */
 .webcam-strip {
   display: grid;
@@ -768,26 +747,44 @@ textarea {
   position: relative;
 }
 
-/* Comfort-meter bar: healthy band highlighted, value needle on top. */
-.tile-gauge {
+/* Current-value meter — mirrors the flood card bar: fill shows the live
+   reading, marks flag the comfort-band edges, scale labels the range. */
+.tile-bar {
   position: relative;
   height: 10px;
   border-radius: 5px;
   background: var(--grid);
-  overflow: hidden;
-  margin-bottom: 6px;
+  overflow: visible;
 }
 
-.tile-gauge-band {
-  position: absolute;
-  top: 0;
-  bottom: 0;
+.tile-bar-fill {
+  height: 100%;
   border-radius: 5px;
-  opacity: 0.32;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--tile-accent) 70%, transparent), var(--tile-accent));
+  transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tile-bar-fill.warning {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lv-warning) 70%, transparent), var(--lv-warning));
+}
+
+.tile-bar-fill.danger {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--lv-danger) 70%, transparent), var(--lv-danger));
+}
+
+/* Comfort-band edges — like the flood card's warning/danger threshold marks. */
+.tile-bar-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--lv-ok) 85%, transparent);
+  transform: translateX(-1px);
 }
 
 /* Scale under the meter — mirrors the flood card's 0 / mid / max labels. */
-.tile-gauge-scale {
+.tile-bar-scale {
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -795,31 +792,11 @@ textarea {
   font-size: 10.5px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  margin-bottom: 10px;
+  margin: 5px 0 10px;
 }
 
-.tile-gauge-scale span:nth-child(2) {
+.tile-bar-scale span:nth-child(2) {
   color: color-mix(in srgb, var(--ink-2) 70%, transparent);
-}
-
-.tile-gauge-needle {
-  position: absolute;
-  top: -2px;
-  bottom: -2px;
-  width: 3px;
-  border-radius: 2px;
-  transform: translateX(-50%);
-  background: var(--lv-ok);
-  box-shadow: 0 0 6px currentColor;
-  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.tile-gauge-needle.warning {
-  background: var(--lv-warning);
-}
-
-.tile-gauge-needle.danger {
-  background: var(--lv-danger);
 }
 
 .tile-foot {
@@ -827,13 +804,6 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-
-.tile-range {
-  font-family: var(--font-mono), monospace;
-  font-size: 10.5px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ═══ DISEASE RISK ═══ */
@@ -1116,40 +1086,73 @@ textarea {
   margin-top: 5px;
 }
 
-/* ═══ STATS ═══ */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+/* ═══ STATS TABLE ═══ */
+.table-wrap {
+  padding: 6px 4px;
+  overflow-x: auto;
 }
 
-.stat-chip {
-  padding: 15px 18px;
-}
-
-.stat-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink-2);
-  margin-bottom: 8px;
-}
-
-.stat-vals {
-  display: flex;
-  gap: 18px;
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
 }
 
-.stat-vals b {
-  display: block;
-  font-weight: 400;
-  font-size: 11px;
+.stats-table th,
+.stats-table td {
+  padding: 10px 18px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stats-table th:first-child,
+.stats-table td:first-child {
+  text-align: left;
+}
+
+.stats-table thead th {
+  font-size: 12px;
+  font-weight: 500;
   color: var(--muted);
-  margin-bottom: 1px;
-  font-family: var(--font-sans), sans-serif;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.stats-table tbody tr + tr td {
+  border-top: 1px solid var(--line);
+}
+
+.stats-table .num {
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.stats-table .num.strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.metric-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+/* Identity mark carries the series color; text stays in ink (dataviz rule). */
+.series-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.table-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 14px;
 }
 
 /* ═══ HYDRO HERO ═══ */
@@ -1682,19 +1685,18 @@ textarea {
 }
 
 /* ═══ FOCUS ═══ */
-.focus-hdr {
+/* Shared section header (SectionHeader component) — title left, meta right. */
+.sec-hdr {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 10px 14px;
   margin-bottom: 12px;
 }
 
-.focus-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* Last element (meta text or a controls row) sits flush right. */
+.sec-hdr > *:last-child:not(.section-title) {
+  margin-left: auto;
 }
 
 .section-title {
@@ -1870,8 +1872,49 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--line);
+}
+
+/* Collapsed log panel: header only, no divider hanging below it. */
+.log-panel .subhdr:last-child {
+  border-bottom: none;
+}
+
+.log-toggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ink-2);
+  font-size: inherit;
+  text-align: left;
+}
+
+.log-count {
+  font-size: 11px;
+  font-family: var(--font-mono), monospace;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-left: 4px;
+}
+
+.log-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--muted);
 }
 
 .subhdr-actions {
@@ -2222,22 +2265,10 @@ textarea {
 
 /* ═══ RESPONSIVE ═══ */
 @media (max-width: 1100px) {
-  .overview {
-    grid-template-columns: auto 1fr;
-  }
-
-  .ov-badges {
-    display: none;
-  }
-
   .charts,
   .focus-grid,
   .bottom {
     grid-template-columns: 1fr;
-  }
-
-  .stats-row {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .focus-cards {
@@ -2260,7 +2291,6 @@ textarea {
 
   .tiles,
   .webcam-strip,
-  .stats-row,
   .flood-grid {
     grid-template-columns: 1fr;
   }
@@ -2269,8 +2299,73 @@ textarea {
     flex-direction: column;
   }
 
+  /* Mobile header: brand + hamburger on one row; everything else drops
+     into a collapsible panel toggled by the burger. */
   .hdr {
     flex-wrap: wrap;
+    row-gap: 0;
+  }
+
+  .brand {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .hdr .hdr-burger {
+    display: grid;
+    flex-shrink: 0;
+  }
+
+  .hdr-collapse {
+    display: none;
+    flex-basis: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    margin-top: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
+  }
+
+  .hdr.open .hdr-collapse {
+    display: flex;
+    animation: hdr-drop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .hdr-mid {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .dev-select {
+    justify-content: space-between;
+  }
+
+  .dev-select select {
+    flex: 1;
+    margin-left: 10px;
+  }
+
+  .hdr-right {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .clock {
+    flex: 1;
+    text-align: left;
+  }
+
+  @keyframes hdr-drop {
+    from {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   .reco-list {

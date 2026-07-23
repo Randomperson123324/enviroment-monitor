@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { CircleCheck, TriangleAlert, CircleAlert, Siren } from 'lucide-react';
+import { CircleCheck, TriangleAlert, CircleAlert, Siren, ChartLine } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
+import SectionHeader from '@/components/SectionHeader';
 import { SENSORS, AQI_LEVELS, aqiLevel } from '@/config/sensors';
 import {
   CHART_COLORS,
@@ -25,7 +26,6 @@ function HistoryChart({ view, smooth, colors }) {
   const gasDiv = CHART_VIEW_DEFAULTS.gasAxisDivisor;
 
   const data = useMemo(() => {
-    const seriesColor = { temp: colors.temp, hum: colors.hum, gas: colors.gas };
     return {
       labels: view.labels,
       datasets: SENSORS.map((s) => ({
@@ -34,8 +34,8 @@ function HistoryChart({ view, smooth, colors }) {
           s.id === 'gas'
             ? smoothSeries(view.gas, smooth).map((v) => (v != null ? v / gasDiv : null))
             : smoothSeries(view[s.id], smooth),
-        borderColor: seriesColor[s.id],
-        backgroundColor: gradientFill(seriesColor[s.id], 0.22),
+        borderColor: colors[s.id],
+        backgroundColor: gradientFill(colors[s.id], 0.22),
         tension: 0.42,
         pointRadius: 0,
         borderWidth: 2,
@@ -164,58 +164,60 @@ export default function ChartsSection({ dash, theme }) {
     CHART_RANGES.find((r) => r.h === dash.hours)?.label ?? `${dash.hours} ชม.`;
 
   return (
-    <section className="charts section-gap">
-      <div className="panel chart-main">
-        <div className="chart-head">
-          <div>
-            <div className="panel-title">ข้อมูลย้อนหลัง</div>
-            <div className="panel-meta">{rangeLabel}</div>
-          </div>
-          <div className="range-row" aria-label="ช่วงเวลา">
-            {CHART_RANGES.map((r) => (
-              <button
-                key={r.h}
-                className={`range-pill ${dash.hours === r.h ? 'active' : ''}`}
-                onClick={() => dash.setHours(r.h)}
-              >
-                {r.label}
-              </button>
-            ))}
-            <select
-              className="chart-opt"
-              value={dash.smooth}
-              onChange={(e) => dash.setSmooth(Number(e.target.value))}
-              title="ความลื่นของเส้นกราฟ"
-              aria-label="ความลื่นของเส้นกราฟ"
+    <section className="section-gap">
+      <SectionHeader
+        Icon={ChartLine}
+        title="แนวโน้มย้อนหลัง"
+        meta={`${rangeLabel} · ${view.timestamps.length} จุดข้อมูล`}
+      >
+        <div className="range-row" aria-label="ช่วงเวลา">
+          {CHART_RANGES.map((r) => (
+            <button
+              key={r.h}
+              className={`range-pill ${dash.hours === r.h ? 'active' : ''}`}
+              onClick={() => dash.setHours(r.h)}
             >
-              {SMOOTH_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="panel-meta">{view.timestamps.length} จุดข้อมูล</div>
+              {r.label}
+            </button>
+          ))}
+          <select
+            className="chart-opt"
+            value={dash.smooth}
+            onChange={(e) => dash.setSmooth(Number(e.target.value))}
+            title="ความลื่นของเส้นกราฟ"
+            aria-label="ความลื่นของเส้นกราฟ"
+          >
+            {SMOOTH_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
         </div>
-        <div className="chart-stage">
-          {/* key remounts on theme switch — Chart.js must not animate across palettes */}
-          <HistoryChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
-        </div>
-      </div>
+      </SectionHeader>
 
-      <div className="chart-side">
-        <div className="panel">
-          <div className="chart-head">
-            <div className="panel-title">คะแนนสุขภาพห้อง</div>
-            <div className="panel-meta">เฉลี่ย {scoreAvg}</div>
-          </div>
-          <div className="chart-stage-sm">
-            <ScoreChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+      <div className="charts">
+        <div className="panel chart-main">
+          <div className="chart-stage">
+            {/* key remounts on theme switch — Chart.js must not animate across palettes */}
+            <HistoryChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
           </div>
         </div>
-        <div className="panel">
-          <div className="panel-title">คุณภาพอากาศ</div>
-          <AqiMeter gas={dash.latest?.gas_ppm != null ? Number(dash.latest.gas_ppm) : null} />
+
+        <div className="chart-side">
+          <div className="panel">
+            <div className="chart-head">
+              <div className="panel-title">คะแนนสุขภาพห้อง</div>
+              <div className="panel-meta">เฉลี่ย {scoreAvg}</div>
+            </div>
+            <div className="chart-stage-sm">
+              <ScoreChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+            </div>
+          </div>
+          <div className="panel">
+            <div className="panel-title">คุณภาพอากาศ</div>
+            <AqiMeter gas={dash.latest?.gas_ppm != null ? Number(dash.latest.gas_ppm) : null} />
+          </div>
         </div>
       </div>
     </section>

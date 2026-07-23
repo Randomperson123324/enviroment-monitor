@@ -14,6 +14,7 @@ import {
   CircleCheck,
   CircleOff,
 } from 'lucide-react';
+import SectionHeader from '@/components/SectionHeader';
 import { GOV_COLLAPSED_ROWS } from '@/config/client';
 import { agoFromTh } from '@/lib/format';
 
@@ -80,21 +81,17 @@ export default function GovPanel({ feed }) {
 
   return (
     <section className="section-gap">
-      <div className="focus-hdr">
-        <div className="focus-title">
-          <span className="section-title">
-            <Landmark size={19} strokeWidth={2.2} aria-hidden /> ข้อมูลภาครัฐ (TMD · ThaiWater ·
-            กรมชลประทาน)
-          </span>
-        </div>
-        <span className="panel-meta">
-          {error
+      <SectionHeader
+        Icon={Landmark}
+        title="ข้อมูลภาครัฐ (TMD · ThaiWater · กรมชลประทาน)"
+        meta={
+          error
             ? 'เชื่อมต่อ StreeFlood ไม่ได้ — แสดงข้อมูลล่าสุดที่มี'
             : data
               ? `แชร์จากเว็บ StreeFlood · อัปเดต${agoFromTh(data.timestamp)}`
-              : ''}
-        </span>
-      </div>
+              : ''
+        }
+      />
 
       {!data && (
         <div className="gov-grid">
