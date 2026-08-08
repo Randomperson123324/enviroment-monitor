@@ -40,11 +40,36 @@ const config = {
     timeoutMs: num('FLOOD_TIMEOUT_MS', 10000),
   },
 
-  /** StreeFlood app itself — env-monitor consumes its /api/gov feed. */
+  /** StreeFlood site — only linked from the UI now (its /api/gov cannot be
+   *  proxied server-to-server: Vercel's bot challenge answers with HTTP 429). */
   streeflood: {
     baseUrl: str('STREEFLOOD_BASE_URL', 'https://streeflood.vercel.app'),
-    govPath: str('STREEFLOOD_GOV_PATH', '/api/gov'),
-    timeoutMs: num('STREEFLOOD_TIMEOUT_MS', 30000),
+  },
+
+  /**
+   * Government water/weather feeds, fetched directly (ported from StreeFlood's
+   * lib/gov). TMD's demo uid/ukey works but is shared/rate-limited — register
+   * at data.tmd.go.th for your own. Server-side only.
+   */
+  gov: {
+    tmdUid: str('TMD_UID', 'demo'),
+    tmdUkey: str('TMD_UKEY', 'demokey'),
+    tmdBase: str('TMD_BASE_URL', 'https://data.tmd.go.th/api'),
+    thaiwaterBase: str(
+      'THAIWATER_BASE_URL',
+      'https://api-v3.thaiwater.net/api/v1/thaiwater30/public'
+    ),
+    ridReservoirUrl: str(
+      'RID_RESERVOIR_URL',
+      'https://app.rid.go.th/reservoir/api/reservoir/public'
+    ),
+    /** Upstream cache window — the rain feed is ~4.5 MB; be polite to free gov APIs. */
+    revalidateSeconds: num('GOV_REVALIDATE_SECONDS', 900),
+    rainTopStations: num('GOV_RAIN_TOP_STATIONS', 10),
+    riverStations: num('GOV_RIVER_STATIONS', 8),
+    reservoirTop: num('GOV_RESERVOIR_TOP', 8),
+    /** app.rid.go.th intermittently refuses connections, then works — retry. */
+    ridFetchAttempts: num('GOV_RID_FETCH_ATTEMPTS', 3),
   },
 
   gemini: {

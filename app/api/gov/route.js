@@ -1,20 +1,11 @@
-import config from '@/config';
-import { jsonOk, jsonError, withErrors } from '@/lib/api-helpers';
+import { getGovData } from '@/lib/gov';
+import { jsonOk, withErrors } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/gov — Thai government water/weather feeds, shared from the
- * StreeFlood app's own /api/gov endpoint (TMD, ThaiWater, RID).
+ * GET /api/gov — Thai government water/weather feeds (TMD, ThaiWater, RID),
+ * fetched directly from the agencies (ported from StreeFlood's lib/gov —
+ * proxying the deployed StreeFlood site is blocked by Vercel's bot challenge).
  */
-export const GET = withErrors(async () => {
-  const { baseUrl, govPath, timeoutMs } = config.streeflood;
-  const res = await fetch(`${baseUrl}${govPath}`, {
-    signal: AbortSignal.timeout(timeoutMs),
-    cache: 'no-store',
-  }).catch((e) => {
-    throw new Error(`StreeFlood unreachable at ${baseUrl}: ${e.message}`);
-  });
-  if (!res.ok) return jsonError(`StreeFlood /api/gov HTTP ${res.status}`, 502);
-  return jsonOk(await res.json());
-});
+export const GET = withErrors(async () => jsonOk(await getGovData()));

@@ -86,9 +86,9 @@ export default function GovPanel({ feed }) {
         title="ข้อมูลภาครัฐ (TMD · ThaiWater · กรมชลประทาน)"
         meta={
           error
-            ? 'เชื่อมต่อ StreeFlood ไม่ได้ — แสดงข้อมูลล่าสุดที่มี'
+            ? 'เชื่อมต่อแหล่งข้อมูลภาครัฐไม่ได้ — แสดงข้อมูลล่าสุดที่มี'
             : data
-              ? `แชร์จากเว็บ StreeFlood · อัปเดต${agoFromTh(data.timestamp)}`
+              ? `ดึงตรงจากหน่วยงาน · อัปเดต${agoFromTh(data.timestamp)}`
               : ''
         }
       />
@@ -106,7 +106,7 @@ export default function GovPanel({ feed }) {
             ))
           ) : (
             <div className="panel flood-empty gov-card-wide">
-              ⚠️ ยังเชื่อมต่อ StreeFlood ไม่ได้ — จะลองใหม่อัตโนมัติ
+              ⚠️ ยังเชื่อมต่อแหล่งข้อมูลภาครัฐไม่ได้ — จะลองใหม่อัตโนมัติ
             </div>
           )}
         </div>
