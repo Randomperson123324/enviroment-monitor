@@ -1,12 +1,18 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Eye, BookOpen } from 'lucide-react';
-import { Bar } from 'react-chartjs-2';
+import { useMemo, useState } from 'react';
+import { Eye, BookOpen, X } from 'lucide-react';
+import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import useFocus, { movementCount } from '@/hooks/useFocus';
 import SectionHeader from '@/components/SectionHeader';
-import { CHART_COLORS, CLIENT_FALLBACK, FOCUS_THRESHOLD_INPUT, withAlpha } from '@/config/client';
+import {
+  CHART_COLORS,
+  CLIENT_FALLBACK,
+  FOCUS_THRESHOLD_INPUT,
+  ID_SERIES_PALETTE,
+  withAlpha,
+} from '@/config/client';
 import { tooltipOptions } from '@/lib/chart-utils';
 
 const GLOSSARY = [
@@ -24,35 +30,136 @@ const DIRECTIONS = [
   ['Down', 'ล่าง ↓'],
 ];
 
-function FocusChart({ buckets, threshold, colors, maxBars }) {
-  const view = buckets.slice(-maxBars);
+// จำนวน ID สูงสุดที่ให้สีต่างกันในกราฟ — เกินนี้ยุบเป็น "+N อื่น ๆ" (ห้าม cycle สี)
+const MAX_ID_SERIES = ID_SERIES_PALETTE.dark.length;
 
-  const data = useMemo(
-    () => ({
-      labels: view.map((b) =>
-        new Date(b.ts).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false })
-      ),
-      datasets: [
-        {
-          label: 'การเคลื่อนไหว / นาที',
-          data: view.map((b) => b.movement),
-          backgroundColor: view.map((b) =>
-            b.movement > threshold ? withAlpha(colors.focusOver, 0.75) : withAlpha(colors.focus, 0.65)
-          ),
-          borderColor: view.map((b) => (b.movement > threshold ? colors.focusOver : colors.focus)),
-          borderWidth: 1.5,
-          borderRadius: 6,
-          maxBarThickness: 26,
-        },
-      ],
-    }),
-    [view, threshold, colors]
-  );
+const hhmm = (ts) =>
+  new Date(ts).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+/**
+ * Group rows into per-person time buckets so each Face ID becomes its own line.
+ * Slots are assigned by ascending ID so a newly-seen (higher) ID appends without
+ * repainting the others — colour follows the entity, never its position.
+ */
+function buildPersonSeries(rows, bucketMs, maxBars) {
+  const byPerson = new Map(); // person -> Map(ts -> bucket)
+  const tsSet = new Set();
+
+  for (const r of rows) {
+    const t = Date.parse(r.created_at);
+    if (!Number.isFinite(t)) continue;
+    const ts = Math.floor(t / bucketMs) * bucketMs;
+    const person = r.person == null ? '—' : String(r.person);
+    tsSet.add(ts);
+    if (!byPerson.has(person)) byPerson.set(person, new Map());
+    const slotMap = byPerson.get(person);
+    if (!slotMap.has(ts)) {
+      slotMap.set(ts, { ts, movement: 0, face_count: 0, count: 0, direction: null });
+    }
+    const b = slotMap.get(ts);
+    b.movement += movementCount(r.movement);
+    b.face_count = Math.max(b.face_count, r.face_count ?? 0);
+    b.count++;
+    if (r.direction) b.direction = r.direction;
+  }
+
+  let labels = [...tsSet].sort((a, b) => a - b);
+  if (labels.length > maxBars) labels = labels.slice(-maxBars);
+  const inWindow = new Set(labels);
+
+  const persons = [...byPerson.keys()]
+    .map((p) => {
+      const pts = [...byPerson.get(p).values()].filter((b) => inWindow.has(b.ts));
+      return { person: p, pts };
+    })
+    .filter((s) => s.pts.length > 0)
+    .sort((a, b) => {
+      const na = Number(a.person);
+      const nb = Number(b.person);
+      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      return String(a.person).localeCompare(String(b.person));
+    });
+
+  const overflow = Math.max(0, persons.length - MAX_ID_SERIES);
+
+  const series = persons.slice(0, MAX_ID_SERIES).map(({ person, pts }, slot) => {
+    const byTs = new Map(pts.map((b) => [b.ts, b]));
+    const points = labels.map((ts) => byTs.get(ts) ?? null);
+    const values = points.map((p) => (p ? p.movement : null));
+    const total = pts.reduce((a, p) => a + p.movement, 0);
+    const max = pts.reduce((a, p) => Math.max(a, p.movement), 0);
+    const last = pts[pts.length - 1] ?? null;
+    return {
+      person,
+      slot,
+      points,
+      values,
+      total,
+      max,
+      avg: pts.length ? total / pts.length : 0,
+      buckets: pts.length,
+      latest: last?.movement ?? null,
+      latestDirection: last?.direction ?? null,
+      latestFace: last?.face_count ?? null,
+    };
+  });
+
+  return { labels, series, overflow };
+}
+
+function FocusIdChart({ labels, series, palette, colors, threshold, selected, onSelect }) {
+  const data = useMemo(() => {
+    const dimmed = selected != null;
+    const lines = series.map((s) => {
+      const hue = palette[s.slot] ?? colors.tick;
+      const active = !dimmed || s.person === selected;
+      return {
+        _person: s.person,
+        label: `#${s.person}`,
+        data: s.values,
+        borderColor: active ? hue : withAlpha(hue, 0.22),
+        backgroundColor: withAlpha(hue, 0.1),
+        borderWidth: s.person === selected ? 3 : dimmed ? 1.25 : 2,
+        pointRadius: s.person === selected ? 3 : 2,
+        pointHoverRadius: 6,
+        pointBackgroundColor: active ? hue : withAlpha(hue, 0.22),
+        pointBorderWidth: 0,
+        tension: 0.32,
+        spanGaps: true,
+        order: s.person === selected ? 0 : 1,
+      };
+    });
+    // เส้นเกณฑ์แจ้งเตือน (คงที่) — เป็น dataset ท้ายสุด ไม่นับใน onClick/legend
+    lines.push({
+      _threshold: true,
+      label: 'เกณฑ์',
+      data: labels.map(() => threshold),
+      borderColor: withAlpha(colors.focusOver, 0.7),
+      borderWidth: 1.25,
+      borderDash: [6, 6],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      fill: false,
+      order: 5,
+    });
+    return { labels: labels.map(hhmm), datasets: lines };
+  }, [labels, series, palette, colors, threshold, selected]);
 
   const options = useMemo(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: false },
+      onHover: (e, els) => {
+        if (e?.native?.target) e.native.target.style.cursor = els.length ? 'pointer' : 'default';
+      },
+      onClick: (_e, els) => {
+        const hit = els.find((el) => series[el.datasetIndex]);
+        if (hit) {
+          const s = series[hit.datasetIndex];
+          onSelect(s.person === selected ? null : s.person);
+        }
+      },
       scales: {
         x: {
           grid: { display: false },
@@ -61,7 +168,7 @@ function FocusChart({ buckets, threshold, colors, maxBars }) {
         },
         y: {
           min: 0,
-          suggestedMax: Math.max(threshold * 1.5, ...view.map((b) => b.movement), 10),
+          suggestedMax: Math.max(threshold * 1.5, ...series.flatMap((s) => s.values.map((v) => v ?? 0)), 10),
           grid: { color: colors.grid },
           border: { display: false },
           ticks: { color: colors.tick },
@@ -70,57 +177,121 @@ function FocusChart({ buckets, threshold, colors, maxBars }) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          ...tooltipOptions(colors, view.map((b) => b.ts)),
+          ...tooltipOptions(colors, labels),
+          filter: (item) => !item.dataset._threshold,
           callbacks: {
-            title: (items) => {
-              const b = view[items[0]?.dataIndex];
-              return `🕐 ${items[0]?.label ?? ''}${b && b.movement > threshold ? ' ⚠ เกิน!' : ''}`;
-            },
+            title: (items) => `🕐 ${items[0]?.label ?? ''}`,
             label: (ctx) => {
-              const b = view[ctx.dataIndex];
-              if (!b) return `ขยับ ${ctx.parsed.y} ครั้ง`;
-              const lines = [
-                `📊 ขยับ ${b.movement} ครั้ง/นาที (เกณฑ์ ${threshold})`,
-                `👤 พบใบหน้า ${b.face_count} คน`,
-                `🔢 ข้อมูล ${b.count} ช่วง × 15 วินาที`,
-              ];
-              if (b.direction) {
+              const s = series[ctx.datasetIndex];
+              if (!s) return null;
+              const b = s.points[ctx.dataIndex];
+              const lines = [`#${s.person} · ขยับ ${ctx.parsed.y} ครั้ง/นาที${ctx.parsed.y > threshold ? ' ⚠' : ''}`];
+              if (b?.direction) {
                 const d = b.direction;
-                lines.push(
-                  `↔ ซ้าย ${d.Left ?? 0}  ขวา ${d.Right ?? 0}  บน ${d.Up ?? 0}  ล่าง ${d.Down ?? 0}`
-                );
+                lines.push(`   ↔ ซ้าย ${d.Left ?? 0} ขวา ${d.Right ?? 0} บน ${d.Up ?? 0} ล่าง ${d.Down ?? 0}`);
               }
-              if (b.person != null) lines.push(`🪪 บุคคลที่ ${b.person}`);
               return lines;
             },
           },
         },
       },
     }),
-    [colors, view, threshold]
+    [series, colors, threshold, labels, selected, onSelect]
   );
 
-  return <Bar data={data} options={options} />;
+  return <Line data={data} options={options} />;
+}
+
+function IdDetail({ series, palette, colors, threshold, onClose }) {
+  const hue = palette[series.slot] ?? colors.tick;
+  const over = series.latest != null && series.latest > threshold;
+  const dir = series.latestDirection;
+  const dirTotal = dir ? DIRECTIONS.reduce((a, [k]) => a + (Number(dir[k]) || 0), 0) || 1 : 1;
+
+  return (
+    <div className="panel id-detail" style={{ borderTopColor: hue }}>
+      <div className="fcard-label">
+        <span className="id-legend-item">
+          <span className="id-swatch" style={{ background: hue }} />
+          รายละเอียด #{series.person}
+        </span>
+        <button className="id-detail-close" onClick={onClose} aria-label="ปิดรายละเอียด">
+          <X size={15} strokeWidth={2.4} aria-hidden />
+        </button>
+      </div>
+      <div className="fcard-val" style={{ color: over ? 'var(--lv-danger)' : hue }}>
+        {series.latest ?? '--'}
+        <span className={`badge ${over ? 'danger' : ''}`} style={{ marginLeft: 10, verticalAlign: 'middle' }}>
+          {series.latest == null ? '—' : over ? 'สูงเกิน!' : 'ปกติ'}
+        </span>
+      </div>
+      <div className="fcard-sub">การเคลื่อนไหวล่าสุด (ครั้ง/นาที) · เกณฑ์ {threshold}</div>
+
+      <div className="id-stat-grid">
+        <div>
+          <div className="dir-label">เฉลี่ย</div>
+          <div className="dir-val">{series.avg.toFixed(1)}</div>
+        </div>
+        <div>
+          <div className="dir-label">สูงสุด</div>
+          <div className="dir-val">{series.max}</div>
+        </div>
+        <div>
+          <div className="dir-label">ช่วงที่เห็น</div>
+          <div className="dir-val">{series.buckets} นาที</div>
+        </div>
+        <div>
+          <div className="dir-label">พบใบหน้า</div>
+          <div className="dir-val">{series.latestFace ?? '--'}</div>
+        </div>
+      </div>
+
+      {dir && (
+        <div className="dir-grid" style={{ marginTop: 12 }}>
+          {DIRECTIONS.map(([key, label]) => {
+            const v = Number(dir[key]) || 0;
+            return (
+              <div key={key}>
+                <div className="dir-label">{label}</div>
+                <div className="dir-val">{v}</div>
+                <div className="dir-bar">
+                  <div
+                    className="dir-fill"
+                    style={{ width: `${Math.round((v / dirTotal) * 100)}%`, background: hue }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function FocusSection({ focusCfg, addLog, theme }) {
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
-  const { rows, buckets, latest, threshold, setThreshold, connected } = useFocus({
-    focusCfg,
-    addLog,
-  });
+  const palette = ID_SERIES_PALETTE[theme] ?? ID_SERIES_PALETTE.dark;
+  const { rows, buckets, latest, threshold, setThreshold, connected } = useFocus({ focusCfg, addLog });
+  const [selected, setSelected] = useState(null);
+
+  const maxBars = focusCfg?.chartBuckets ?? CLIENT_FALLBACK.focus.chartBuckets;
+  const bucketMs = focusCfg?.bucketMs ?? CLIENT_FALLBACK.focus.bucketMs;
+
+  const { labels, series, overflow } = useMemo(
+    () => buildPersonSeries(rows, bucketMs, maxBars),
+    [rows, bucketMs, maxBars]
+  );
+
+  // ID ที่เลือกอาจหลุดออกนอกหน้าต่างเวลาไปแล้ว — อ้างจาก series ปัจจุบันเสมอ
+  const selectedSeries = selected != null ? series.find((s) => s.person === selected) ?? null : null;
+  // ถ้า ID ที่เลือกไม่อยู่ในกราฟแล้ว อย่าหรี่เส้นอื่นทิ้งโดยไม่มีตัวไฮไลต์
+  const activeSel = selectedSeries ? selected : null;
 
   const lastBucket = buckets[buckets.length - 1] ?? null;
   const mvPerMin = lastBucket?.movement ?? null;
   const overThreshold = mvPerMin != null && mvPerMin > threshold;
-
   const faceCount = latest?.face_count ?? null;
-  const dir = latest?.direction ?? null;
-  const dirTotal = dir
-    ? DIRECTIONS.reduce((a, [k]) => a + (Number(dir[k]) || 0), 0) || 1
-    : 1;
-
-  const maxBars = focusCfg?.chartBuckets ?? CLIENT_FALLBACK.focus.chartBuckets;
 
   return (
     <section className="section-gap">
@@ -138,14 +309,6 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
             />{' '}
             ครั้ง/นาที
           </label>
-          <span className="legend-item">
-            <span className="legend-swatch" style={{ background: withAlpha(colors.focus, 0.65) }} />
-            ปกติ
-          </span>
-          <span className="legend-item">
-            <span className="legend-swatch" style={{ background: withAlpha(colors.focusOver, 0.75) }} />
-            เกินกำหนด
-          </span>
         </div>
       </SectionHeader>
 
@@ -161,22 +324,52 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
       <div className="focus-grid">
         <div className="focus-main">
           <div className="panel">
-            <div className="panel-title">การเคลื่อนไหวต่อนาที (รวม 4 ช่วง × 15 วินาที)</div>
+            <div className="panel-title">การเคลื่อนไหวต่อนาที — แยกตามบุคคล (Face ID)</div>
             <div className="panel-meta" style={{ margin: '4px 0 8px' }}>
-              {buckets.length
-                ? `${Math.min(buckets.length, maxBars)} นาทีล่าสุด · ${rows.length} รายการ · เกณฑ์ ${threshold} ครั้ง/นาที`
+              {series.length
+                ? `${series.length} บุคคล · ${Math.min(labels.length, maxBars)} นาทีล่าสุด · แตะเส้นหรือ ID เพื่อดูรายละเอียด`
                 : '— รอข้อมูล —'}
             </div>
             <div className="focus-chart-stage">
-              <FocusChart
-                key={theme}
-                buckets={buckets}
-                threshold={threshold}
-                colors={colors}
-                maxBars={maxBars}
-              />
+              {series.length ? (
+                <FocusIdChart
+                  key={theme}
+                  labels={labels}
+                  series={series}
+                  palette={palette}
+                  colors={colors}
+                  threshold={threshold}
+                  selected={activeSel}
+                  onSelect={setSelected}
+                />
+              ) : (
+                <div className="focus-empty">ยังไม่มีข้อมูลการตรวจจับ</div>
+              )}
             </div>
+
+            {series.length > 0 && (
+              <div className="id-legend">
+                {series.map((s) => {
+                  const hue = palette[s.slot] ?? colors.tick;
+                  const active = activeSel == null || activeSel === s.person;
+                  return (
+                    <button
+                      key={s.person}
+                      type="button"
+                      className={`id-legend-item ${selected === s.person ? 'selected' : ''} ${active ? '' : 'dim'}`}
+                      onClick={() => setSelected(selected === s.person ? null : s.person)}
+                      aria-pressed={selected === s.person}
+                    >
+                      <span className="id-swatch" style={{ background: hue }} />
+                      #{s.person}
+                    </button>
+                  );
+                })}
+                {overflow > 0 && <span className="id-legend-more">+{overflow} อื่น ๆ</span>}
+              </div>
+            )}
           </div>
+
           <div className="panel">
             <div className="panel-title gov-card-title">
               <BookOpen size={15} strokeWidth={2.2} aria-hidden /> ความหมายของข้อมูล
@@ -193,16 +386,35 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
         </div>
 
         <div className="focus-cards">
+          {selectedSeries ? (
+            <IdDetail
+              series={selectedSeries}
+              palette={palette}
+              colors={colors}
+              threshold={threshold}
+              onClose={() => setSelected(null)}
+            />
+          ) : (
+            <div className="panel id-detail-hint">
+              <div className="fcard-label">
+                <span>รายละเอียดรายบุคคล</span>
+              </div>
+              <div className="fcard-sub">
+                แตะเส้นในกราฟ หรือแตะ ID ด้านล่างกราฟ เพื่อดูสถิติของบุคคลนั้น — การเคลื่อนไหวเฉลี่ย/สูงสุด และทิศทางที่หันล่าสุด
+              </div>
+            </div>
+          )}
+
           <div className="panel">
             <div className="fcard-label">
-              <span>การเคลื่อนไหว / นาที</span>
+              <span>การเคลื่อนไหวรวม / นาที</span>
               <span className={`badge ${overThreshold ? 'danger' : mvPerMin != null ? '' : 'nodata'}`}>
                 {mvPerMin == null ? '—' : overThreshold ? 'สูงเกิน!' : 'ปกติ'}
               </span>
             </div>
             <div className="fcard-val">{mvPerMin ?? '--'}</div>
             <div className="fcard-sub">
-              รวม 4 ช่วง × 15 วินาทีล่าสุด
+              รวมทุกคน 4 ช่วง × 15 วินาทีล่าสุด
               <br />
               เกณฑ์แจ้งเตือน: {threshold} ครั้ง/นาที
             </div>
@@ -235,26 +447,6 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                   : faceCount === 1
                     ? 'ตรวจพบ 1 คน'
                     : `ตรวจพบ ${faceCount} คน`}
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="fcard-label">
-              <span>ทิศทางที่หัน (15 วินาทีล่าสุด)</span>
-            </div>
-            <div className="dir-grid">
-              {DIRECTIONS.map(([key, label]) => {
-                const v = Number(dir?.[key]) || 0;
-                return (
-                  <div key={key}>
-                    <div className="dir-label">{label}</div>
-                    <div className="dir-val">{dir ? v : '--'}</div>
-                    <div className="dir-bar">
-                      <div className="dir-fill" style={{ width: `${Math.round((v / dirTotal) * 100)}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>

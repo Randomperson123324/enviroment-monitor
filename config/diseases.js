@@ -49,7 +49,6 @@ export const DISEASES = [
   {
     id: 'mould',
     name: 'เชื้อราและโรคระบบทางเดินหายใจ',
-    icon: '🦠',
     level: (r) => {
       const h = num(r.humidity);
       if (!has(h)) return '';
@@ -65,7 +64,6 @@ export const DISEASES = [
   {
     id: 'flu',
     name: 'ไข้หวัดและไข้หวัดใหญ่',
-    icon: '🤧',
     level: (r) => {
       const h = num(r.humidity);
       const t = num(r.temperature);
@@ -81,7 +79,6 @@ export const DISEASES = [
   {
     id: 'dustmite',
     name: 'ภูมิแพ้จากไรฝุ่น',
-    icon: '🌫️',
     level: (r) => {
       const h = num(r.humidity);
       const t = num(r.temperature);
@@ -96,7 +93,6 @@ export const DISEASES = [
   {
     id: 'heat',
     name: 'โรคจากความร้อน / เพลียแดด',
-    icon: '🥵',
     level: (r) => {
       const t = num(r.temperature);
       if (!has(t)) return '';
@@ -112,7 +108,6 @@ export const DISEASES = [
   {
     id: 'respiratory',
     name: 'การระคายเคืองทางเดินหายใจ / หอบหืด',
-    icon: '😷',
     level: (r) => {
       const g = num(r.gas_ppm);
       if (!has(g)) return '';
@@ -128,7 +123,6 @@ export const DISEASES = [
   {
     id: 'bacteria',
     name: 'การเจริญของแบคทีเรีย / อาหารเป็นพิษ',
-    icon: '🍽️',
     level: (r) => {
       const t = num(r.temperature);
       const h = num(r.humidity);

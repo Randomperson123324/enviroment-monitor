@@ -21,7 +21,7 @@ export const STORAGE = {
 export const TABS = [
   { id: 'environment', label: 'Environment' },
   { id: 'focus', label: 'Focus' },
-  { id: 'hydro', label: 'Hydro Info' },
+  { id: 'hydro', label: 'Safety & Health' },
 ];
 
 export const CHART_RANGES = [
@@ -117,6 +117,19 @@ export const CHART_COLORS = {
     tooltipInk: '#e8f4fa',
     border: 'rgba(255,255,255,0.12)',
   },
+};
+
+/**
+ * Categorical palette for per-entity series (one colour per person/Face ID in the
+ * Focus chart). These are the dataviz reference palette's 8 CVD-safe slots in their
+ * fixed order — validated with scripts/validate_palette.js for both modes. Assign a
+ * slot to an entity by stable order and never cycle: a 9th ID folds into "+N more"
+ * rather than reusing slot 1's colour. Because colours sit in the CVD floor band,
+ * they must always be paired with a text label (the ID legend), never colour alone.
+ */
+export const ID_SERIES_PALETTE = {
+  light: ['#2a78d6', '#1baf7a', '#eda100', '#008300', '#4a3aa7', '#e34948', '#e87ba4', '#eb6834'],
+  dark: ['#3987e5', '#199e70', '#c98500', '#008300', '#9085e9', '#e66767', '#d55181', '#d95926'],
 };
 
 /** Status palette (fixed, never themed). */

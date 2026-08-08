@@ -1,7 +1,19 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Activity, ShieldCheck, ExternalLink, ShieldAlert, TriangleAlert } from 'lucide-react';
+import {
+  Activity,
+  ShieldCheck,
+  ExternalLink,
+  ShieldAlert,
+  TriangleAlert,
+  Droplets,
+  Snowflake,
+  Bug,
+  ThermometerSun,
+  Wind,
+  Utensils,
+} from 'lucide-react';
 import SectionHeader from '@/components/SectionHeader';
 import { assessDiseases } from '@/lib/disease';
 
@@ -9,6 +21,16 @@ const WORST = {
   danger: { Icon: ShieldAlert, color: 'var(--lv-danger)', title: 'มีความเสี่ยงต่อโรคสูง — ควรรีบปรับสภาพแวดล้อม' },
   warning: { Icon: TriangleAlert, color: 'var(--lv-warning)', title: 'มีความเสี่ยงต่อโรคบางชนิด — ควรเฝ้าระวัง' },
   clear: { Icon: ShieldCheck, color: 'var(--lv-ok)', title: 'ความเสี่ยงต่อโรคจากสิ่งแวดล้อมต่ำ' },
+};
+
+// ไอคอน lucide แทน emoji เดิม — คีย์ด้วย id ของโรคใน config/diseases.js
+const DISEASE_ICONS = {
+  mould: Droplets,
+  flu: Snowflake,
+  dustmite: Bug,
+  heat: ThermometerSun,
+  respiratory: Wind,
+  bacteria: Utensils,
 };
 
 /**
@@ -59,11 +81,20 @@ export default function DiseasePanel({ latest }) {
         </div>
       ) : risks.length ? (
         <div className="disease-grid">
-          {risks.map((d) => (
+          {risks.map((d) => {
+            const Icon = DISEASE_ICONS[d.id] ?? Activity;
+            return (
             <div key={d.id} className={`panel disease-card ${d.level}`}>
               <div className="disease-card-head">
                 <span className="disease-name">
-                  <span className="disease-emoji">{d.icon}</span> {d.name}
+                  <Icon
+                    className="disease-icon"
+                    size={17}
+                    strokeWidth={2.1}
+                    style={{ color: d.level === 'danger' ? 'var(--lv-danger)' : 'var(--lv-warning)' }}
+                    aria-hidden
+                  />{' '}
+                  {d.name}
                 </span>
                 <span className={`badge ${d.level}`}>
                   {d.level === 'danger' ? 'เสี่ยงสูง' : 'เฝ้าระวัง'}
@@ -82,7 +113,8 @@ export default function DiseasePanel({ latest }) {
                 <ExternalLink size={12} strokeWidth={2.2} aria-hidden /> ที่มา: {d.source.name}
               </a>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </section>
