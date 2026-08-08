@@ -6,31 +6,17 @@ import FloodPanel from '@/components/FloodPanel';
 import GovPanel from '@/components/GovPanel';
 import RedirectButton from '@/components/RedirectButton';
 import { agoTh } from '@/lib/format';
+import { useLang } from '@/hooks/useLang';
 
 const HERO = {
-  danger: {
-    Icon: Siren,
-    color: 'var(--lv-danger)',
-    title: (n) => `มีจุดอันตราย ${n} แห่ง — ระดับน้ำเกินเกณฑ์!`,
-  },
-  warning: {
-    Icon: TriangleAlert,
-    color: 'var(--lv-warning)',
-    title: (n) => `มีจุดเฝ้าระวัง ${n} แห่ง — ควรติดตามใกล้ชิด`,
-  },
-  normal: {
-    Icon: Droplet,
-    color: 'var(--lv-ok)',
-    title: () => 'สถานการณ์น้ำปกติทุกจุดวัด',
-  },
-  unknown: {
-    Icon: CircleHelp,
-    color: 'var(--muted)',
-    title: () => 'ยังไม่มีข้อมูลระดับน้ำล่าสุด',
-  },
+  danger: { Icon: Siren, color: 'var(--lv-danger)', titleKey: 'hydro.danger' },
+  warning: { Icon: TriangleAlert, color: 'var(--lv-warning)', titleKey: 'hydro.warning' },
+  normal: { Icon: Droplet, color: 'var(--lv-ok)', titleKey: 'hydro.normal' },
+  unknown: { Icon: CircleHelp, color: 'var(--muted)', titleKey: 'hydro.unknown' },
 };
 
 function HydroHero({ flood, gov, lastFetched, onRefresh, loading }) {
+  const { t } = useLang();
   const summary = flood?.summary ?? null;
   const worst = summary?.worstFresh ?? 'unknown';
   const hero = HERO[worst] ?? HERO.unknown;
@@ -41,24 +27,24 @@ function HydroHero({ flood, gov, lastFetched, onRefresh, loading }) {
   const overCap = gov?.reservoirs?.overCapacityCount ?? null;
 
   const chips = [
-    summary && { label: 'จุดวัดทั้งหมด', value: summary.total },
-    summary && summary.danger > 0 && { label: 'อันตราย', value: summary.danger, tone: 'danger' },
+    summary && { label: t('hydro.chipTotal'), value: summary.total },
+    summary && summary.danger > 0 && { label: t('hydro.chipDanger'), value: summary.danger, tone: 'danger' },
     summary &&
-      summary.warning > 0 && { label: 'เฝ้าระวัง', value: summary.warning, tone: 'warning' },
+      summary.warning > 0 && { label: t('hydro.chipWarning'), value: summary.warning, tone: 'warning' },
     summary &&
       summary.stale + summary.noData > 0 && {
-        label: 'ไม่มีข้อมูลล่าสุด',
+        label: t('hydro.chipNoData'),
         value: summary.stale + summary.noData,
         tone: 'muted',
       },
     warningCount != null && {
-      label: 'ประกาศเตือนฝน',
+      label: t('hydro.chipRainWarn'),
       value: warningCount,
       tone: warningCount ? 'warning' : undefined,
     },
-    topRain && { label: 'ฝนสูงสุด 24 ชม.', value: `${Number(topRain.rain24h).toFixed(0)} มม.` },
+    topRain && { label: t('hydro.chipRainMax'), value: `${Number(topRain.rain24h).toFixed(0)} ${t('hydro.mm')}` },
     overCap != null &&
-      overCap > 0 && { label: 'เขื่อนเกินความจุ', value: overCap, tone: 'danger' },
+      overCap > 0 && { label: t('hydro.chipOverCap'), value: overCap, tone: 'danger' },
   ].filter(Boolean);
 
   return (
@@ -68,16 +54,16 @@ function HydroHero({ flood, gov, lastFetched, onRefresh, loading }) {
           <hero.Icon size={30} strokeWidth={2} aria-hidden />
         </div>
         <div className="hydro-hero-text">
-          <div className="hydro-hero-title">{hero.title(heroCount)}</div>
+          <div className="hydro-hero-title">{t(hero.titleKey, { n: heroCount })}</div>
           <div className="hydro-hero-sub">
-            ข้อมูลจากเว็บ StreeFlood และหน่วยงานภาครัฐ
-            {lastFetched ? ` · อัปเดต${agoTh(Date.now() - lastFetched)}` : ''}
+            {t('hydro.source')}
+            {lastFetched ? t('hydro.updatedAgo', { ago: agoTh(Date.now() - lastFetched) }) : ''}
           </div>
         </div>
         <button
           className="icon-btn hydro-refresh"
           onClick={onRefresh}
-          title="รีเฟรชข้อมูลน้ำ"
+          title={t('hydro.refresh')}
           disabled={loading}
         >
           <RotateCw size={16} strokeWidth={2.2} className={loading ? 'spin' : undefined} aria-hidden />
@@ -99,16 +85,17 @@ function HydroHero({ flood, gov, lastFetched, onRefresh, loading }) {
 
 /** Hydro Info tab: hero summary + flood stations + government feeds. */
 export default function HydroSection({ apiBase, serverCfg, addLog, theme }) {
+  const { t } = useLang();
   const flood = useHydroFeed({
     url: `${apiBase}/api/flood`,
     refreshMs: serverCfg.floodRefreshMs,
-    label: 'น้ำท่วม',
+    label: t('hydro.feedFlood'),
     addLog,
   });
   const gov = useHydroFeed({
     url: `${apiBase}/api/gov`,
     refreshMs: serverCfg.govRefreshMs,
-    label: 'ภาครัฐ',
+    label: t('hydro.feedGov'),
     addLog,
   });
 
@@ -132,7 +119,7 @@ export default function HydroSection({ apiBase, serverCfg, addLog, theme }) {
       <GovPanel feed={gov} />
       <div className="hydro-more section-gap">
         <RedirectButton href={serverCfg.streefloodUrl}>
-          ดูข้อมูลเพิ่มเติมที่ StreeFlood
+          {t('hydro.seeMore')}
         </RedirectButton>
       </div>
     </>

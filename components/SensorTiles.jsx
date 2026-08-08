@@ -6,6 +6,7 @@ import '@/components/charts/setup';
 import { SENSORS } from '@/config/sensors';
 import { CHART_COLORS } from '@/config/client';
 import { buildHistView, smoothSeries, gradientFill, tooltipOptions } from '@/lib/chart-utils';
+import { useLang } from '@/hooks/useLang';
 
 // Mini sparklines read as a trend, not a data table — smooth harder than the
 // main chart so raw sensor jitter doesn't look ragged (flows like the flood card).
@@ -13,6 +14,7 @@ const MINI_SMOOTH_MIN = 7;
 const MINI_SMOOTH_CAP = 9;
 
 function SensorTile({ sensor, latest, view, smooth, colors }) {
+  const { t } = useLang();
   const raw = latest?.[sensor.field];
   const value = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : null;
   const level = value != null ? sensor.level(value) : null;
@@ -75,7 +77,7 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
       <div className="tile-head">
         <span className="tile-label">
           <span className="tile-dot" />
-          {sensor.label}
+          {t(`sensor.${sensor.id}.label`)}
         </span>
         <span className="tile-value">
           {value != null ? value.toFixed(sensor.dp) : '--'}
@@ -85,7 +87,7 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
       <div className="tile-chart">
         <Line data={data} options={options} />
       </div>
-      <div className="tile-bar" title="แถบแสดงค่าปัจจุบันเทียบกับช่วงที่เหมาะสม">
+      <div className="tile-bar" title={t('sensor.tile.barTitle')}>
         <div
           className={`tile-bar-fill ${level || 'ok'}`}
           style={{ width: `${needlePct ?? 0}%` }}
@@ -93,26 +95,24 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
         <div
           className="tile-bar-mark"
           style={{ left: `${comfortLeft}%` }}
-          title={`ช่วงเหมาะสมเริ่ม ${bar.comfort[0]} ${sensor.unit}`}
+          title={t('sensor.tile.comfortStart', { v: bar.comfort[0], unit: sensor.unit })}
         />
         <div
           className="tile-bar-mark"
           style={{ left: `${comfortLeft + comfortWidth}%` }}
-          title={`ช่วงเหมาะสมสิ้นสุด ${bar.comfort[1]} ${sensor.unit}`}
+          title={t('sensor.tile.comfortEnd', { v: bar.comfort[1], unit: sensor.unit })}
         />
       </div>
       <div className="tile-bar-scale">
         <span>{bar.min}</span>
-        <span>
-          เหมาะสม {bar.comfort[0]}–{bar.comfort[1]}
-        </span>
+        <span>{t('sensor.tile.comfort', { lo: bar.comfort[0], hi: bar.comfort[1] })}</span>
         <span>
           {bar.max} {sensor.unit}
         </span>
       </div>
       <div className="tile-foot">
         <span className={`badge ${value == null ? 'nodata' : level || ''}`}>
-          {value == null ? 'รอข้อมูล' : sensor.text(value)}
+          {value == null ? t('sensor.tile.waiting') : t(`sensor.${sensor.id}.${sensor.textKey(value)}`)}
         </span>
       </div>
     </div>

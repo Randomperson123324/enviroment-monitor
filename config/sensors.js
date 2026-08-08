@@ -44,6 +44,15 @@ export const SENSORS = [
       if (v > t.okHi) return 'ค่อนข้างร้อน';
       return 'สมบูรณ์';
     },
+    /** i18n key suffix (see config/i18n.js `sensor.temp.*`). */
+    textKey: (v) => {
+      const t = THRESHOLDS.temp;
+      if (v < t.warnLo) return 'cold2';
+      if (v < t.okLo) return 'cold';
+      if (v > t.warnHi) return 'hot2';
+      if (v > t.okHi) return 'hot';
+      return 'ok';
+    },
     statLabel: 'อุณหภูมิ',
   },
   {
@@ -63,6 +72,14 @@ export const SENSORS = [
       if (v > t.warnHi) return 'ชื้นเกิน';
       if (v > t.okHi) return 'ชื้น';
       return 'เหมาะสม';
+    },
+    textKey: (v) => {
+      const t = THRESHOLDS.hum;
+      if (v < t.warnLo) return 'dry2';
+      if (v < t.okLo) return 'dry';
+      if (v > t.warnHi) return 'wet2';
+      if (v > t.okHi) return 'wet';
+      return 'ok';
     },
     statLabel: 'ความชื้น',
   },
@@ -88,6 +105,14 @@ export const SENSORS = [
       if (v > t.warn) return 'ไม่ดี';
       if (v > t.clean) return 'พอใช้';
       return 'บริสุทธิ์';
+    },
+    textKey: (v) => {
+      const t = THRESHOLDS.gas;
+      if (v > t.critical) return 'crit';
+      if (v > t.danger) return 'bad2';
+      if (v > t.warn) return 'bad';
+      if (v > t.clean) return 'okish';
+      return 'ok';
     },
     statLabel: 'ก๊าซ',
   },

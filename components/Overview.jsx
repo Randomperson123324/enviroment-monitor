@@ -3,6 +3,7 @@
 import { Laugh, Smile, Meh, Frown, Angry, Moon } from 'lucide-react';
 import { scoreBand } from '@/config/sensors';
 import { SCORE_BAND_COLORS } from '@/config/client';
+import { useLang } from '@/hooks/useLang';
 
 const RING = { size: 176, radius: 78 };
 const CIRC = 2 * Math.PI * RING.radius;
@@ -16,6 +17,7 @@ function scoreColor(score, theme) {
 }
 
 export default function Overview({ latest, theme }) {
+  const { t, lang } = useLang();
   const ai = latest?.ai_analysis ?? null;
   const score = ai?.score ?? latest?.health_score ?? null;
   const color = score != null ? scoreColor(score, theme) : 'var(--muted)';
@@ -23,7 +25,7 @@ export default function Overview({ latest, theme }) {
   const FaceIcon = score != null ? (SCORE_FACE[scoreBand(score).id] ?? Meh) : Moon;
 
   const ts = latest?.created_at
-    ? new Date(latest.created_at).toLocaleString('th-TH', {
+    ? new Date(latest.created_at).toLocaleString(lang === 'en' ? 'en-GB' : 'th-TH', {
         hour12: false,
         day: '2-digit',
         month: '2-digit',
@@ -58,15 +60,15 @@ export default function Overview({ latest, theme }) {
           <div className="ring-num" style={{ color }}>
             {score ?? '--'}
           </div>
-          <div className="ring-label">คะแนนสุขภาพห้อง</div>
+          <div className="ring-label">{t('overview.scoreLabel')}</div>
         </div>
       </div>
 
       <div className="ov-status">
-        <div className="ov-title">{ai?.msg ?? 'กำลังรอข้อมูลจากเซ็นเซอร์...'}</div>
-        <div className="ov-ts">อัปเดตล่าสุด: {ts}</div>
+        <div className="ov-title">{ai?.msg ?? t('overview.waiting')}</div>
+        <div className="ov-ts">{t('overview.updated', { ts })}</div>
         <div className="reco-list">
-          {(ai?.recommendations ?? [{ level: 'info', text: '⏳ กำลังเชื่อมต่อ Arduino UNO Q' }]).map(
+          {(ai?.recommendations ?? [{ level: 'info', text: t('overview.connecting') }]).map(
             (r, i) => (
               <div key={i} className={`reco ${r.level ?? ''}`}>
                 {r.text}

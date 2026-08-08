@@ -19,20 +19,22 @@ import SectionHeader from '@/components/SectionHeader';
 import { CHART_COLORS, STATUS_COLORS } from '@/config/client';
 import { gradientFill } from '@/lib/chart-utils';
 import { agoTh, timeTh } from '@/lib/format';
+import { useLang } from '@/hooks/useLang';
 
 const SEVERITY = {
-  normal: { label: 'ปกติ', cls: '', Icon: Droplet, color: STATUS_COLORS.good },
-  warning: { label: 'เฝ้าระวัง', cls: 'warning', Icon: TriangleAlert, color: STATUS_COLORS.warning },
-  danger: { label: 'อันตราย', cls: 'danger', Icon: Siren, color: STATUS_COLORS.critical },
+  normal: { labelKey: 'flood.sevNormal', cls: '', Icon: Droplet, color: STATUS_COLORS.good },
+  warning: { labelKey: 'flood.sevWarning', cls: 'warning', Icon: TriangleAlert, color: STATUS_COLORS.warning },
+  danger: { labelKey: 'flood.sevDanger', cls: 'danger', Icon: Siren, color: STATUS_COLORS.critical },
 };
 
 const TREND = {
-  rising: { label: 'กำลังเพิ่มขึ้น', Icon: TrendingUp },
-  falling: { label: 'กำลังลดลง', Icon: TrendingDown },
-  stable: { label: 'คงที่', Icon: MoveRight },
+  rising: { labelKey: 'flood.trendRising', Icon: TrendingUp },
+  falling: { labelKey: 'flood.trendFalling', Icon: TrendingDown },
+  stable: { labelKey: 'flood.trendStable', Icon: MoveRight },
 };
 
 function Sparkline({ history, color, colors }) {
+  const { t } = useLang();
   const data = useMemo(
     () => ({
       labels: history.map(([t]) =>
@@ -73,18 +75,19 @@ function Sparkline({ history, color, colors }) {
               const [t] = history[items[0]?.dataIndex] ?? [];
               return t ? timeTh(new Date(t).toISOString()) : '';
             },
-            label: (ctx) => `${ctx.parsed.y?.toFixed(1)} ซม.`,
+            label: (ctx) => `${ctx.parsed.y?.toFixed(1)} ${t('flood.cm')}`,
           },
         },
       },
     }),
-    [history, colors]
+    [history, colors, t]
   );
 
   return <Line data={data} options={options} />;
 }
 
 function StationCard({ st, colors }) {
+  const { t } = useLang();
   const noData = st.level == null;
   const sev = SEVERITY[st.severity] ?? SEVERITY.normal;
   const trend = TREND[st.trend] ?? TREND.stable;
@@ -104,14 +107,14 @@ function StationCard({ st, colors }) {
           {st.label}
         </span>
         <span className={`badge ${noData || st.stale ? 'nodata' : sev.cls}`}>
-          {noData ? 'ไม่มีข้อมูล' : st.stale ? 'ข้อมูลเก่า' : sev.label}
+          {noData ? t('flood.noData') : st.stale ? t('flood.stale') : t(sev.labelKey)}
         </span>
       </div>
 
       <div className="flood-reading">
         <div className={`flood-level ${st.stale ? 'stale' : ''}`}>
           {noData ? '--' : st.level.toFixed(1)}
-          <small> ซม.</small>
+          <small> {t('flood.cm')}</small>
         </div>
         <div className="flood-meta">
           {!noData && (
@@ -140,32 +143,32 @@ function StationCard({ st, colors }) {
         <div
           className="flood-bar-mark"
           style={{ left: `${Math.min(100, (st.warning_level_cm / st.danger_level_cm) * 100)}%` }}
-          title={`เกณฑ์เฝ้าระวัง ${st.warning_level_cm} ซม.`}
+          title={t('flood.warnThresh', { v: st.warning_level_cm })}
         />
         <div
           className="flood-bar-mark danger"
           style={{ left: '100%' }}
-          title={`เกณฑ์อันตราย ${st.danger_level_cm} ซม.`}
+          title={t('flood.dangerThresh', { v: st.danger_level_cm })}
         />
       </div>
       <div className="flood-bar-scale">
         <span>0</span>
-        <span>เตือน {st.warning_level_cm}</span>
-        <span>อันตราย {st.danger_level_cm} ซม.</span>
+        <span>{t('flood.warnLevel', { v: st.warning_level_cm })}</span>
+        <span>{t('flood.dangerLevel', { v: st.danger_level_cm })}</span>
       </div>
 
       <div className="flood-sub">
         <span className="flood-trend">
           {noData ? (
-            'ยังไม่มีการวัดจากสถานีนี้'
+            t('flood.noReading')
           ) : (
             <>
-              <trend.Icon size={13} strokeWidth={2.2} aria-hidden /> {trend.label}
-              {st.trend !== 'stable' ? ` (${Math.abs(st.ratePerHour).toFixed(1)} ซม./ชม.)` : ''}
+              <trend.Icon size={13} strokeWidth={2.2} aria-hidden /> {t(trend.labelKey)}
+              {st.trend !== 'stable' ? ` ${t('flood.ratePerHour', { v: Math.abs(st.ratePerHour).toFixed(1) })}` : ''}
             </>
           )}
         </span>
-        {!noData && <span>{noData ? '' : `${pct}% ของเกณฑ์อันตราย`}</span>}
+        {!noData && <span>{t('flood.pctOfDanger', { pct })}</span>}
       </div>
     </div>
   );
@@ -184,6 +187,7 @@ function SkeletonCard() {
 
 /** Flood stations shared from StreeFlood (presentational — data via useHydroFeed). */
 export default function FloodPanel({ feed, theme }) {
+  const { t } = useLang();
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
   const { data, error, loading } = feed;
   const stations = data?.stations ?? [];
@@ -192,20 +196,18 @@ export default function FloodPanel({ feed, theme }) {
     <section className="section-gap">
       <SectionHeader
         Icon={Waves}
-        title="ระดับน้ำจากระบบเตือนภัยน้ำท่วม"
+        title={t('flood.title')}
         meta={
           error
-            ? 'เชื่อมต่อฐานข้อมูลน้ำท่วมไม่ได้ — แสดงข้อมูลล่าสุดที่มี'
+            ? t('flood.metaErr')
             : data
-              ? `${stations.length} จุดวัด · ข้อมูลจาก StreeFlood`
+              ? t('flood.meta', { n: stations.length })
               : ''
         }
       />
 
       {error && !data && (
-        <div className="panel flood-empty">
-          ⚠️ ยังเชื่อมต่อข้อมูลน้ำท่วมไม่ได้ — จะลองใหม่อัตโนมัติ
-        </div>
+        <div className="panel flood-empty">{t('flood.empty')}</div>
       )}
 
       <div className="flood-grid">

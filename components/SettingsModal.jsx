@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { Settings } from 'lucide-react';
+import { useLang } from '@/hooks/useLang';
 
 export default function SettingsModal({ settings, serverCfg, onSave, onClose }) {
+  const { t } = useLang();
   const [apiBase, setApiBase] = useState(settings.apiBase);
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey);
   const [pollSec, setPollSec] = useState(settings.pollMs / 1000);
@@ -28,28 +30,28 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
     >
       <div className="modal">
         <h3 className="ai-float-title">
-          <Settings size={18} strokeWidth={2.2} aria-hidden /> ตั้งค่า
+          <Settings size={18} strokeWidth={2.2} aria-hidden /> {t('settings.title')}
         </h3>
         <div className="field">
-          <label>ที่อยู่เซิร์ฟเวอร์ API (เว้นว่าง = เซิร์ฟเวอร์เดียวกัน)</label>
+          <label>{t('settings.apiBase')}</label>
           <input type="text" value={apiBase} onChange={(e) => setApiBase(e.target.value)} />
         </div>
         <div className="field">
-          <label>Gemini API Key (ไม่บังคับ — ใช้แทนของเซิร์ฟเวอร์)</label>
+          <label>{t('settings.geminiKey')}</label>
           <input
             type="password"
             value={geminiKey}
             onChange={(e) => setGeminiKey(e.target.value)}
-            placeholder="เว้นว่างไว้เพื่อใช้ key ของเซิร์ฟเวอร์"
+            placeholder={t('settings.geminiPlaceholder')}
           />
         </div>
         <p className="field-hint">
-          อุปกรณ์ส่งข้อมูลเข้า <code>POST /api/ingest</code> ด้วย 3 ค่า:{' '}
+          {t('settings.ingestHintPre')} <code>POST /api/ingest</code> {t('settings.ingestHintMid')}{' '}
           <code>temperature</code>, <code>humidity</code>, <code>gas_ppm</code>{' '}
-          (หรือ <code>temp</code>, <code>hum</code>, <code>gas</code>)
+          ({t('settings.ingestHintOr')} <code>temp</code>, <code>hum</code>, <code>gas</code>)
         </p>
         <div className="field">
-          <label>ความถี่อัปเดตข้อมูล (วินาที)</label>
+          <label>{t('settings.pollSec')}</label>
           <input
             type="number"
             min={serverCfg.pollMsMin / 1000}
@@ -60,10 +62,10 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
         </div>
         <div className="modal-foot">
           <button className="btn" onClick={onClose}>
-            ยกเลิก
+            {t('settings.cancel')}
           </button>
           <button className="btn btn-primary" onClick={save}>
-            บันทึก
+            {t('settings.save')}
           </button>
         </div>
       </div>

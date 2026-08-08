@@ -1,20 +1,21 @@
 'use client';
 
 import { THRESHOLDS } from '@/config/sensors';
-import { MSG, fill } from '@/config/messages.th';
+import { useLang } from '@/hooks/useLang';
 
 /** Gas alert banner + upstream data-quality warnings. */
 export default function AlertBar({ latest }) {
+  const { t } = useLang();
   if (!latest) return null;
   const gas = Number(latest.gas_ppm ?? 0);
-  const t = THRESHOLDS.gas;
+  const th = THRESHOLDS.gas;
 
-  if (gas > t.danger) {
-    const template = gas > t.critical ? MSG.alerts.gasCritical : MSG.alerts.gasHigh;
+  if (gas > th.danger) {
+    const key = gas > th.critical ? 'alert.gasCritical' : 'alert.gasHigh';
     return (
       <div className="alert-bar" role="alert">
         <span>⚠</span>
-        <span>{fill(template, { v: gas.toFixed(0) })}</span>
+        <span>{t(key, { v: gas.toFixed(0) })}</span>
       </div>
     );
   }

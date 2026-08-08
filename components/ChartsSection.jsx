@@ -21,15 +21,20 @@ import {
   valueAxis,
   tooltipOptions,
 } from '@/lib/chart-utils';
+import { useLang } from '@/hooks/useLang';
 
 function HistoryChart({ view, smooth, colors }) {
+  const { t } = useLang();
   const gasDiv = CHART_VIEW_DEFAULTS.gasAxisDivisor;
 
   const data = useMemo(() => {
     return {
       labels: view.labels,
       datasets: SENSORS.map((s) => ({
-        label: s.id === 'gas' ? `ก๊าซ ÷${gasDiv}` : `${s.label} (${s.unit})`,
+        label:
+          s.id === 'gas'
+            ? t('charts.gasDiv', { n: gasDiv })
+            : t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
         data:
           s.id === 'gas'
             ? smoothSeries(view.gas, smooth).map((v) => (v != null ? v / gasDiv : null))
@@ -44,7 +49,7 @@ function HistoryChart({ view, smooth, colors }) {
         fill: s.id !== 'gas',
       })),
     };
-  }, [view, smooth, colors, gasDiv]);
+  }, [view, smooth, colors, gasDiv, t]);
 
   const options = useMemo(
     () => ({
@@ -120,6 +125,7 @@ const AQI_STATUS_ICON = {
 
 /** Linear AQI meter — status segments with icon + label (never color alone). */
 function AqiMeter({ gas }) {
+  const { t } = useLang();
   const level = gas != null ? aqiLevel(gas) : null;
   const StatusIcon = level ? AQI_STATUS_ICON[level.status] : null;
   return (
@@ -135,7 +141,7 @@ function AqiMeter({ gas }) {
       </div>
       <div className="aqi-scale">
         {AQI_LEVELS.map((l) => (
-          <span key={l.id}>{l.label}</span>
+          <span key={l.id}>{t(`aqi.${l.id}`)}</span>
         ))}
       </div>
       <div className="aqi-reading">
@@ -145,7 +151,7 @@ function AqiMeter({ gas }) {
         </div>
         <div className="aqi-cat" style={{ color: level ? STATUS_COLORS[level.status] : 'var(--muted)' }}>
           {StatusIcon ? <StatusIcon size={16} strokeWidth={2.2} aria-hidden /> : <span>—</span>}
-          <span>{level?.label ?? '--'}</span>
+          <span>{level ? t(`aqi.${level.id}`) : '--'}</span>
         </div>
       </div>
     </div>
@@ -153,6 +159,7 @@ function AqiMeter({ gas }) {
 }
 
 export default function ChartsSection({ dash, theme }) {
+  const { t } = useLang();
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
   const view = useMemo(() => buildHistView(dash.histRows, dash.hours), [dash.histRows, dash.hours]);
 
@@ -160,36 +167,37 @@ export default function ChartsSection({ dash, theme }) {
   const scoreAvg = scores.length
     ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(0)
     : '--';
-  const rangeLabel =
-    CHART_RANGES.find((r) => r.h === dash.hours)?.label ?? `${dash.hours} ชม.`;
+  const rangeLabel = CHART_RANGES.some((r) => r.h === dash.hours)
+    ? t(`ranges.${dash.hours}`)
+    : t('charts.hoursShort', { h: dash.hours });
 
   return (
     <section className="section-gap">
       <SectionHeader
         Icon={ChartLine}
-        title="แนวโน้มย้อนหลัง"
-        meta={`${rangeLabel} · ${view.timestamps.length} จุดข้อมูล`}
+        title={t('charts.title')}
+        meta={t('charts.meta', { range: rangeLabel, n: view.timestamps.length })}
       >
-        <div className="range-row" aria-label="ช่วงเวลา">
+        <div className="range-row" aria-label={t('charts.timeRange')}>
           {CHART_RANGES.map((r) => (
             <button
               key={r.h}
               className={`range-pill ${dash.hours === r.h ? 'active' : ''}`}
               onClick={() => dash.setHours(r.h)}
             >
-              {r.label}
+              {t(`ranges.${r.h}`)}
             </button>
           ))}
           <select
             className="chart-opt"
             value={dash.smooth}
             onChange={(e) => dash.setSmooth(Number(e.target.value))}
-            title="ความลื่นของเส้นกราฟ"
-            aria-label="ความลื่นของเส้นกราฟ"
+            title={t('charts.smoothing')}
+            aria-label={t('charts.smoothing')}
           >
             {SMOOTH_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
-                {o.label}
+                {t(`smooth.${o.key}`)}
               </option>
             ))}
           </select>
@@ -207,15 +215,15 @@ export default function ChartsSection({ dash, theme }) {
         <div className="chart-side">
           <div className="panel">
             <div className="chart-head">
-              <div className="panel-title">คะแนนสุขภาพห้อง</div>
-              <div className="panel-meta">เฉลี่ย {scoreAvg}</div>
+              <div className="panel-title">{t('charts.scoreTitle')}</div>
+              <div className="panel-meta">{t('charts.avg', { v: scoreAvg })}</div>
             </div>
             <div className="chart-stage-sm">
               <ScoreChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
             </div>
           </div>
           <div className="panel">
-            <div className="panel-title">คุณภาพอากาศ</div>
+            <div className="panel-title">{t('charts.airQuality')}</div>
             <AqiMeter gas={dash.latest?.gas_ppm != null ? Number(dash.latest.gas_ppm) : null} />
           </div>
         </div>

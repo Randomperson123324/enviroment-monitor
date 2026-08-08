@@ -15,6 +15,7 @@ export const STORAGE = {
   chartSmooth: 'em_chart_smooth',
   focusThreshold: 'em_focus_threshold',
   activeTab: 'em_active_tab',
+  lang: 'em_lang',
 };
 
 /** Dashboard sections, grouped by the top-level menu. */
@@ -33,10 +34,10 @@ export const CHART_RANGES = [
 ];
 
 export const SMOOTH_OPTIONS = [
-  { value: 1, label: 'ดิบ' },
-  { value: 3, label: 'เบา' },
-  { value: 5, label: 'กลาง' },
-  { value: 9, label: 'ลื่น' },
+  { value: 1, key: 'raw', label: 'ดิบ' },
+  { value: 3, key: 'light', label: 'เบา' },
+  { value: 5, key: 'medium', label: 'กลาง' },
+  { value: 9, key: 'smooth', label: 'ลื่น' },
 ];
 
 export const CHART_VIEW_DEFAULTS = {

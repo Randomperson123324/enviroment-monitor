@@ -16,11 +16,12 @@ import {
 } from 'lucide-react';
 import SectionHeader from '@/components/SectionHeader';
 import { assessDiseases } from '@/lib/disease';
+import { useLang } from '@/hooks/useLang';
 
 const WORST = {
-  danger: { Icon: ShieldAlert, color: 'var(--lv-danger)', title: 'มีความเสี่ยงต่อโรคสูง — ควรรีบปรับสภาพแวดล้อม' },
-  warning: { Icon: TriangleAlert, color: 'var(--lv-warning)', title: 'มีความเสี่ยงต่อโรคบางชนิด — ควรเฝ้าระวัง' },
-  clear: { Icon: ShieldCheck, color: 'var(--lv-ok)', title: 'ความเสี่ยงต่อโรคจากสิ่งแวดล้อมต่ำ' },
+  danger: { Icon: ShieldAlert, color: 'var(--lv-danger)', titleKey: 'disease.heroDanger' },
+  warning: { Icon: TriangleAlert, color: 'var(--lv-warning)', titleKey: 'disease.heroWarning' },
+  clear: { Icon: ShieldCheck, color: 'var(--lv-ok)', titleKey: 'disease.heroClear' },
 };
 
 // ไอคอน lucide แทน emoji เดิม — คีย์ด้วย id ของโรคใน config/diseases.js
@@ -39,7 +40,8 @@ const DISEASE_ICONS = {
  * Rule-based (config/diseases.js), computed live from the latest reading.
  */
 export default function DiseasePanel({ latest }) {
-  const { risks, worst, allClear } = useMemo(() => assessDiseases(latest), [latest]);
+  const { t } = useLang();
+  const { risks, worst } = useMemo(() => assessDiseases(latest), [latest]);
   const head = WORST[worst ?? 'clear'];
   const loading = !latest;
 
@@ -47,8 +49,8 @@ export default function DiseasePanel({ latest }) {
     <section className="section-gap">
       <SectionHeader
         Icon={Activity}
-        title="ความเสี่ยงโรคจากสภาพแวดล้อม"
-        meta="วิเคราะห์จากอุณหภูมิ · ความชื้น · คุณภาพอากาศ"
+        title={t('disease.section')}
+        meta={t('disease.meta')}
       />
 
       <div className="panel disease-hero">
@@ -57,14 +59,14 @@ export default function DiseasePanel({ latest }) {
         </div>
         <div>
           <div className="disease-hero-title">
-            {loading ? 'กำลังรอข้อมูลเซ็นเซอร์...' : head.title}
+            {loading ? t('disease.waiting') : t(head.titleKey)}
           </div>
           <div className="disease-hero-sub">
             {loading
-              ? 'ต้องมีข้อมูลอุณหภูมิ ความชื้น หรือก๊าซ เพื่อประเมินความเสี่ยง'
+              ? t('disease.needData')
               : risks.length
-                ? `พบความเสี่ยง ${risks.length} รายการ`
-                : allClear?.detail}
+                ? t('disease.found', { n: risks.length })
+                : t('disease.clearDetail')}
           </div>
         </div>
       </div>
@@ -94,15 +96,15 @@ export default function DiseasePanel({ latest }) {
                     style={{ color: d.level === 'danger' ? 'var(--lv-danger)' : 'var(--lv-warning)' }}
                     aria-hidden
                   />{' '}
-                  {d.name}
+                  {t(d.nameKey)}
                 </span>
                 <span className={`badge ${d.level}`}>
-                  {d.level === 'danger' ? 'เสี่ยงสูง' : 'เฝ้าระวัง'}
+                  {d.level === 'danger' ? t('disease.levelDanger') : t('disease.levelWarning')}
                 </span>
               </div>
-              <p className="disease-reason">{d.reason}</p>
+              <p className="disease-reason">{t(d.reasonKey, d.reasonVars)}</p>
               <p className="disease-prevention">
-                <ShieldCheck size={13} strokeWidth={2.2} aria-hidden /> {d.prevention}
+                <ShieldCheck size={13} strokeWidth={2.2} aria-hidden /> {t(d.preventionKey)}
               </p>
               <a
                 className="disease-source"
@@ -110,7 +112,7 @@ export default function DiseasePanel({ latest }) {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <ExternalLink size={12} strokeWidth={2.2} aria-hidden /> ที่มา: {d.source.name}
+                <ExternalLink size={12} strokeWidth={2.2} aria-hidden /> {t('disease.source', { name: d.source.name })}
               </a>
             </div>
             );

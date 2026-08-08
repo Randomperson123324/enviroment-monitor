@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Leaf, Eye, Waves, Gauge } from 'lucide-react';
 import { STORAGE, TABS } from '@/config/client';
+import { LanguageProvider, useLang } from '@/hooks/useLang';
 import useTheme from '@/hooks/useTheme';
 import useSettings from '@/hooks/useSettings';
 import useLogs from '@/hooks/useLogs';
@@ -26,6 +27,15 @@ import SettingsModal from '@/components/SettingsModal';
 const TAB_ICONS = { environment: Leaf, focus: Eye, hydro: Waves };
 
 export default function Dashboard() {
+  return (
+    <LanguageProvider>
+      <DashboardInner />
+    </LanguageProvider>
+  );
+}
+
+function DashboardInner() {
+  const { t } = useLang();
   const [theme, toggleTheme] = useTheme();
   const { settings, save } = useSettings();
   const { logs, addLog, clearLogs } = useLogs();
@@ -59,7 +69,7 @@ export default function Dashboard() {
       />
       <AlertBar latest={dash.latest} />
 
-      <nav className="tab-menu" aria-label="เลือกหมวดข้อมูล">
+      <nav className="tab-menu" aria-label={t('tabs.menuLabel')}>
         {TABS.map((t) => {
           const Icon = TAB_ICONS[t.id];
           return (
@@ -81,8 +91,8 @@ export default function Dashboard() {
           <section className="section-gap">
             <SectionHeader
               Icon={Gauge}
-              title="สถานะปัจจุบัน"
-              meta={dash.latest?.device_id ? `อุปกรณ์ ${dash.latest.device_id}` : ''}
+              title={t('env.statusNow')}
+              meta={dash.latest?.device_id ? t('env.deviceMeta', { id: dash.latest.device_id }) : ''}
             />
             <Overview latest={dash.latest} theme={theme} />
             <div className="tiles section-gap">
@@ -103,7 +113,6 @@ export default function Dashboard() {
             theme={theme}
             loading={!dash.loaded && !dash.stats}
           />
-          <DiseasePanel latest={dash.latest} />
         </>
       )}
 
@@ -115,7 +124,10 @@ export default function Dashboard() {
       )}
 
       {tab === 'hydro' && (
-        <HydroSection apiBase={settings.apiBase} serverCfg={serverCfg} addLog={addLog} theme={theme} />
+        <>
+          <DiseasePanel latest={dash.latest} />
+          <HydroSection apiBase={settings.apiBase} serverCfg={serverCfg} addLog={addLog} theme={theme} />
+        </>
       )}
 
       <div className="section-gap">

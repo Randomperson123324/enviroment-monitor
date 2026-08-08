@@ -14,20 +14,23 @@ import {
   withAlpha,
 } from '@/config/client';
 import { tooltipOptions } from '@/lib/chart-utils';
+import { useLang } from '@/hooks/useLang';
 
+// [glossary key shown literally, i18n key for its description]
 const GLOSSARY = [
-  ['person', 'ID หน้าของบุคคลที่ตรวจจับ (Face ID) — ใช้ระบุว่าเป็นคนเดิมหรือไม่'],
-  ['movement', 'จำนวนครั้งที่หัวหัน/ขยับภายใน 15 วินาที — ค่าสูง = เสียสมาธิ'],
-  ['direction', 'ทิศทางที่หัน: Left / Right / Up / Down — ตัวเลขคือจำนวนครั้งต่อ 15s'],
-  ['face_count', 'จำนวนใบหน้าที่ตรวจพบในกล้องขณะนั้น — >1 คน = มีคนอื่นในห้อง'],
-  ['created_at', 'เวลาที่บันทึก (ทุก 15 วินาที) — กราฟรวม 4 ช่วง = 1 นาที'],
+  ['person', 'focus.gPerson'],
+  ['movement', 'focus.gMovement'],
+  ['direction', 'focus.gDirection'],
+  ['face_count', 'focus.gFaceCount'],
+  ['created_at', 'focus.gCreatedAt'],
 ];
 
+// [direction field in the data, i18n key for its label]
 const DIRECTIONS = [
-  ['Left', 'ซ้าย ←'],
-  ['Right', 'ขวา →'],
-  ['Up', 'บน ↑'],
-  ['Down', 'ล่าง ↓'],
+  ['Left', 'focus.dirLeft'],
+  ['Right', 'focus.dirRight'],
+  ['Up', 'focus.dirUp'],
+  ['Down', 'focus.dirDown'],
 ];
 
 // จำนวน ID สูงสุดที่ให้สีต่างกันในกราฟ — เกินนี้ยุบเป็น "+N อื่น ๆ" (ห้าม cycle สี)
@@ -107,7 +110,7 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
   return { labels, series, overflow };
 }
 
-function FocusIdChart({ labels, series, palette, colors, threshold, selected, onSelect }) {
+function FocusIdChart({ labels, series, palette, colors, threshold, selected, onSelect, t }) {
   const data = useMemo(() => {
     const dimmed = selected != null;
     const lines = series.map((s) => {
@@ -132,7 +135,7 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
     // เส้นเกณฑ์แจ้งเตือน (คงที่) — เป็น dataset ท้ายสุด ไม่นับใน onClick/legend
     lines.push({
       _threshold: true,
-      label: 'เกณฑ์',
+      label: 'threshold',
       data: labels.map(() => threshold),
       borderColor: withAlpha(colors.focusOver, 0.7),
       borderWidth: 1.25,
@@ -185,10 +188,14 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
               const s = series[ctx.datasetIndex];
               if (!s) return null;
               const b = s.points[ctx.dataIndex];
-              const lines = [`#${s.person} · ขยับ ${ctx.parsed.y} ครั้ง/นาที${ctx.parsed.y > threshold ? ' ⚠' : ''}`];
+              const lines = [
+                `#${s.person} · ${t('focus.tipMove', { y: ctx.parsed.y })}${ctx.parsed.y > threshold ? ' ⚠' : ''}`,
+              ];
               if (b?.direction) {
                 const d = b.direction;
-                lines.push(`   ↔ ซ้าย ${d.Left ?? 0} ขวา ${d.Right ?? 0} บน ${d.Up ?? 0} ล่าง ${d.Down ?? 0}`);
+                lines.push(
+                  `   ${t('focus.tipDir', { l: d.Left ?? 0, r: d.Right ?? 0, u: d.Up ?? 0, d: d.Down ?? 0 })}`
+                );
               }
               return lines;
             },
@@ -196,13 +203,13 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
         },
       },
     }),
-    [series, colors, threshold, labels, selected, onSelect]
+    [series, colors, threshold, labels, selected, onSelect, t]
   );
 
   return <Line data={data} options={options} />;
 }
 
-function IdDetail({ series, palette, colors, threshold, onClose }) {
+function IdDetail({ series, palette, colors, threshold, onClose, t }) {
   const hue = palette[series.slot] ?? colors.tick;
   const over = series.latest != null && series.latest > threshold;
   const dir = series.latestDirection;
@@ -213,46 +220,46 @@ function IdDetail({ series, palette, colors, threshold, onClose }) {
       <div className="fcard-label">
         <span className="id-legend-item">
           <span className="id-swatch" style={{ background: hue }} />
-          รายละเอียด #{series.person}
+          {t('focus.detailTitle', { id: series.person })}
         </span>
-        <button className="id-detail-close" onClick={onClose} aria-label="ปิดรายละเอียด">
+        <button className="id-detail-close" onClick={onClose} aria-label={t('focus.closeDetail')}>
           <X size={15} strokeWidth={2.4} aria-hidden />
         </button>
       </div>
       <div className="fcard-val" style={{ color: over ? 'var(--lv-danger)' : hue }}>
         {series.latest ?? '--'}
         <span className={`badge ${over ? 'danger' : ''}`} style={{ marginLeft: 10, verticalAlign: 'middle' }}>
-          {series.latest == null ? '—' : over ? 'สูงเกิน!' : 'ปกติ'}
+          {series.latest == null ? '—' : over ? t('focus.high') : t('focus.normal')}
         </span>
       </div>
-      <div className="fcard-sub">การเคลื่อนไหวล่าสุด (ครั้ง/นาที) · เกณฑ์ {threshold}</div>
+      <div className="fcard-sub">{t('focus.latestMove', { th: threshold })}</div>
 
       <div className="id-stat-grid">
         <div>
-          <div className="dir-label">เฉลี่ย</div>
+          <div className="dir-label">{t('focus.avg')}</div>
           <div className="dir-val">{series.avg.toFixed(1)}</div>
         </div>
         <div>
-          <div className="dir-label">สูงสุด</div>
+          <div className="dir-label">{t('focus.max')}</div>
           <div className="dir-val">{series.max}</div>
         </div>
         <div>
-          <div className="dir-label">ช่วงที่เห็น</div>
-          <div className="dir-val">{series.buckets} นาที</div>
+          <div className="dir-label">{t('focus.seen')}</div>
+          <div className="dir-val">{t('focus.mins', { n: series.buckets })}</div>
         </div>
         <div>
-          <div className="dir-label">พบใบหน้า</div>
+          <div className="dir-label">{t('focus.faces')}</div>
           <div className="dir-val">{series.latestFace ?? '--'}</div>
         </div>
       </div>
 
       {dir && (
         <div className="dir-grid" style={{ marginTop: 12 }}>
-          {DIRECTIONS.map(([key, label]) => {
+          {DIRECTIONS.map(([key, labelKey]) => {
             const v = Number(dir[key]) || 0;
             return (
               <div key={key}>
-                <div className="dir-label">{label}</div>
+                <div className="dir-label">{t(labelKey)}</div>
                 <div className="dir-val">{v}</div>
                 <div className="dir-bar">
                   <div
@@ -270,6 +277,7 @@ function IdDetail({ series, palette, colors, threshold, onClose }) {
 }
 
 export default function FocusSection({ focusCfg, addLog, theme }) {
+  const { t } = useLang();
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
   const palette = ID_SERIES_PALETTE[theme] ?? ID_SERIES_PALETTE.dark;
   const { rows, buckets, latest, threshold, setThreshold, connected } = useFocus({ focusCfg, addLog });
@@ -295,10 +303,10 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
 
   return (
     <section className="section-gap">
-      <SectionHeader Icon={Eye} title="การจดจ่อจากกล้อง" live={connected}>
+      <SectionHeader Icon={Eye} title={t('focus.title')} live={connected}>
         <div className="focus-controls">
           <label>
-            แจ้งเตือนเมื่อขยับเกิน{' '}
+            {t('focus.thresholdPre')}{' '}
             <input
               type="number"
               className="threshold-input"
@@ -307,7 +315,7 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}
             />{' '}
-            ครั้ง/นาที
+            {t('focus.thresholdPost')}
           </label>
         </div>
       </SectionHeader>
@@ -315,20 +323,18 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
       {overThreshold && (
         <div className="alert-bar" style={{ marginBottom: 10 }} role="alert">
           <span>⚠</span>
-          <span>
-            ขยับ {mvPerMin} ครั้ง/นาที — เกินที่กำหนดไว้ {threshold} ครั้ง!
-          </span>
+          <span>{t('focus.over', { mv: mvPerMin, th: threshold })}</span>
         </div>
       )}
 
       <div className="focus-grid">
         <div className="focus-main">
           <div className="panel">
-            <div className="panel-title">การเคลื่อนไหวต่อนาที — แยกตามบุคคล (Face ID)</div>
+            <div className="panel-title">{t('focus.chartTitle')}</div>
             <div className="panel-meta" style={{ margin: '4px 0 8px' }}>
               {series.length
-                ? `${series.length} บุคคล · ${Math.min(labels.length, maxBars)} นาทีล่าสุด · แตะเส้นหรือ ID เพื่อดูรายละเอียด`
-                : '— รอข้อมูล —'}
+                ? t('focus.chartMeta', { people: series.length, mins: Math.min(labels.length, maxBars) })
+                : t('focus.waiting')}
             </div>
             <div className="focus-chart-stage">
               {series.length ? (
@@ -341,9 +347,10 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                   threshold={threshold}
                   selected={activeSel}
                   onSelect={setSelected}
+                  t={t}
                 />
               ) : (
-                <div className="focus-empty">ยังไม่มีข้อมูลการตรวจจับ</div>
+                <div className="focus-empty">{t('focus.empty')}</div>
               )}
             </div>
 
@@ -365,20 +372,20 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                     </button>
                   );
                 })}
-                {overflow > 0 && <span className="id-legend-more">+{overflow} อื่น ๆ</span>}
+                {overflow > 0 && <span className="id-legend-more">{t('focus.more', { n: overflow })}</span>}
               </div>
             )}
           </div>
 
           <div className="panel">
             <div className="panel-title gov-card-title">
-              <BookOpen size={15} strokeWidth={2.2} aria-hidden /> ความหมายของข้อมูล
+              <BookOpen size={15} strokeWidth={2.2} aria-hidden /> {t('focus.glossaryTitle')}
             </div>
             <div className="glossary">
-              {GLOSSARY.map(([key, desc]) => (
+              {GLOSSARY.map(([key, descKey]) => (
                 <div key={key} className="glossary-row">
                   <span className="glossary-key">{key}</span>
-                  <span className="glossary-desc">{desc}</span>
+                  <span className="glossary-desc">{t(descKey)}</span>
                 </div>
               ))}
             </div>
@@ -393,36 +400,35 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
               colors={colors}
               threshold={threshold}
               onClose={() => setSelected(null)}
+              t={t}
             />
           ) : (
             <div className="panel id-detail-hint">
               <div className="fcard-label">
-                <span>รายละเอียดรายบุคคล</span>
+                <span>{t('focus.detailHintTitle')}</span>
               </div>
-              <div className="fcard-sub">
-                แตะเส้นในกราฟ หรือแตะ ID ด้านล่างกราฟ เพื่อดูสถิติของบุคคลนั้น — การเคลื่อนไหวเฉลี่ย/สูงสุด และทิศทางที่หันล่าสุด
-              </div>
+              <div className="fcard-sub">{t('focus.detailHint')}</div>
             </div>
           )}
 
           <div className="panel">
             <div className="fcard-label">
-              <span>การเคลื่อนไหวรวม / นาที</span>
+              <span>{t('focus.totalMove')}</span>
               <span className={`badge ${overThreshold ? 'danger' : mvPerMin != null ? '' : 'nodata'}`}>
-                {mvPerMin == null ? '—' : overThreshold ? 'สูงเกิน!' : 'ปกติ'}
+                {mvPerMin == null ? '—' : overThreshold ? t('focus.high') : t('focus.normal')}
               </span>
             </div>
             <div className="fcard-val">{mvPerMin ?? '--'}</div>
             <div className="fcard-sub">
-              รวมทุกคน 4 ช่วง × 15 วินาทีล่าสุด
+              {t('focus.totalSub')}
               <br />
-              เกณฑ์แจ้งเตือน: {threshold} ครั้ง/นาที
+              {t('focus.thresholdInfo', { th: threshold })}
             </div>
           </div>
 
           <div className="panel">
             <div className="fcard-label">
-              <span>จำนวนใบหน้า</span>
+              <span>{t('focus.faceCount')}</span>
             </div>
             <div
               className="fcard-val"
@@ -441,12 +447,12 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
             </div>
             <div className="fcard-sub">
               {faceCount == null
-                ? 'จำนวนใบหน้าที่ตรวจพบล่าสุด'
+                ? t('focus.faceWaiting')
                 : faceCount === 0
-                  ? 'ไม่พบใบหน้า'
+                  ? t('focus.faceNone')
                   : faceCount === 1
-                    ? 'ตรวจพบ 1 คน'
-                    : `ตรวจพบ ${faceCount} คน`}
+                    ? t('focus.faceOne')
+                    : t('focus.faceMany', { n: faceCount })}
             </div>
           </div>
         </div>

@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { House, RotateCw, Settings, Sun, Moon, Menu, X } from 'lucide-react';
+import { House, RotateCw, Settings, Sun, Moon, Menu, X, Languages } from 'lucide-react';
 import { DATA_AGE } from '@/config/client';
+import { useLang } from '@/hooks/useLang';
 
 function DataAge({ createdAt }) {
+  const { t } = useLang();
   const [, force] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => force((n) => n + 1), DATA_AGE.tickMs);
-    return () => clearInterval(t);
+    const timer = setInterval(() => force((n) => n + 1), DATA_AGE.tickMs);
+    return () => clearInterval(timer);
   }, []);
   if (!createdAt) return null;
   const mins = Math.round((Date.now() - Date.parse(createdAt)) / 60000);
@@ -17,24 +19,8 @@ function DataAge({ createdAt }) {
     mins <= DATA_AGE.freshMin ? 'var(--lv-ok)' : mins <= DATA_AGE.staleMin ? 'var(--lv-warning)' : 'var(--lv-danger)';
   return (
     <span className="data-age" style={{ color }}>
-      {mins <= 1 ? '● เมื่อสักครู่' : `● ${mins} นาทีที่แล้ว`}
+      {mins <= 1 ? t('header.agoJustNow') : t('header.agoMinutes', { n: mins })}
     </span>
-  );
-}
-
-function Clock() {
-  const [now, setNow] = useState(null);
-  useEffect(() => {
-    setNow(new Date());
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <div className="clock">
-      {now
-        ? now.toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        : '--:--:--'}
-    </div>
   );
 }
 
@@ -49,6 +35,7 @@ export default function Header({
   onRefresh,
   onOpenSettings,
 }) {
+  const { t, toggle: toggleLang } = useLang();
   const dbState =
     health.supabaseOk == null ? '' : health.supabaseOk ? 'live' : 'err';
   const [menuOpen, setMenuOpen] = useState(false);
@@ -61,16 +48,16 @@ export default function Header({
         </div>
         <div>
           <div className="brand-name">ENV Monitor</div>
-          <div className="brand-sub">ดูแลสภาพแวดล้อมห้องของคุณ</div>
+          <div className="brand-sub">{t('header.brandSub')}</div>
         </div>
       </div>
 
       <button
         className="icon-btn hdr-burger"
         onClick={() => setMenuOpen((o) => !o)}
-        aria-label="เมนู"
+        aria-label={t('header.menu')}
         aria-expanded={menuOpen}
-        title="เมนู"
+        title={t('header.menu')}
       >
         {menuOpen ? (
           <X size={19} strokeWidth={2.2} aria-hidden />
@@ -82,12 +69,12 @@ export default function Header({
       <div className="hdr-collapse">
         <div className="hdr-mid">
           <div className="dev-select">
-            <span>อุปกรณ์</span>
+            <span>{t('header.device')}</span>
             <select
               value={deviceId ?? ''}
               onChange={(e) => onSelectDevice(e.target.value)}
               disabled={!devices.length}
-              aria-label="เลือกอุปกรณ์"
+              aria-label={t('header.selectDevice')}
             >
               {devices.length ? (
                 devices.map((id) => (
@@ -96,7 +83,7 @@ export default function Header({
                   </option>
                 ))
               ) : (
-                <option value="">— รอข้อมูล —</option>
+                <option value="">{t('header.noData')}</option>
               )}
             </select>
           </div>
@@ -106,16 +93,24 @@ export default function Header({
         <div className="hdr-right">
           <div className={`pill ${dbState}`}>
             <span className="dot" />
-            <span>{health.supabaseOk === false ? 'ขาดการเชื่อมต่อ' : 'เชื่อมต่อแล้ว'}</span>
+            <span>{health.supabaseOk === false ? t('header.disconnected') : t('header.connected')}</span>
           </div>
-          <Clock />
-          <button className="icon-btn" onClick={onRefresh} title="รีเฟรชข้อมูล">
+          <button
+            className="icon-btn lang-btn"
+            onClick={toggleLang}
+            title={t('lang.label')}
+            aria-label={t('lang.label')}
+          >
+            <Languages size={16} strokeWidth={2.2} aria-hidden />
+            <span className="lang-code">{t('lang.toggle')}</span>
+          </button>
+          <button className="icon-btn" onClick={onRefresh} title={t('header.refresh')}>
             <RotateCw size={17} strokeWidth={2.2} aria-hidden />
           </button>
-          <button className="icon-btn" onClick={onOpenSettings} title="ตั้งค่า">
+          <button className="icon-btn" onClick={onOpenSettings} title={t('header.settings')}>
             <Settings size={17} strokeWidth={2.2} aria-hidden />
           </button>
-          <button className="icon-btn" onClick={onToggleTheme} title="สลับโหมดสว่าง/มืด">
+          <button className="icon-btn" onClick={onToggleTheme} title={t('header.toggleTheme')}>
             {theme === 'dark' ? (
               <Sun size={17} strokeWidth={2.2} aria-hidden />
             ) : (

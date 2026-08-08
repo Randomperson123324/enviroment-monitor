@@ -17,11 +17,13 @@ import {
 import SectionHeader from '@/components/SectionHeader';
 import { GOV_COLLAPSED_ROWS } from '@/config/client';
 import { agoFromTh } from '@/lib/format';
+import { useLang } from '@/hooks/useLang';
 
 function FeedDown() {
+  const { t } = useLang();
   return (
     <div className="gov-muted gov-feed-down">
-      <CircleOff size={13} strokeWidth={2.2} aria-hidden /> ฟีดนี้ขัดข้องชั่วคราว
+      <CircleOff size={13} strokeWidth={2.2} aria-hidden /> {t('gov.feedDown')}
     </div>
   );
 }
@@ -36,6 +38,7 @@ function AllClear({ text }) {
 
 /** Collapsible list — shows GOV_COLLAPSED_ROWS rows with a "ดูทั้งหมด" toggle. */
 function ExpandableList({ items, renderRow }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const visible = open ? items : items.slice(0, GOV_COLLAPSED_ROWS);
   return (
@@ -45,11 +48,11 @@ function ExpandableList({ items, renderRow }) {
         <button className="gov-expand" onClick={() => setOpen((v) => !v)}>
           {open ? (
             <>
-              <ChevronUp size={14} strokeWidth={2.2} aria-hidden /> ย่อรายการ
+              <ChevronUp size={14} strokeWidth={2.2} aria-hidden /> {t('gov.collapse')}
             </>
           ) : (
             <>
-              <ChevronDown size={14} strokeWidth={2.2} aria-hidden /> ดูทั้งหมด ({items.length})
+              <ChevronDown size={14} strokeWidth={2.2} aria-hidden /> {t('gov.expandAll', { n: items.length })}
             </>
           )}
         </button>
@@ -71,6 +74,7 @@ function GovCard({ Icon, title, children }) {
 
 /** Government feeds shared from StreeFlood (presentational — data via useHydroFeed). */
 export default function GovPanel({ feed }) {
+  const { t } = useLang();
   const { data, error, loading } = feed;
   const warnings = data?.waterWarnings ?? null;
   const river = data?.riverSituation ?? null;
@@ -83,12 +87,12 @@ export default function GovPanel({ feed }) {
     <section className="section-gap">
       <SectionHeader
         Icon={Landmark}
-        title="ข้อมูลภาครัฐ (TMD · ThaiWater · กรมชลประทาน)"
+        title={t('gov.title')}
         meta={
           error
-            ? 'เชื่อมต่อแหล่งข้อมูลภาครัฐไม่ได้ — แสดงข้อมูลล่าสุดที่มี'
+            ? t('gov.metaErr')
             : data
-              ? `ดึงตรงจากหน่วยงาน · อัปเดต${agoFromTh(data.timestamp)}`
+              ? t('gov.meta', { ago: agoFromTh(data.timestamp) })
               : ''
         }
       />
@@ -105,30 +109,28 @@ export default function GovPanel({ feed }) {
               </div>
             ))
           ) : (
-            <div className="panel flood-empty gov-card-wide">
-              ⚠️ ยังเชื่อมต่อแหล่งข้อมูลภาครัฐไม่ได้ — จะลองใหม่อัตโนมัติ
-            </div>
+            <div className="panel flood-empty gov-card-wide">{t('gov.empty')}</div>
           )}
         </div>
       )}
 
       {data && (
         <div className="gov-grid">
-          <GovCard Icon={TriangleAlert} title="เตือนฝนตกหนัก / น้ำท่วมฉับพลัน">
+          <GovCard Icon={TriangleAlert} title={t('gov.warnTitle')}>
             {warnings == null ? (
               <FeedDown />
             ) : warnings.length === 0 ? (
-              <AllClear text="ไม่มีประกาศเตือนขณะนี้" />
+              <AllClear text={t('gov.warnNone')} />
             ) : (
               <ExpandableList
                 items={warnings}
                 renderRow={(w, i) => (
                   <div key={i} className="gov-row">
                     <span className={`badge ${w.flashFloodRisk ? 'danger' : 'warning'}`}>
-                      {w.flashFloodRisk ? 'น้ำท่วมฉับพลัน' : 'ฝนตกหนัก'}
+                      {w.flashFloodRisk ? t('gov.badgeFlash') : t('gov.badgeHeavyRain')}
                     </span>
                     <span className="gov-row-text" title={w.raw}>
-                      {w.station ? `${w.station} ` : ''}จ.{w.province} · {w.amountMm} มม.
+                      {w.station ? `${w.station} ` : ''}{t('gov.province')}{w.province} · {w.amountMm} {t('gov.mm')}
                       {w.periodRange ? ` (${w.periodRange})` : ''}
                     </span>
                   </div>
@@ -137,22 +139,22 @@ export default function GovPanel({ feed }) {
             )}
           </GovCard>
 
-          <GovCard Icon={Waves} title="สถานการณ์แม่น้ำ">
+          <GovCard Icon={Waves} title={t('gov.riverTitle')}>
             {river == null ? (
               <FeedDown />
             ) : (
               <>
                 <div className="gov-stats">
                   <div>
-                    <b>สถานีทั้งหมด</b>
+                    <b>{t('gov.riverTotal')}</b>
                     {river.totalStations}
                   </div>
                   <div style={{ color: river.overflowCount ? 'var(--lv-danger)' : undefined }}>
-                    <b>ล้นตลิ่ง</b>
+                    <b>{t('gov.riverOverflow')}</b>
                     {river.overflowCount}
                   </div>
                   <div style={{ color: river.highCount ? 'var(--lv-warning)' : undefined }}>
-                    <b>น้ำมาก</b>
+                    <b>{t('gov.riverHigh')}</b>
                     {river.highCount}
                   </div>
                 </div>
@@ -161,34 +163,34 @@ export default function GovPanel({ feed }) {
                     items={river.critical}
                     renderRow={(s, i) => (
                       <div key={i} className="gov-row">
-                        <span className="badge danger">วิกฤต</span>
+                        <span className="badge danger">{t('gov.badgeCritical')}</span>
                         <span className="gov-row-text">
-                          {s.stationName} ({s.river}) จ.{s.province?.th ?? '-'}
+                          {s.stationName} ({s.river}) {t('gov.province')}{s.province?.th ?? '-'}
                           {s.storagePercent != null ? ` · ${s.storagePercent}%` : ''}
                         </span>
                       </div>
                     )}
                   />
                 ) : (
-                  <AllClear text="ไม่มีสถานีระดับวิกฤต" />
+                  <AllClear text={t('gov.riverNone')} />
                 )}
               </>
             )}
           </GovCard>
 
-          <GovCard Icon={CloudRain} title="ฝนสะสม 24 ชม. สูงสุด">
+          <GovCard Icon={CloudRain} title={t('gov.rainTitle')}>
             {rain == null ? (
               <FeedDown />
             ) : rain.length === 0 ? (
-              <AllClear text="ไม่มีข้อมูลฝนตกหนัก" />
+              <AllClear text={t('gov.rainNone')} />
             ) : (
               <ExpandableList
                 items={rain}
                 renderRow={(r, i) => (
                   <div key={i} className="gov-row">
-                    <span className="gov-rain">{Number(r.rain24h).toFixed(1)} มม.</span>
+                    <span className="gov-rain">{Number(r.rain24h).toFixed(1)} {t('gov.mm')}</span>
                     <span className="gov-row-text">
-                      {r.stationName} จ.{r.province?.th ?? '-'}
+                      {r.stationName} {t('gov.province')}{r.province?.th ?? '-'}
                     </span>
                   </div>
                 )}
@@ -196,24 +198,24 @@ export default function GovPanel({ feed }) {
             )}
           </GovCard>
 
-          <GovCard Icon={Droplets} title="อ่างเก็บน้ำ / เขื่อน">
+          <GovCard Icon={Droplets} title={t('gov.resTitle')}>
             {reservoirs == null ? (
               <FeedDown />
             ) : (
               <>
                 <div className="gov-stats">
                   <div>
-                    <b>ทั้งหมด</b>
+                    <b>{t('gov.resTotal')}</b>
                     {reservoirs.totalReservoirs}
                   </div>
                   <div
                     style={{ color: reservoirs.overCapacityCount ? 'var(--lv-danger)' : undefined }}
                   >
-                    <b>เกินความจุ</b>
+                    <b>{t('gov.resOverCap')}</b>
                     {reservoirs.overCapacityCount}
                   </div>
                   <div style={{ color: reservoirs.highCount ? 'var(--lv-warning)' : undefined }}>
-                    <b>น้ำมาก</b>
+                    <b>{t('gov.resHigh')}</b>
                     {reservoirs.highCount}
                   </div>
                 </div>
@@ -233,12 +235,11 @@ export default function GovPanel({ feed }) {
           {(announcement || forecast) && (
             <div className="panel gov-card gov-card-wide">
               <div className="gov-card-title">
-                <Megaphone size={15} strokeWidth={2.2} aria-hidden /> ประกาศ / พยากรณ์อากาศ
-                (กรมอุตุนิยมวิทยา)
+                <Megaphone size={15} strokeWidth={2.2} aria-hidden /> {t('gov.annTitle')}
               </div>
               {announcement && (
                 <div className="gov-row">
-                  <span className="badge warning">ประกาศ</span>
+                  <span className="badge warning">{t('gov.badgeAnn')}</span>
                   <span className="gov-row-text">
                     {announcement.titleThai || announcement.titleEnglish}
                   </span>
@@ -248,7 +249,7 @@ export default function GovPanel({ feed }) {
                       href={announcement.webUrlThai}
                       target="_blank"
                       rel="noreferrer"
-                      title="อ่านประกาศฉบับเต็ม"
+                      title={t('gov.annRead')}
                     >
                       <ExternalLink size={13} strokeWidth={2.2} aria-hidden />
                     </a>

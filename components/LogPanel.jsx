@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ScrollText, Check, Info, TriangleAlert, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { useLang } from '@/hooks/useLang';
 
 const LEVEL_ICON = {
   ok: Check,
@@ -15,6 +16,7 @@ const LEVEL_ICON = {
  * latest entry as a one-line preview instead of claiming a full panel.
  */
 export default function LogPanel({ logs, onClear, onRefresh }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
 
   return (
@@ -24,10 +26,10 @@ export default function LogPanel({ logs, onClear, onRefresh }) {
           className="log-toggle"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          title={open ? 'ย่อบันทึกระบบ' : 'ขยายบันทึกระบบ'}
+          title={open ? t('log.collapse') : t('log.expand')}
         >
           <span className="panel-title ai-float-title">
-            <ScrollText size={16} strokeWidth={2.2} aria-hidden /> บันทึกระบบ
+            <ScrollText size={16} strokeWidth={2.2} aria-hidden /> {t('log.title')}
             <span className="log-count">{logs.length}</span>
           </span>
           {!open && logs[0] && <span className="log-preview">{logs[0].msg}</span>}
@@ -40,10 +42,10 @@ export default function LogPanel({ logs, onClear, onRefresh }) {
         {open && (
           <div className="subhdr-actions">
             <button className="mini-btn" onClick={onClear}>
-              ล้าง
+              {t('log.clear')}
             </button>
             <button className="mini-btn" onClick={onRefresh}>
-              รีเฟรช
+              {t('log.refresh')}
             </button>
           </div>
         )}

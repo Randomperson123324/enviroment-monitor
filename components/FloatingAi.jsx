@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, X, ChartColumn, MessageCircle, Sparkles, ArrowUp } from 'lucide-react';
 import { CHAT_MAX_TURNS } from '@/config/client';
+import { useLang } from '@/hooks/useLang';
 
 function apiHeaders(settings) {
   const h = { 'Content-Type': 'application/json' };
@@ -11,6 +12,7 @@ function apiHeaders(settings) {
 }
 
 function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
+  const { t } = useLang();
   const [override, setOverride] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -21,14 +23,14 @@ function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
   };
 
   const hint = settings.geminiKey
-    ? 'ใช้ Gemini key จากเบราว์เซอร์ (override)'
+    ? t('ai.hintOverride')
     : serverGemini
-      ? 'วิเคราะห์ผ่านเซิร์ฟเวอร์ (GEMINI_API_KEY)'
-      : 'โหมด local — ตั้ง GEMINI_API_KEY บนโฮสต์ หรือใส่ key ใน Settings';
+      ? t('ai.hintServer')
+      : t('ai.hintLocal');
 
   const forceAnalyze = async () => {
     setBusy(true);
-    addLog('ดึงข้อมูลล่าสุดจาก DB แล้ววิเคราะห์...', 'info');
+    addLog(t('ai.logFetching'), 'info');
     try {
       const r = await fetch(`${settings.apiBase}/api/gemini-analyze`, {
         method: 'POST',
@@ -47,7 +49,7 @@ function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
         recommendations: parsed.recommendations,
         summary: parsed.summary,
       });
-      addLog(`วิเคราะห์สำเร็จ (${parsed.source === 'gemini' ? 'Gemini' : 'ในเครื่อง'})`, 'ok');
+      addLog(t('ai.logDone', { src: parsed.source === 'gemini' ? t('ai.srcGemini') : t('ai.srcLocal') }), 'ok');
     } catch (e) {
       addLog(`Analyze error: ${e.message}`, 'err');
     } finally {
@@ -59,7 +61,7 @@ function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
     <>
       <div className="ai-body">
         {busy ? (
-          <div className="ai-rec info">✨ Gemini กำลังวิเคราะห์...</div>
+          <div className="ai-rec info">{t('ai.analyzing')}</div>
         ) : ai.recommendations?.length ? (
           <>
             {ai.summary ? <div className="ai-rec info">🤖 {ai.summary}</div> : null}
@@ -70,11 +72,11 @@ function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
             ))}
           </>
         ) : (
-          <div className="ai-rec info">🤖 รอข้อมูลจากเซ็นเซอร์...</div>
+          <div className="ai-rec info">{t('ai.waiting')}</div>
         )}
       </div>
       <button className="analyze-btn" onClick={forceAnalyze} disabled={busy}>
-        <Sparkles size={15} strokeWidth={2.2} aria-hidden /> วิเคราะห์ด้วย Gemini ตอนนี้
+        <Sparkles size={15} strokeWidth={2.2} aria-hidden /> {t('ai.analyzeNow')}
       </button>
       <div className="analyze-hint">{hint}</div>
     </>
@@ -82,6 +84,7 @@ function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
 }
 
 function ChatPane({ deviceId, settings, addLog }) {
+  const { t } = useLang();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -120,7 +123,7 @@ function ChatPane({ deviceId, settings, addLog }) {
     } catch (e) {
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: `⚠️ ขออภัย เกิดข้อผิดพลาด: ${e.message}`, ts: new Date() },
+        { role: 'assistant', content: t('ai.chatError', { msg: e.message }), ts: new Date() },
       ]);
       addLog(`Chat error: ${e.message}`, 'err');
     } finally {
@@ -133,9 +136,9 @@ function ChatPane({ deviceId, settings, addLog }) {
       <div className="chat-msgs" ref={bodyRef}>
         {messages.length === 0 && (
           <div className="chat-empty">
-            ถามเกี่ยวกับสภาพแวดล้อมในห้อง
+            {t('ai.chatEmpty1')}
             <br />
-            ข้อมูลเซ็นเซอร์จะถูกแนบไปอัตโนมัติ
+            {t('ai.chatEmpty2')}
           </div>
         )}
         {messages.map((m, i) => (
@@ -156,7 +159,7 @@ function ChatPane({ deviceId, settings, addLog }) {
         <textarea
           className="chat-input"
           rows={1}
-          placeholder="ถามเกี่ยวกับสภาพแวดล้อม..."
+          placeholder={t('ai.chatPlaceholder')}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -166,7 +169,7 @@ function ChatPane({ deviceId, settings, addLog }) {
             }
           }}
         />
-        <button className="chat-send" onClick={send} disabled={busy} title="ส่ง">
+        <button className="chat-send" onClick={send} disabled={busy} title={t('ai.send')}>
           <ArrowUp size={17} strokeWidth={2.4} aria-hidden />
         </button>
       </div>
@@ -176,17 +179,18 @@ function ChatPane({ deviceId, settings, addLog }) {
 
 /** AI assistant as a floating action button (bottom-right) with a glass popover. */
 export default function FloatingAi({ latest, deviceId, settings, serverGemini, addLog }) {
+  const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('recs');
-  const source = settings.geminiKey || serverGemini ? 'Gemini' : 'ในเครื่อง';
+  const source = settings.geminiKey || serverGemini ? 'Gemini' : t('ai.local');
 
   return (
     <>
       {open && (
-        <div className="panel ai-panel ai-float" role="dialog" aria-label="ผู้ช่วย AI">
+        <div className="panel ai-panel ai-float" role="dialog" aria-label={t('ai.dialog')}>
           <div className="subhdr">
             <span className="panel-title ai-float-title">
-              <Bot size={17} strokeWidth={2.2} aria-hidden /> ผู้ช่วย AI
+              <Bot size={17} strokeWidth={2.2} aria-hidden /> {t('ai.title')}
             </span>
             <span className="src-tag">{source}</span>
           </div>
@@ -195,13 +199,13 @@ export default function FloatingAi({ latest, deviceId, settings, serverGemini, a
               className={`ai-tab ${tab === 'recs' ? 'active' : ''}`}
               onClick={() => setTab('recs')}
             >
-              <ChartColumn size={14} strokeWidth={2.2} aria-hidden /> วิเคราะห์
+              <ChartColumn size={14} strokeWidth={2.2} aria-hidden /> {t('ai.analyze')}
             </button>
             <button
               className={`ai-tab ${tab === 'chat' ? 'active' : ''}`}
               onClick={() => setTab('chat')}
             >
-              <MessageCircle size={14} strokeWidth={2.2} aria-hidden /> แชท
+              <MessageCircle size={14} strokeWidth={2.2} aria-hidden /> {t('ai.chat')}
             </button>
           </div>
           {tab === 'recs' ? (
@@ -220,7 +224,7 @@ export default function FloatingAi({ latest, deviceId, settings, serverGemini, a
       <button
         className={`fab ${open ? 'open' : ''}`}
         onClick={() => setOpen((v) => !v)}
-        title={open ? 'ปิดผู้ช่วย AI' : 'เปิดผู้ช่วย AI'}
+        title={open ? t('ai.close') : t('ai.openAi')}
         aria-expanded={open}
       >
         {open ? <X size={22} strokeWidth={2.2} /> : <Bot size={24} strokeWidth={2} />}
