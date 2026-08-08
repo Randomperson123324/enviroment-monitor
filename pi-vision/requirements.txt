@@ -1,0 +1,11 @@
+# pi-vision — ติดตั้งด้วย:  pip install -r requirements.txt --break-system-packages
+#
+# หมายเหตุสำหรับ Raspberry Pi OS Bookworm:
+#   - picamera2 ไม่อยู่ในไฟล์นี้ เพราะต้องลงผ่าน apt:
+#       sudo apt install -y python3-picamera2
+#     (ลงผ่าน pip จะ build ไม่ผ่านและชนกับแพ็กเกจของระบบ)
+#   - ถ้าใช้เฉพาะ USB webcam ไม่ต้องลง picamera2
+
+mediapipe>=0.10.14
+opencv-python>=4.9
+numpy>=1.24

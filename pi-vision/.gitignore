@@ -1,0 +1,8 @@
+# ค่าจริง — ห้าม commit (ใช้ .env.example เป็นเอกสารแทน)
+.env
+
+# โมเดล MediaPipe (~3.7 MB) ดาวน์โหลดอัตโนมัติตอนรันครั้งแรก
+models/
+
+__pycache__/
+*.py[cod]
