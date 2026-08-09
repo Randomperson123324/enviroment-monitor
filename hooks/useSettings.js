@@ -17,6 +17,8 @@ const DEFAULTS = {
   aiGeminiBase: '',
   aiGeminiModel: '',
   aiRelay: '',
+  /** 'blocks' | 'markdown' — see AI_SUMMARY_STYLES */
+  aiSummaryStyle: 'blocks',
   pollMs: CLIENT_FALLBACK.pollMsDefault,
 };
 

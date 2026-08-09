@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Settings } from 'lucide-react';
-import { AI_ORDER_PRESETS } from '@/config/client';
+import { AI_ORDER_PRESETS, AI_SUMMARY_STYLES } from '@/config/client';
 import { aiHeaders } from '@/lib/ai-client';
 import { useLang } from '@/hooks/useLang';
 
@@ -89,6 +89,7 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
   const [aiGeminiBase, setAiGeminiBase] = useState(settings.aiGeminiBase);
   const [aiGeminiModel, setAiGeminiModel] = useState(settings.aiGeminiModel);
   const [aiRelay, setAiRelay] = useState(settings.aiRelay);
+  const [aiSummaryStyle, setAiSummaryStyle] = useState(settings.aiSummaryStyle);
   const [pollSec, setPollSec] = useState(settings.pollMs / 1000);
 
   const ai = serverCfg.ai ?? {};
@@ -113,6 +114,7 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
       aiGeminiBase: aiGeminiBase.trim(),
       aiGeminiModel: aiGeminiModel.trim(),
       aiRelay: aiRelay.trim(),
+      aiSummaryStyle,
       pollMs: sec * 1000,
     });
   };
@@ -145,6 +147,18 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
         </p>
 
         <h4 className="field-group">{t('settings.aiSection')}</h4>
+
+        <div className="field">
+          <label>{t('settings.aiSummaryStyle')}</label>
+          <select value={aiSummaryStyle} onChange={(e) => setAiSummaryStyle(e.target.value)}>
+            {AI_SUMMARY_STYLES.map((s) => (
+              <option key={s.key} value={s.value}>
+                {t(`settings.aiSummaryStyleOpt.${s.key}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="field-hint">{t('settings.aiSummaryStyleHint')}</p>
 
         <div className="field">
           <label>{t('settings.aiOrder')}</label>

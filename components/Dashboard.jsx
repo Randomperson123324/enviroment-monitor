@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Leaf, Eye, Waves, Gauge } from 'lucide-react';
+import { Gauge } from 'lucide-react';
 import { STORAGE, TABS } from '@/config/client';
 import { LanguageProvider, useLang } from '@/hooks/useLang';
 import useTheme from '@/hooks/useTheme';
@@ -9,7 +9,10 @@ import useSettings from '@/hooks/useSettings';
 import useLogs from '@/hooks/useLogs';
 import useServerConfig from '@/hooks/useServerConfig';
 import useDashboard from '@/hooks/useDashboard';
+import useAiSummary from '@/hooks/useAiSummary';
+import AiSummary from '@/components/AiSummary';
 import Header from '@/components/Header';
+import TabMenu from '@/components/TabMenu';
 import AlertBar from '@/components/AlertBar';
 import SectionHeader from '@/components/SectionHeader';
 import Overview from '@/components/Overview';
@@ -23,8 +26,6 @@ import HydroSection from '@/components/HydroSection';
 import LogPanel from '@/components/LogPanel';
 import FloatingAi from '@/components/FloatingAi';
 import SettingsModal from '@/components/SettingsModal';
-
-const TAB_ICONS = { environment: Leaf, focus: Eye, hydro: Waves };
 
 export default function Dashboard() {
   return (
@@ -43,6 +44,27 @@ function DashboardInner() {
   const dash = useDashboard({ settings, serverCfg, addLog });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState(TABS[0].id);
+
+  // One cached summary per tab, generated server-side at most every 30 min.
+  // Only the visible tab polls — a hidden tab shouldn't hold a refresh timer.
+  const summaryArgs = {
+    apiBase: settings.apiBase,
+    settings,
+    pollMs: serverCfg.aiSummaryPollMs,
+  };
+  const envAi = useAiSummary({
+    ...summaryArgs,
+    scope: 'environment',
+    deviceId: dash.deviceId,
+    enabled: tab === 'environment',
+  });
+  const focusAi = useAiSummary({ ...summaryArgs, scope: 'focus', enabled: tab === 'focus' });
+  const hydroAi = useAiSummary({
+    ...summaryArgs,
+    scope: 'hydro',
+    deviceId: dash.deviceId,
+    enabled: tab === 'hydro',
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE.activeTab);
@@ -63,28 +85,15 @@ function DashboardInner() {
         deviceId={dash.deviceId}
         onSelectDevice={dash.setDevice}
         latest={dash.latest}
-        health={dash.health}
         onRefresh={dash.refresh}
         onOpenSettings={() => setSettingsOpen(true)}
+        activeTab={tab}
+        onSelectTab={switchTab}
       />
       <AlertBar latest={dash.latest} />
 
-      <nav className="tab-menu" aria-label={t('tabs.menuLabel')}>
-        {TABS.map((t) => {
-          const Icon = TAB_ICONS[t.id];
-          return (
-            <button
-              key={t.id}
-              className={`tab-item ${tab === t.id ? 'active' : ''}`}
-              onClick={() => switchTab(t.id)}
-              aria-current={tab === t.id ? 'page' : undefined}
-            >
-              <Icon size={17} strokeWidth={2.2} aria-hidden />
-              <span>{t.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+      {/* Desktop only — on mobile the same nav lives inside the burger panel. */}
+      <TabMenu active={tab} onSelect={switchTab} className="standalone" />
 
       {tab === 'environment' && (
         <>
@@ -94,7 +103,14 @@ function DashboardInner() {
               title={t('env.statusNow')}
               meta={dash.latest?.device_id ? t('env.deviceMeta', { id: dash.latest.device_id }) : ''}
             />
-            <Overview latest={dash.latest} theme={theme} />
+            <Overview
+              latest={dash.latest}
+              theme={theme}
+              summary={envAi.data}
+              summaryStyle={settings.aiSummaryStyle}
+              summaryLoading={envAi.loading}
+              onRefreshSummary={envAi.refresh}
+            />
             <div className="tiles section-gap">
               <SensorTiles
                 latest={dash.latest}
@@ -118,6 +134,14 @@ function DashboardInner() {
 
       {tab === 'focus' && (
         <>
+          <AiSummary
+            title={t('aiSummary.titleFocus')}
+            data={focusAi.data}
+            style={settings.aiSummaryStyle}
+            loading={focusAi.loading}
+            error={focusAi.error}
+            onRefresh={focusAi.refresh}
+          />
           <WebcamStrip webcam={dash.latest?.webcam_json} />
           <FocusSection focusCfg={serverCfg.focus} addLog={addLog} theme={theme} />
         </>
@@ -125,6 +149,14 @@ function DashboardInner() {
 
       {tab === 'hydro' && (
         <>
+          <AiSummary
+            title={t('aiSummary.titleHydro')}
+            data={hydroAi.data}
+            style={settings.aiSummaryStyle}
+            loading={hydroAi.loading}
+            error={hydroAi.error}
+            onRefresh={hydroAi.refresh}
+          />
           <DiseasePanel latest={dash.latest} />
           <HydroSection apiBase={settings.apiBase} serverCfg={serverCfg} addLog={addLog} theme={theme} />
         </>

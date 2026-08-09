@@ -9,61 +9,106 @@ import {
   Droplets,
   Megaphone,
   ChevronDown,
-  ChevronUp,
   ExternalLink,
+  ShieldAlert,
   CircleCheck,
   CircleOff,
 } from 'lucide-react';
 import SectionHeader from '@/components/SectionHeader';
-import { GOV_COLLAPSED_ROWS } from '@/config/client';
+import { GOV_LEVELS } from '@/config/client';
 import { agoFromTh } from '@/lib/format';
 import { useLang } from '@/hooks/useLang';
 
 function FeedDown() {
   const { t } = useLang();
   return (
-    <div className="gov-muted gov-feed-down">
-      <CircleOff size={13} strokeWidth={2.2} aria-hidden /> {t('gov.feedDown')}
-    </div>
+    <p className="gov-empty">
+      <CircleOff size={14} strokeWidth={2.2} aria-hidden /> {t('gov.feedDown')}
+    </p>
   );
 }
 
 function AllClear({ text }) {
   return (
-    <div className="gov-ok">
+    <p className="gov-empty ok">
       <CircleCheck size={14} strokeWidth={2.2} aria-hidden /> {text}
+    </p>
+  );
+}
+
+/**
+ * A place line that only repeats the station name carries no information —
+ * many ThaiWater stations are named after their own province ("นครพนม" in
+ * จ.นครพนม). Compare against the bare place, not the prefixed string, so this
+ * works in both languages (Thai prefixes "จ.", English prefixes nothing).
+ */
+function placeLine(name, place, prefix = '') {
+  if (!place) return '';
+  return name?.includes(place) ? '' : `${prefix}${place}`;
+}
+
+/** Count chips above a list — the section's headline numbers at a glance. */
+function Chips({ items }) {
+  return (
+    <div className="gov-chips">
+      {items.map((c) => (
+        <span key={c.label} className={`gov-chip ${c.tone ?? ''}`}>
+          {c.label}: {c.value}
+        </span>
+      ))}
     </div>
   );
 }
 
-/** Collapsible list — shows GOV_COLLAPSED_ROWS rows with a "ดูทั้งหมด" toggle. */
-function ExpandableList({ items, renderRow }) {
-  const { t } = useLang();
-  const [open, setOpen] = useState(false);
-  const visible = open ? items : items.slice(0, GOV_COLLAPSED_ROWS);
+/**
+ * One station / reservoir row, ported from StreeFlood's gov-data `DataRow`.
+ *
+ * Desktop: marker + name + value on the top line, location detail on its own
+ * line below, always visible. Mobile: a compact single line with a chevron —
+ * tapping un-truncates the name and reveals the detail, so nothing is lost on
+ * a small screen without cramming it.
+ */
+function DataRow({ marker, title, subtitle, value, tone, label, labelTone, tooltip }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <>
-      {visible.map(renderRow)}
-      {items.length > GOV_COLLAPSED_ROWS && (
-        <button className="gov-expand" onClick={() => setOpen((v) => !v)}>
-          {open ? (
-            <>
-              <ChevronUp size={14} strokeWidth={2.2} aria-hidden /> {t('gov.collapse')}
-            </>
-          ) : (
-            <>
-              <ChevronDown size={14} strokeWidth={2.2} aria-hidden /> {t('gov.expandAll', { n: items.length })}
-            </>
-          )}
-        </button>
-      )}
-    </>
+    <li
+      className={`gov-datarow ${expanded ? 'open' : ''}`}
+      title={tooltip}
+      onClick={() => setExpanded((v) => !v)}
+      aria-expanded={expanded}
+    >
+      <div className="gov-datarow-main">
+        <div className="gov-datarow-left">
+          <span className={`gov-marker ${tone ?? ''}`}>{marker}</span>
+          <p className="gov-datarow-title">{title}</p>
+        </div>
+        <div className="gov-datarow-right">
+          <div>
+            <p className={`gov-datarow-value ${tone ?? ''}`}>{value}</p>
+            {label ? <p className={`gov-datarow-label ${labelTone ?? ''}`}>{label}</p> : null}
+          </div>
+          <ChevronDown className="gov-datarow-chev" size={14} strokeWidth={2.2} aria-hidden />
+        </div>
+      </div>
+      {subtitle ? <p className="gov-datarow-sub">{subtitle}</p> : null}
+    </li>
   );
 }
 
-function GovCard({ Icon, title, children }) {
+/**
+ * Every row, in a scrolling list. Capping the height rather than the row count
+ * keeps the four cards the same size regardless of how many alerts a feed
+ * carries, and reaching the last of 64 warnings is a scroll instead of an
+ * expand that reflows the whole grid.
+ */
+function RowList({ items, renderRow }) {
+  return <ul className="gov-rows">{items.map(renderRow)}</ul>;
+}
+
+function GovCard({ Icon, title, children, wide }) {
   return (
-    <div className="panel gov-card">
+    <div className={`panel gov-card ${wide ? 'gov-card-wide' : ''}`}>
       <div className="gov-card-title">
         <Icon size={15} strokeWidth={2.2} aria-hidden /> {title}
       </div>
@@ -122,20 +167,63 @@ export default function GovPanel({ feed }) {
             ) : warnings.length === 0 ? (
               <AllClear text={t('gov.warnNone')} />
             ) : (
-              <ExpandableList
-                items={warnings}
-                renderRow={(w, i) => (
-                  <div key={i} className="gov-row">
-                    <span className={`badge ${w.flashFloodRisk ? 'danger' : 'warning'}`}>
-                      {w.flashFloodRisk ? t('gov.badgeFlash') : t('gov.badgeHeavyRain')}
-                    </span>
-                    <span className="gov-row-text" title={w.raw}>
-                      {w.station ? `${w.station} ` : ''}{t('gov.province')}{w.province} · {w.amountMm} {t('gov.mm')}
-                      {w.periodRange ? ` (${w.periodRange})` : ''}
-                    </span>
-                  </div>
-                )}
-              />
+              <>
+                <Chips
+                  items={[
+                    {
+                      label: t('gov.badgeFlash'),
+                      value: warnings.filter((w) => w.flashFloodRisk).length,
+                      tone: 'danger',
+                    },
+                    {
+                      label: t('gov.warnVeryHeavy'),
+                      value: warnings.filter((w) => w.veryHeavy).length,
+                      tone: 'warning',
+                    },
+                    { label: t('gov.warnTotal'), value: warnings.length },
+                  ]}
+                />
+                <RowList
+                  // Most urgent first; the feed is already newest-first, which a
+                  // stable sort preserves inside each tier.
+                  items={[...warnings].sort(
+                    (a, b) =>
+                      Number(b.flashFloodRisk) - Number(a.flashFloodRisk) ||
+                      Number(b.veryHeavy) - Number(a.veryHeavy)
+                  )}
+                  renderRow={(w, i) =>
+                    w.parsed ? (
+                      <DataRow
+                        key={i}
+                        tooltip={w.periodRange}
+                        tone={w.flashFloodRisk || w.veryHeavy ? 'danger' : 'warning'}
+                        marker={
+                          w.flashFloodRisk ? (
+                            <ShieldAlert size={16} strokeWidth={2.2} aria-hidden />
+                          ) : (
+                            <CloudRain size={16} strokeWidth={2.2} aria-hidden />
+                          )
+                        }
+                        title={w.station}
+                        subtitle={[
+                          w.amphoe ? `อ.${w.amphoe}` : '',
+                          w.province ? `${t('gov.province')}${w.province}` : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        value={`${Number(w.amountMm).toFixed(1)} ${t('gov.mm')}`}
+                        label={w.flashFloodRisk ? t('gov.badgeFlash') : w.periodType}
+                        labelTone={w.flashFloodRisk ? 'danger' : ''}
+                      />
+                    ) : (
+                      // Unparseable alerts still carry the warning text verbatim.
+                      <li key={i} className="gov-datarow raw">
+                        {w.raw}
+                      </li>
+                    )
+                  }
+                />
+              </>
             )}
           </GovCard>
 
@@ -144,32 +232,34 @@ export default function GovPanel({ feed }) {
               <FeedDown />
             ) : (
               <>
-                <div className="gov-stats">
-                  <div>
-                    <b>{t('gov.riverTotal')}</b>
-                    {river.totalStations}
-                  </div>
-                  <div style={{ color: river.overflowCount ? 'var(--lv-danger)' : undefined }}>
-                    <b>{t('gov.riverOverflow')}</b>
-                    {river.overflowCount}
-                  </div>
-                  <div style={{ color: river.highCount ? 'var(--lv-warning)' : undefined }}>
-                    <b>{t('gov.riverHigh')}</b>
-                    {river.highCount}
-                  </div>
-                </div>
+                <Chips
+                  items={[
+                    { label: t('gov.riverOverflow'), value: river.overflowCount, tone: 'danger' },
+                    { label: t('gov.riverHigh'), value: river.highCount, tone: 'warning' },
+                    { label: t('gov.riverTotal'), value: river.totalStations },
+                  ]}
+                />
                 {river.critical?.length ? (
-                  <ExpandableList
+                  <RowList
                     items={river.critical}
-                    renderRow={(s, i) => (
-                      <div key={i} className="gov-row">
-                        <span className="badge danger">{t('gov.badgeCritical')}</span>
-                        <span className="gov-row-text">
-                          {s.stationName} ({s.river}) {t('gov.province')}{s.province?.th ?? '-'}
-                          {s.storagePercent != null ? ` · ${s.storagePercent}%` : ''}
-                        </span>
-                      </div>
-                    )}
+                    renderRow={(s, i) => {
+                      const overflowing = s.situationLevel >= GOV_LEVELS.riverOverflow;
+                      return (
+                        <DataRow
+                          key={i}
+                          tone={overflowing ? 'danger' : 'warning'}
+                          marker={<Waves size={16} strokeWidth={2.2} aria-hidden />}
+                          title={s.stationName}
+                          subtitle={[s.river, s.amphoe?.th, s.province?.th].filter(Boolean).join(' · ')}
+                          value={overflowing ? t('gov.riverOverflow') : t('gov.riverHigh')}
+                          label={
+                            s.storagePercent != null
+                              ? `${Number(s.storagePercent).toFixed(0)}% ${t('gov.bank')}`
+                              : undefined
+                          }
+                        />
+                      );
+                    }}
                   />
                 ) : (
                   <AllClear text={t('gov.riverNone')} />
@@ -184,15 +274,17 @@ export default function GovPanel({ feed }) {
             ) : rain.length === 0 ? (
               <AllClear text={t('gov.rainNone')} />
             ) : (
-              <ExpandableList
+              <RowList
                 items={rain}
                 renderRow={(r, i) => (
-                  <div key={i} className="gov-row">
-                    <span className="gov-rain">{Number(r.rain24h).toFixed(1)} {t('gov.mm')}</span>
-                    <span className="gov-row-text">
-                      {r.stationName} {t('gov.province')}{r.province?.th ?? '-'}
-                    </span>
-                  </div>
+                  <DataRow
+                    key={i}
+                    tone="info"
+                    marker={<CloudRain size={16} strokeWidth={2.2} aria-hidden />}
+                    title={r.stationName}
+                    subtitle={placeLine(r.stationName, r.province?.th, t('gov.province'))}
+                    value={`${Number(r.rain24h).toFixed(1)} ${t('gov.mm')}`}
+                  />
                 )}
               />
             )}
@@ -203,75 +295,72 @@ export default function GovPanel({ feed }) {
               <FeedDown />
             ) : (
               <>
-                <div className="gov-stats">
-                  <div>
-                    <b>{t('gov.resTotal')}</b>
-                    {reservoirs.totalReservoirs}
-                  </div>
-                  <div
-                    style={{ color: reservoirs.overCapacityCount ? 'var(--lv-danger)' : undefined }}
-                  >
-                    <b>{t('gov.resOverCap')}</b>
-                    {reservoirs.overCapacityCount}
-                  </div>
-                  <div style={{ color: reservoirs.highCount ? 'var(--lv-warning)' : undefined }}>
-                    <b>{t('gov.resHigh')}</b>
-                    {reservoirs.highCount}
-                  </div>
-                </div>
-                <ExpandableList
+                <Chips
+                  items={[
+                    { label: t('gov.resOverCap'), value: reservoirs.overCapacityCount, tone: 'danger' },
+                    { label: t('gov.resHigh'), value: reservoirs.highCount, tone: 'warning' },
+                    { label: t('gov.resTotal'), value: reservoirs.totalReservoirs },
+                  ]}
+                />
+                <RowList
                   items={reservoirs.top ?? []}
-                  renderRow={(rv, i) => (
-                    <div key={i} className="gov-row">
-                      <span className="gov-rain">{Number(rv.percentStorage).toFixed(0)}%</span>
-                      <span className="gov-row-text">{rv.name}</span>
-                    </div>
-                  )}
+                  renderRow={(rv, i) => {
+                    const pct = Number(rv.percentStorage);
+                    return (
+                      <DataRow
+                        key={i}
+                        tone={
+                          pct > GOV_LEVELS.reservoirOverPercent
+                            ? 'danger'
+                            : pct >= GOV_LEVELS.reservoirHighPercent
+                              ? 'warning'
+                              : 'info'
+                        }
+                        marker={<Droplets size={16} strokeWidth={2.2} aria-hidden />}
+                        title={rv.name}
+                        subtitle={placeLine(rv.name, rv.region?.th)}
+                        value={`${pct.toFixed(0)}%`}
+                      />
+                    );
+                  }}
                 />
               </>
             )}
           </GovCard>
 
           {(announcement || forecast) && (
-            <div className="panel gov-card gov-card-wide">
-              <div className="gov-card-title">
-                <Megaphone size={15} strokeWidth={2.2} aria-hidden /> {t('gov.annTitle')}
-              </div>
+            <GovCard Icon={Megaphone} title={t('gov.annTitle')} wide>
               {announcement && (
-                <div className="gov-row">
-                  <span className="badge warning">{t('gov.badgeAnn')}</span>
-                  <span className="gov-row-text">
+                <div className="gov-ann">
+                  <p className="gov-ann-title">
                     {announcement.titleThai || announcement.titleEnglish}
-                  </span>
+                  </p>
                   {announcement.webUrlThai && (
                     <a
-                      className="gov-link"
+                      className="gov-more"
                       href={announcement.webUrlThai}
                       target="_blank"
                       rel="noreferrer"
-                      title={t('gov.annRead')}
                     >
-                      <ExternalLink size={13} strokeWidth={2.2} aria-hidden />
+                      {t('gov.annRead')} <ExternalLink size={12} strokeWidth={2.2} aria-hidden />
                     </a>
                   )}
                 </div>
               )}
+              {forecast?.issuedText && <p className="gov-muted">{forecast.issuedText}</p>}
               {forecast?.overall?.th && <p className="gov-forecast">{forecast.overall.th}</p>}
               {forecast?.regions?.length ? (
-                <div className="gov-regions">
-                  <ExpandableList
-                    items={forecast.regions}
-                    renderRow={(rg, i) => (
-                      <div key={i} className="gov-region-row">
-                        <span className="gov-region-name">{rg.region?.th}</span>
-                        <span className="gov-region-desc">{rg.description?.th}</span>
-                      </div>
-                    )}
-                  />
-                </div>
+                <RowList
+                  items={forecast.regions}
+                  renderRow={(rg, i) => (
+                    <li key={i} className="gov-datarow region">
+                      <p className="gov-datarow-title">{rg.region?.th}</p>
+                      <p className="gov-datarow-sub">{rg.description?.th}</p>
+                    </li>
+                  )}
+                />
               ) : null}
-              {forecast?.issuedText && <div className="gov-muted">{forecast.issuedText}</div>}
-            </div>
+            </GovCard>
           )}
         </div>
       )}

@@ -20,8 +20,6 @@ const DICT = {
       device: 'อุปกรณ์',
       selectDevice: 'เลือกอุปกรณ์',
       noData: '— รอข้อมูล —',
-      connected: 'เชื่อมต่อแล้ว',
-      disconnected: 'ขาดการเชื่อมต่อ',
       refresh: 'รีเฟรชข้อมูล',
       settings: 'ตั้งค่า',
       toggleTheme: 'สลับโหมดสว่าง/มืด',
@@ -110,6 +108,13 @@ const DICT = {
       cancel: 'ยกเลิก', save: 'บันทึก',
 
       aiSection: 'ผู้ช่วย AI',
+      aiSummaryStyle: 'รูปแบบการแสดงสรุปของ AI',
+      aiSummaryStyleOpt: {
+        blocks: 'แบบบล็อก (แยกกล่องตามระดับความสำคัญ)',
+        markdown: 'แบบข้อความ (Markdown)',
+      },
+      aiSummaryStyleHint:
+        'เปลี่ยนเฉพาะการแสดงผล ใช้ผลสรุปเดิมที่แคชไว้ ไม่ต้องเรียก AI ใหม่ · จำค่าไว้ในเบราว์เซอร์นี้',
       aiOrder: 'ลำดับการใช้ AI',
       aiOrderOpt: {
         server: 'ตามค่าเซิร์ฟเวอร์',
@@ -135,6 +140,7 @@ const DICT = {
     ai: {
       title: 'ผู้ช่วย AI', analyze: 'วิเคราะห์', chat: 'แชท',
       local: 'ในเครื่อง',
+      summaryTitle: 'สรุปโดย AI',
       hintAnswered: 'ตอบโดย {name}',
       hintServer: 'วิเคราะห์ผ่านเซิร์ฟเวอร์ ({providers})',
       hintLocal: 'โหมดกฎในเครื่อง — ตั้งค่า AI ในหน้า Settings หรือบนโฮสต์',
@@ -150,6 +156,21 @@ const DICT = {
       chatPlaceholder: 'ถามเกี่ยวกับสภาพแวดล้อม...',
       send: 'ส่ง', close: 'ปิดผู้ช่วย AI', openAi: 'เปิดผู้ช่วย AI', dialog: 'ผู้ช่วย AI',
       chatError: '⚠️ ขออภัย เกิดข้อผิดพลาด: {msg}',
+    },
+
+    aiSummary: {
+      title: 'สรุปโดย AI',
+      titleEnv: 'สรุปสภาพห้องโดย AI',
+      titleFocus: 'สรุปการจดจ่อโดย AI (ประมวลผลในเครื่อง)',
+      titleHydro: 'สรุปความปลอดภัยและสุขภาพโดย AI',
+      loading: '✨ กำลังสรุป...',
+      refresh: 'สรุปใหม่ตอนนี้',
+      generatedAt: 'สรุปเมื่อ {time}',
+      nextRefresh: 'จะสรุปใหม่อัตโนมัติเวลา {time}',
+      failed: '⚠️ สรุปไม่สำเร็จ: {msg}',
+      failedPinned: '⚠️ AI ในเครื่อง ({providers}) ใช้งานไม่ได้: {msg}',
+      pinnedNote:
+        'หมวดนี้ใช้ AI ในเครื่อง ({providers}) เท่านั้น จะไม่ส่งข้อมูลกล้องไปยัง Gemini หรือบริการภายนอก',
     },
 
     focus: {
@@ -251,11 +272,13 @@ const DICT = {
       meta: 'ดึงตรงจากหน่วยงาน · อัปเดต{ago}',
       empty: '⚠️ ยังเชื่อมต่อแหล่งข้อมูลภาครัฐไม่ได้ — จะลองใหม่อัตโนมัติ',
       feedDown: 'ฟีดนี้ขัดข้องชั่วคราว',
-      collapse: 'ย่อรายการ', expandAll: 'ดูทั้งหมด ({n})',
       warnTitle: 'เตือนฝนตกหนัก / น้ำท่วมฉับพลัน',
       warnNone: 'ไม่มีประกาศเตือนขณะนี้',
       badgeFlash: 'น้ำท่วมฉับพลัน', badgeHeavyRain: 'ฝนตกหนัก',
       province: 'จ.',
+      warnVeryHeavy: 'ฝนตกหนักมาก',
+      warnTotal: 'ทั้งหมด',
+      bank: 'ของตลิ่ง',
       riverTitle: 'สถานการณ์แม่น้ำ',
       riverTotal: 'สถานีทั้งหมด', riverOverflow: 'ล้นตลิ่ง', riverHigh: 'น้ำมาก',
       badgeCritical: 'วิกฤต', riverNone: 'ไม่มีสถานีระดับวิกฤต',
@@ -276,8 +299,6 @@ const DICT = {
       device: 'Device',
       selectDevice: 'Select device',
       noData: '— waiting —',
-      connected: 'Connected',
-      disconnected: 'Disconnected',
       refresh: 'Refresh data',
       settings: 'Settings',
       toggleTheme: 'Toggle light/dark',
@@ -366,6 +387,13 @@ const DICT = {
       cancel: 'Cancel', save: 'Save',
 
       aiSection: 'AI assistant',
+      aiSummaryStyle: 'AI summary style',
+      aiSummaryStyleOpt: {
+        blocks: 'Blocks (one card per recommendation, colour-coded)',
+        markdown: 'Text (Markdown)',
+      },
+      aiSummaryStyleHint:
+        'Presentation only — reuses the cached summary, so switching costs no AI call. Remembered in this browser.',
       aiOrder: 'Provider priority',
       aiOrderOpt: {
         server: 'Follow the server',
@@ -391,6 +419,7 @@ const DICT = {
     ai: {
       title: 'AI assistant', analyze: 'Analysis', chat: 'Chat',
       local: 'Local',
+      summaryTitle: 'AI summary',
       hintAnswered: 'Answered by {name}',
       hintServer: 'Analyzing via the server ({providers})',
       hintLocal: 'Local rule mode — configure AI in Settings or on the host',
@@ -406,6 +435,21 @@ const DICT = {
       chatPlaceholder: 'Ask about the environment...',
       send: 'Send', close: 'Close AI assistant', openAi: 'Open AI assistant', dialog: 'AI assistant',
       chatError: '⚠️ Sorry, an error occurred: {msg}',
+    },
+
+    aiSummary: {
+      title: 'AI summary',
+      titleEnv: 'AI room summary',
+      titleFocus: 'AI focus summary (on-device)',
+      titleHydro: 'AI safety & health summary',
+      loading: '✨ Summarizing...',
+      refresh: 'Summarize again now',
+      generatedAt: 'Summarized at {time}',
+      nextRefresh: 'Refreshes automatically at {time}',
+      failed: '⚠️ Summary failed: {msg}',
+      failedPinned: '⚠️ On-device AI ({providers}) is unavailable: {msg}',
+      pinnedNote:
+        'This tab uses on-device AI ({providers}) only — camera data is never sent to Gemini or any external service.',
     },
 
     focus: {
@@ -507,11 +551,13 @@ const DICT = {
       meta: 'Fetched directly · updated {ago}',
       empty: '⚠️ Cannot reach government sources yet — retrying automatically',
       feedDown: 'This feed is temporarily down',
-      collapse: 'Collapse', expandAll: 'See all ({n})',
       warnTitle: 'Heavy rain / flash-flood warnings',
       warnNone: 'No warnings right now',
       badgeFlash: 'Flash flood', badgeHeavyRain: 'Heavy rain',
       province: '',
+      warnVeryHeavy: 'Very heavy rain',
+      warnTotal: 'Total',
+      bank: 'of bank',
       riverTitle: 'River situation',
       riverTotal: 'Total stations', riverOverflow: 'Overflowing', riverHigh: 'High',
       badgeCritical: 'Critical', riverNone: 'No critical stations',

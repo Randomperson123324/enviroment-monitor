@@ -16,6 +16,8 @@ export const STORAGE = {
   aiGeminiBase: 'em_ai_gemini_base',
   aiGeminiModel: 'em_ai_gemini_model',
   aiRelay: 'em_ai_relay',
+  /** How AI summaries are rendered — see AI_SUMMARY_STYLES */
+  aiSummaryStyle: 'em_ai_summary_style',
   pollMs: 'em_poll_ms',
   deviceId: 'em_device_id',
   chartHours: 'em_chart_hours',
@@ -44,6 +46,15 @@ export const AI_ORDER_PRESETS = [
   { value: 'gemini', key: 'geminiOnly' },
 ];
 
+/**
+ * Presentation of AI summaries. Purely client-side: both styles render the same
+ * cached payload, so switching never triggers a new generation.
+ */
+export const AI_SUMMARY_STYLES = [
+  { value: 'blocks', key: 'blocks' },
+  { value: 'markdown', key: 'markdown' },
+];
+
 export const CHART_RANGES = [
   { h: 1, label: '1 ชม.' },
   { h: 6, label: '6 ชม.' },
@@ -68,8 +79,21 @@ export const CHART_VIEW_DEFAULTS = {
 };
 
 export const LOG_MAX_ROWS = 120;
-/** Rows shown in gov-data lists before "ดูทั้งหมด" expands them. */
-export const GOV_COLLAPSED_ROWS = 3;
+/**
+ * Classification cutoffs for gov-feed rows, used to tone the UI.
+ * These mirror ThaiWater's and RID's official scales and must stay in step with
+ * the server-side constants in lib/gov.js, which do the actual counting —
+ * lib/gov.js can't be imported here because it pulls in server config.
+ */
+export const GOV_LEVELS = {
+  /** ThaiWater situation scale: 4 = high (น้ำมาก), 5 = overflowing (ล้นตลิ่ง) */
+  riverHigh: 4,
+  riverOverflow: 5,
+  /** RID storage: >100% of capacity = over capacity, 81–100% = high */
+  reservoirHighPercent: 81,
+  reservoirOverPercent: 100,
+};
+
 export const CHAT_MAX_TURNS = 20;
 
 /** Header freshness indicator: minutes before the reading turns amber/red. */
@@ -96,6 +120,7 @@ export const CLIENT_FALLBACK = {
   healthPollMs: 30000,
   floodRefreshMs: 60000,
   govRefreshMs: 300000,
+  aiSummaryPollMs: 1800000,
   geminiEnabled: false,
   ai: {
     order: ['local', 'gemini'],

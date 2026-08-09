@@ -133,6 +133,24 @@ const config = {
       timeoutMs: num('AI_RELAY_TIMEOUT_MS', 130000),
     },
 
+    /**
+     * Per-tab AI summaries. Generated at most once per `ttlMs` and served from
+     * cache in between, so opening a tab never costs a model call.
+     */
+    summary: {
+      ttlMs: num('AI_SUMMARY_TTL_MS', 30 * 60 * 1000),
+      maxRecs: num('AI_SUMMARY_MAX_RECS', 4),
+      /** Rows of camera history folded into the focus summary */
+      focusRows: num('AI_SUMMARY_FOCUS_ROWS', 200),
+      /** Look-back window for the environment trend line */
+      envHours: num('AI_SUMMARY_ENV_HOURS', 6),
+      /**
+       * Focus is pinned to the on-device endpoint: camera data never leaves the
+       * network, so a failure is reported rather than retried against Gemini.
+       */
+      focusProviders: list('AI_SUMMARY_FOCUS_PROVIDERS', ['local']),
+    },
+
     /** Max chat-history turns forwarded to the model */
     maxHistoryTurns: num('AI_MAX_HISTORY_TURNS', num('GEMINI_MAX_HISTORY_TURNS', 10)),
     /** Server-side cache for the providers' model lists */
@@ -166,6 +184,8 @@ const config = {
     healthPollMs: num('CLIENT_HEALTH_POLL_MS', 30000),
     floodRefreshMs: num('CLIENT_FLOOD_REFRESH_MS', 60000),
     govRefreshMs: num('CLIENT_GOV_REFRESH_MS', 300000),
+    /** How often a tab re-asks for its summary; the server serves cache until ttlMs is up. */
+    aiSummaryPollMs: num('CLIENT_AI_SUMMARY_POLL_MS', 30 * 60 * 1000),
     focus: {
       fetchLimit: num('FOCUS_FETCH_LIMIT', 120),
       pollMs: num('FOCUS_POLL_MS', 20000),

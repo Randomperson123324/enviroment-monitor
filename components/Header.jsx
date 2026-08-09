@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { House, RotateCw, Settings, Sun, Moon, Menu, X, Languages } from 'lucide-react';
 import { DATA_AGE } from '@/config/client';
+import TabMenu from '@/components/TabMenu';
 import { useLang } from '@/hooks/useLang';
 
 function DataAge({ createdAt }) {
@@ -31,13 +32,12 @@ export default function Header({
   deviceId,
   onSelectDevice,
   latest,
-  health,
   onRefresh,
   onOpenSettings,
+  activeTab,
+  onSelectTab,
 }) {
   const { t, toggle: toggleLang } = useLang();
-  const dbState =
-    health.supabaseOk == null ? '' : health.supabaseOk ? 'live' : 'err';
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -67,6 +67,18 @@ export default function Header({
       </button>
 
       <div className="hdr-collapse">
+        {/* Mobile only (hidden by CSS on desktop, where the nav has its own bar).
+            Picking a section also closes the panel — leaving it open would cover
+            the content the tap just navigated to. */}
+        <TabMenu
+          active={activeTab}
+          onSelect={(id) => {
+            onSelectTab(id);
+            setMenuOpen(false);
+          }}
+          className="in-hdr"
+        />
+
         <div className="hdr-mid">
           <div className="dev-select">
             <span>{t('header.device')}</span>
@@ -91,10 +103,6 @@ export default function Header({
         </div>
 
         <div className="hdr-right">
-          <div className={`pill ${dbState}`}>
-            <span className="dot" />
-            <span>{health.supabaseOk === false ? t('header.disconnected') : t('header.connected')}</span>
-          </div>
           <button
             className="icon-btn lang-btn"
             onClick={toggleLang}

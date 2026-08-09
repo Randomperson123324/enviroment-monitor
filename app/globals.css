@@ -326,48 +326,6 @@ textarea {
   gap: 8px;
 }
 
-.pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 13px;
-  border-radius: 999px;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--muted);
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-
-.pill .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.pill.live {
-  color: var(--lv-ok);
-  background: color-mix(in srgb, var(--lv-ok) 12%, transparent);
-  border-color: color-mix(in srgb, var(--lv-ok) 25%, transparent);
-}
-
-.pill.live .dot {
-  animation: blink 2.4s ease-in-out infinite;
-}
-
-.pill.warn {
-  color: var(--lv-warning);
-  background: color-mix(in srgb, var(--lv-warning) 12%, transparent);
-  border-color: color-mix(in srgb, var(--lv-warning) 25%, transparent);
-}
-
-.pill.err {
-  color: var(--lv-danger);
-  background: color-mix(in srgb, var(--lv-danger) 12%, transparent);
-  border-color: color-mix(in srgb, var(--lv-danger) 25%, transparent);
-}
-
 @keyframes blink {
   0%,
   100% {
@@ -419,11 +377,18 @@ textarea {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
-/* ═══ TAB MENU ═══ */
+/* ═══ TAB MENU ═══
+   Two placements, one component (components/TabMenu.jsx): `standalone` is the
+   bar under the header on desktop, `in-hdr` lives inside the burger panel on
+   mobile. Exactly one is ever displayed — see the 640px block. */
 .tab-menu {
   display: flex;
   gap: 8px;
   margin-top: 16px;
+}
+
+.tab-menu.in-hdr {
+  display: none;
 }
 
 .tab-item {
@@ -659,6 +624,93 @@ textarea {
 .reco.info {
   background: color-mix(in srgb, var(--lv-info) 10%, var(--surface));
   border-color: color-mix(in srgb, var(--lv-info) 18%, transparent);
+}
+
+/* ═══ AI SUMMARY (top of every tab) ═══ */
+.ai-summary-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-summary-text {
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--ink);
+  margin: 12px 0 14px;
+}
+
+.ai-summary .reco-list {
+  gap: 8px;
+}
+
+/* Markdown rendering of AI summaries (components/Markdown.jsx). */
+.markdown {
+  font-size: 14.5px;
+  line-height: 1.8;
+  color: var(--ink);
+}
+
+.markdown p {
+  margin: 0 0 10px;
+}
+
+.markdown p:last-child,
+.markdown ul:last-child,
+.markdown ol:last-child {
+  margin-bottom: 0;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 0 0 10px;
+  padding-inline-start: 22px;
+}
+
+.markdown li {
+  margin-bottom: 6px;
+}
+
+.markdown li::marker {
+  color: var(--muted);
+}
+
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 14px 0 6px;
+  color: var(--ink);
+}
+
+.markdown strong {
+  font-weight: 600;
+}
+
+.markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ink) 8%, var(--surface));
+}
+
+.markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Freshness + refresh for the AI text on the Environment score card. */
+.ov-ai-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
 }
 
 /* ═══ WEBCAM STRIP ═══ */
@@ -1550,147 +1602,238 @@ textarea {
   gap: 7px;
 }
 
-.gov-big {
-  font-size: 26px;
-  font-weight: 700;
-  font-family: var(--font-mono), monospace;
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 8px;
-}
-
-.gov-big small {
-  font-size: 12px;
-  font-weight: 400;
-  color: var(--muted);
-  font-family: var(--font-sans), sans-serif;
-}
-
-.gov-stats {
+.gov-chips {
   display: flex;
-  gap: 18px;
-  font-size: 15px;
-  font-weight: 600;
-  font-family: var(--font-mono), monospace;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Headline counts above each list — StreeFlood's `glass-panel-strong px-3 py-1.5`. */
+.gov-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.gov-chip.danger {
+  color: var(--lv-danger);
+}
+
+.gov-chip.warning {
+  color: var(--lv-warning);
+}
+
+/* Column layout so the row list can absorb whatever height the grid hands the
+   card — without it, a card with no chips row (Top 24h rainfall) stretches to
+   match its neighbours and leaves the extra height as dead space. */
+.gov-card {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrolls rather than expands: a feed can carry 60+ alerts, and bounding the
+   height keeps all four cards the same size no matter how many arrive.
+   `flex: 1 1 19rem` makes 19rem the *natural* height rather than a hard cap, so
+   the list still grows to fill a card the grid stretched. min-height:0 is what
+   lets a flex item shrink below its content and actually scroll.
+   padding-inline-end reserves the gutter so the bar never sits on a row. */
+.gov-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  flex: 1 1 19rem;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.gov-rows::-webkit-scrollbar {
+  width: 6px;
+}
+
+.gov-rows::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.gov-rows::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+
+.gov-rows::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
+
+/* Each station is its own soft card rather than a dense text line. */
+.gov-datarow {
+  padding: 10px 12px;
+  border-radius: 1.125rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.gov-datarow.raw {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.gov-datarow-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gov-datarow-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.gov-marker {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.gov-marker.danger {
+  color: var(--lv-danger);
+}
+
+.gov-marker.warning {
+  color: var(--lv-warning);
+}
+
+.gov-marker.info {
+  color: var(--c-hum);
+}
+
+.gov-datarow-title {
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.gov-datarow-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.gov-datarow-value {
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.gov-datarow-value.danger {
+  color: var(--lv-danger);
+}
+
+.gov-datarow-value.warning {
+  color: var(--lv-warning);
+}
+
+.gov-datarow-value.info {
+  color: var(--c-hum);
+}
+
+.gov-datarow-label {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.gov-datarow-label.danger {
+  color: var(--lv-danger);
+}
+
+.gov-datarow-sub {
+  margin-top: 3px;
+  padding-inline-start: 30px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.gov-datarow.region .gov-datarow-sub {
+  padding-inline-start: 0;
+}
+
+/* Chevron + tap-to-expand are mobile affordances; desktop shows everything. */
+.gov-datarow-chev {
+  display: none;
+}
+
+/* Accent text link, replacing the old bordered pill toggle. */
+.gov-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.gov-more:hover {
+  text-decoration: underline;
+}
+
+.gov-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.gov-empty.ok {
+  color: var(--lv-ok);
+}
+
+.gov-ann {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   margin-bottom: 10px;
 }
 
-.gov-stats b {
-  display: block;
-  font-weight: 400;
-  font-size: 11px;
-  color: var(--muted);
-  font-family: var(--font-sans), sans-serif;
-}
-
-.gov-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 0;
-  font-size: 13px;
-}
-
-.gov-row .badge {
-  flex-shrink: 0;
-}
-
-.gov-row-text {
-  color: var(--ink-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.gov-rain {
-  font-family: var(--font-mono), monospace;
+.gov-ann-title {
+  font-size: 13.5px;
   font-weight: 600;
-  color: var(--c-hum);
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
+  line-height: 1.55;
+  color: var(--ink);
 }
 
 .gov-muted {
   font-size: 13px;
   color: var(--muted);
-}
-
-.gov-feed-down {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.gov-ok {
-  font-size: 13.5px;
-  color: var(--lv-ok);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.gov-expand {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 8px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--ink-2);
-  font-size: 12px;
-  transition: color 0.2s ease, border-color 0.2s ease;
-}
-
-.gov-expand:hover {
-  color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-.gov-link {
-  display: inline-grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  color: var(--accent);
-  background: var(--accent-soft);
-  flex-shrink: 0;
-}
-
-.gov-regions {
-  margin: 4px 0 10px;
-}
-
-.gov-region-row {
-  display: grid;
-  grid-template-columns: 150px 1fr;
-  gap: 12px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
-}
-
-.gov-region-row:last-of-type {
-  border-bottom: none;
-}
-
-.gov-region-name {
-  font-weight: 600;
-  color: var(--ink-2);
-}
-
-.gov-region-desc {
-  color: var(--ink-2);
-  line-height: 1.65;
-}
-
-@media (max-width: 640px) {
-  .gov-region-row {
-    grid-template-columns: 1fr;
-    gap: 2px;
-  }
 }
 
 .gov-forecast {
@@ -2467,6 +2610,77 @@ textarea {
   .hdr.open .hdr-collapse {
     display: flex;
     animation: hdr-drop 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Section nav moves into the burger panel: the standalone bar goes away and
+     the in-header copy stacks full-width so each target is an easy tap. */
+  .tab-menu.standalone {
+    display: none;
+  }
+
+  /* Menu rows follow StreeFlood's mobile nav (`glass-interactive` +
+     `rounded-glass-sm` + `gap-1 px-3 py-2.5`): borderless and transparent
+     inside the panel's own glass, so the list reads as rows rather than as
+     stacked capsules. The 1.03/0.97 hover physics on .tab-item already match
+     glass-interactive, so they're left alone. */
+  .tab-menu.in-hdr {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 0;
+  }
+
+  .tab-menu.in-hdr .tab-item {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 10px 12px;
+    border-radius: 1.125rem;
+    border-color: transparent;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  /* Re-assert the accent fill: the rule above is three classes deep and would
+     otherwise out-specify `.tab-item.active` and flatten the selected row. */
+  .tab-menu.in-hdr .tab-item.active {
+    background: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  /* Gov rows collapse to one line on mobile: the name truncates and the detail
+     hides until tapped, so a long station name can't push the value off-screen. */
+  .gov-datarow {
+    cursor: pointer;
+  }
+
+  .gov-datarow-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gov-datarow.open .gov-datarow-title {
+    overflow: visible;
+    white-space: normal;
+  }
+
+  .gov-datarow-sub {
+    display: none;
+  }
+
+  .gov-datarow.open .gov-datarow-sub {
+    display: block;
+  }
+
+  .gov-datarow-chev {
+    display: block;
+    margin-top: 3px;
+    color: var(--muted);
+    transition: transform 0.2s ease;
+  }
+
+  .gov-datarow.open .gov-datarow-chev {
+    transform: rotate(180deg);
   }
 
   .hdr-mid {
