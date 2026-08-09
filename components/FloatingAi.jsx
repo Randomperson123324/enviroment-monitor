@@ -3,29 +3,32 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, X, ChartColumn, MessageCircle, Sparkles, ArrowUp } from 'lucide-react';
 import { CHAT_MAX_TURNS } from '@/config/client';
+import { aiJsonHeaders } from '@/lib/ai-client';
 import { useLang } from '@/hooks/useLang';
 
-function apiHeaders(settings) {
-  const h = { 'Content-Type': 'application/json' };
-  if (settings.geminiKey) h['X-Gemini-Key'] = settings.geminiKey;
-  return h;
+/** "gemma4-e4b (via relay)" — what actually answered, not what's configured. */
+function sourceLabel(t, res) {
+  if (!res?.provider) return '';
+  // No model ran: the rule engine in lib/analysis.js replied.
+  const name = res.provider === 'local-rules' ? t('ai.srcLocal') : res.model || res.provider;
+  return res.via === 'relay' ? t('ai.viaRelay', { name }) : name;
 }
 
-function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
+function AnalysisPane({ latest, deviceId, settings, serverAi, addLog, onSource }) {
   const { t } = useLang();
   const [override, setOverride] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const ai = override ?? {
-    source: latest?.ai_analysis?.ai_source === 'gemini' ? 'gemini' : 'local',
     recommendations: latest?.ai_analysis?.recommendations ?? null,
     summary: null,
   };
 
-  const hint = settings.geminiKey
-    ? t('ai.hintOverride')
-    : serverGemini
-      ? t('ai.hintServer')
+  const answered = sourceLabel(t, override);
+  const hint = answered
+    ? t('ai.hintAnswered', { name: answered })
+    : serverAi?.length
+      ? t('ai.hintServer', { providers: serverAi.join(' → ') })
       : t('ai.hintLocal');
 
   const forceAnalyze = async () => {
@@ -34,7 +37,7 @@ function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
     try {
       const r = await fetch(`${settings.apiBase}/api/gemini-analyze`, {
         method: 'POST',
-        headers: apiHeaders(settings),
+        headers: aiJsonHeaders(settings),
         body: JSON.stringify({
           device_id: deviceId,
           temperature: latest?.temperature,
@@ -44,12 +47,15 @@ function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const parsed = await r.json();
+      onSource?.(parsed);
       setOverride({
-        source: parsed.source,
+        provider: parsed.provider,
+        model: parsed.model,
+        via: parsed.via,
         recommendations: parsed.recommendations,
         summary: parsed.summary,
       });
-      addLog(t('ai.logDone', { src: parsed.source === 'gemini' ? t('ai.srcGemini') : t('ai.srcLocal') }), 'ok');
+      addLog(t('ai.logDone', { src: sourceLabel(t, parsed) || t('ai.srcLocal') }), 'ok');
     } catch (e) {
       addLog(`Analyze error: ${e.message}`, 'err');
     } finally {
@@ -83,7 +89,7 @@ function AnalysisPane({ latest, deviceId, settings, serverGemini, addLog }) {
   );
 }
 
-function ChatPane({ deviceId, settings, addLog }) {
+function ChatPane({ deviceId, settings, addLog, onSource }) {
   const { t } = useLang();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -104,7 +110,7 @@ function ChatPane({ deviceId, settings, addLog }) {
     try {
       const r = await fetch(`${settings.apiBase}/api/chat`, {
         method: 'POST',
-        headers: apiHeaders(settings),
+        headers: aiJsonHeaders(settings),
         body: JSON.stringify({
           message: msg,
           history: nextMsgs.slice(0, -1).slice(-CHAT_MAX_TURNS / 2).map((m) => ({
@@ -116,6 +122,7 @@ function ChatPane({ deviceId, settings, addLog }) {
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
+      onSource?.(data);
       setMessages((prev) => {
         const next = [...prev, { role: 'assistant', content: data.reply ?? '—', ts: new Date() }];
         return next.length > CHAT_MAX_TURNS ? next.slice(next.length - CHAT_MAX_TURNS) : next;
@@ -178,11 +185,14 @@ function ChatPane({ deviceId, settings, addLog }) {
 }
 
 /** AI assistant as a floating action button (bottom-right) with a glass popover. */
-export default function FloatingAi({ latest, deviceId, settings, serverGemini, addLog }) {
+export default function FloatingAi({ latest, deviceId, settings, serverAi, addLog }) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('recs');
-  const source = settings.geminiKey || serverGemini ? 'Gemini' : t('ai.local');
+  const [lastSource, setLastSource] = useState(null);
+  // Until something answers we can only name the chain the server would use.
+  const source =
+    sourceLabel(t, lastSource) || (serverAi?.length ? serverAi.join(' → ') : t('ai.local'));
 
   return (
     <>
@@ -213,11 +223,17 @@ export default function FloatingAi({ latest, deviceId, settings, serverGemini, a
               latest={latest}
               deviceId={deviceId}
               settings={settings}
-              serverGemini={serverGemini}
+              serverAi={serverAi}
               addLog={addLog}
+              onSource={setLastSource}
             />
           ) : (
-            <ChatPane deviceId={deviceId} settings={settings} addLog={addLog} />
+            <ChatPane
+              deviceId={deviceId}
+              settings={settings}
+              addLog={addLog}
+              onSource={setLastSource}
+            />
           )}
         </div>
       )}

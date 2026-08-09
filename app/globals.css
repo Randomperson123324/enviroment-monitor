@@ -2337,8 +2337,36 @@ textarea {
   outline: none;
 }
 
-.field input:focus {
+.field select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 13.5px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  outline: none;
+}
+
+.field input:focus,
+.field select:focus {
   border-color: var(--accent);
+}
+
+/* Section divider inside the settings dialog. */
+.field-group {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin: 20px 0 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* The AI section makes the dialog tall — keep it inside the viewport. */
+.modal-scroll {
+  max-height: min(86vh, 780px);
+  overflow-y: auto;
 }
 
 .field-hint {

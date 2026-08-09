@@ -1,5 +1,6 @@
 import config from '@/config';
-import { geminiEnabled } from '@/lib/gemini';
+import { aiStatus } from '@/lib/ai';
+import { providerSettings } from '@/lib/ai/discovery';
 import { jsonOk, withErrors } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
@@ -7,13 +8,29 @@ export const dynamic = 'force-dynamic';
 /**
  * Public runtime config for the browser. The anon key is a public,
  * RLS-guarded key by design — but it still lives in env, not in source.
+ * AI settings expose endpoints and model *preferences* only, never keys.
  */
 export const GET = withErrors(async () => {
   const { client, supabase } = config;
+  const status = aiStatus();
+  const local = providerSettings('local');
+  const gemini = providerSettings('gemini');
+
   return jsonOk({
     ...client,
-    geminiEnabled: geminiEnabled(),
+    geminiEnabled: status.available.includes('gemini'),
     streefloodUrl: config.streeflood.baseUrl,
+    ai: {
+      order: status.order,
+      available: status.available,
+      localBaseUrl: local.baseUrl,
+      /** '' means the server auto-discovers whichever model is loaded */
+      localModel: local.model,
+      geminiBaseUrl: gemini.baseUrl,
+      geminiModel: gemini.model,
+      relayConfigured: Boolean(config.ai.relay.url),
+      allowClientOverrides: config.ai.allowClientOverrides,
+    },
     focus: {
       ...client.focus,
       supabaseUrl: supabase.url,

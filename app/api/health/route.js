@@ -1,7 +1,7 @@
 import config from '@/config';
 import { pingSupabase } from '@/lib/supabase';
 import { listDevices } from '@/lib/dashboard';
-import { geminiEnabled } from '@/lib/gemini';
+import { aiStatus } from '@/lib/ai';
 import { jsonOk, withErrors } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
@@ -12,11 +12,15 @@ export const GET = withErrors(async () => {
   if (supabase_ok) {
     devices = await listDevices().catch(() => []);
   }
+  const ai = aiStatus();
   return jsonOk({
     ok: true,
     supabase_ok,
-    gemini_enabled: geminiEnabled(),
-    model: config.gemini.model,
+    ai_enabled: ai.available.length > 0,
+    ai_providers: ai.available,
+    /** Retained for older clients that only knew about Gemini */
+    gemini_enabled: ai.available.includes('gemini'),
+    model: config.ai.gemini.model,
     devices,
     active_device: devices[0] ?? null,
     ts: new Date().toISOString(),

@@ -15,7 +15,7 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
   const [latest, setLatest] = useState(null);
   const [histRows, setHistRows] = useState([]);
   const [stats, setStats] = useState(null);
-  const [health, setHealth] = useState({ supabaseOk: null, geminiEnabled: false });
+  const [health, setHealth] = useState({ supabaseOk: null, aiEnabled: false, aiProviders: [] });
   const [hours, setHoursState] = useState(CHART_VIEW_DEFAULTS.hours);
   const [smooth, setSmoothState] = useState(CHART_VIEW_DEFAULTS.smooth);
   const [pollTick, setPollTick] = useState(0);
@@ -89,9 +89,13 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
     try {
       const r = await fetch(`${settings.apiBase}/api/health`, { cache: 'no-store' });
       const d = await r.json();
-      setHealth({ supabaseOk: !!d.supabase_ok, geminiEnabled: !!d.gemini_enabled });
+      setHealth({
+        supabaseOk: !!d.supabase_ok,
+        aiEnabled: !!d.ai_enabled,
+        aiProviders: Array.isArray(d.ai_providers) ? d.ai_providers : [],
+      });
     } catch {
-      setHealth({ supabaseOk: false, geminiEnabled: false });
+      setHealth({ supabaseOk: false, aiEnabled: false, aiProviders: [] });
     }
   }, [settings.apiBase]);
 

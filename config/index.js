@@ -9,6 +9,19 @@ const num = (key, fallback) => {
   return Number.isFinite(v) ? v : fallback;
 };
 const str = (key, fallback = '') => (process.env[key] ?? '').trim() || fallback;
+const bool = (key, fallback) => {
+  const v = (process.env[key] ?? '').trim().toLowerCase();
+  if (!v) return fallback;
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+};
+/** Comma-separated env list → array of trimmed entries (empty → fallback). */
+const list = (key, fallback) => {
+  const parts = (process.env[key] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.length ? parts : fallback;
+};
 
 const config = {
   supabase: {
@@ -72,14 +85,64 @@ const config = {
     ridFetchAttempts: num('GOV_RID_FETCH_ATTEMPTS', 3),
   },
 
-  gemini: {
-    apiKey: str('GEMINI_API_KEY'),
-    model: str('GEMINI_MODEL', 'gemini-2.5-flash'),
-    baseUrl: str('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
-    timeoutMs: num('GEMINI_TIMEOUT_MS', 25000),
-    maxOutputTokens: num('GEMINI_MAX_OUTPUT_TOKENS', 1024),
+  /**
+   * AI providers, tried in `order` until one answers; if all fail the callers
+   * fall back to the local rule engine in lib/analysis.js. Every provider is
+   * reachable server-side only — the local endpoint is plain HTTP, so a browser
+   * on an HTTPS page cannot call it directly (mixed content).
+   *
+   * No model id is hardcoded for the local provider: an empty `model` means
+   * "ask the endpoint which one is loaded" (see lib/ai/discovery.js).
+   */
+  ai: {
+    order: list('AI_PROVIDER_ORDER', ['local', 'gemini']),
+
+    /**
+     * OpenAI-compatible endpoint (llama-swap / llama.cpp / LM Studio / Ollama).
+     * `thinking: false` matters: the default model there is a reasoning model,
+     * and with thinking on it spends its whole token budget in
+     * `reasoning_content`, returning an empty `content`. See docs/06-ai-providers.md.
+     */
+    local: {
+      baseUrl: str('AI_LOCAL_BASE_URL', 'http://kagenou.serveminecraft.net:2000'),
+      /** '' = auto-discover the currently loaded model */
+      model: str('AI_LOCAL_MODEL', ''),
+      /** llama-swap needs no key; kept for LM Studio / gateway parity */
+      apiKey: str('AI_LOCAL_API_KEY'),
+      thinking: bool('AI_LOCAL_THINKING', false),
+      /** Generous: a request for an unloaded model triggers a cold model swap */
+      timeoutMs: num('AI_LOCAL_TIMEOUT_MS', 120000),
+      maxTokens: num('AI_LOCAL_MAX_TOKENS', 2048),
+    },
+
+    gemini: {
+      apiKey: str('GEMINI_API_KEY'),
+      model: str('GEMINI_MODEL', 'gemini-3.5-flash-lite'),
+      baseUrl: str('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
+      timeoutMs: num('GEMINI_TIMEOUT_MS', 25000),
+      maxTokens: num('GEMINI_MAX_OUTPUT_TOKENS', 1024),
+    },
+
+    /**
+     * Hosted deployment used as an outbound relay. Set on a machine that cannot
+     * reach the providers itself (venue Wi-Fi, raw-IP demo box) — its AI routes
+     * then forward to this origin instead of calling the models directly.
+     */
+    relay: {
+      url: str('AI_RELAY_URL'),
+      timeoutMs: num('AI_RELAY_TIMEOUT_MS', 130000),
+    },
+
     /** Max chat-history turns forwarded to the model */
-    maxHistoryTurns: num('GEMINI_MAX_HISTORY_TURNS', 10),
+    maxHistoryTurns: num('AI_MAX_HISTORY_TURNS', num('GEMINI_MAX_HISTORY_TURNS', 10)),
+    /** Server-side cache for the providers' model lists */
+    modelCacheMs: num('AI_MODEL_CACHE_MS', 60000),
+    /**
+     * Whether x-ai-* request headers may override endpoints/keys/models. Handy
+     * for the demo (everything is settable from the browser), but it lets a
+     * caller point the server at an arbitrary URL — turn off for public hosts.
+     */
+    allowClientOverrides: bool('AI_ALLOW_CLIENT_OVERRIDES', true),
   },
 
   api: {

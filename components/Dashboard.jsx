@@ -138,7 +138,7 @@ function DashboardInner() {
         latest={dash.latest}
         deviceId={dash.deviceId}
         settings={settings}
-        serverGemini={dash.health.geminiEnabled}
+        serverAi={dash.health.aiProviders}
         addLog={addLog}
       />
 

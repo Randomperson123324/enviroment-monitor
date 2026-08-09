@@ -1,18 +1,32 @@
 import { getLatest, normalizeDeviceId } from '@/lib/dashboard';
 import { analyzeReading, readingSummary, healthScore } from '@/lib/analysis';
-import { geminiAnalyze, geminiEnabled } from '@/lib/gemini';
-import { jsonOk, geminiKeyFrom, withErrors } from '@/lib/api-helpers';
+import { aiAnalyze, aiEnabled } from '@/lib/ai';
+import { relayTarget, relayFetch } from '@/lib/ai/relay';
+import { jsonOk, aiOverridesFrom, withErrors } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/gemini-analyze — re-fetch the latest reading from the DB and
- * analyze it with Gemini when a key is available, else the local rule engine.
+ * analyze it with the configured AI providers, else the local rule engine.
  * Body may carry fallback sensor values from the browser cache.
+ *
+ * The path keeps its original name so existing clients and the relay hop stay
+ * compatible; it is no longer Gemini-specific.
  */
 export const POST = withErrors(async (request) => {
   const body = await request.json().catch(() => ({}));
-  const overrideKey = geminiKeyFrom(request);
+  const overrides = aiOverridesFrom(request);
+
+  const target = relayTarget(request, overrides);
+  if (target) {
+    try {
+      const relayed = await relayFetch(request, target, '/api/gemini-analyze', body);
+      return jsonOk({ ...relayed, via: 'relay' });
+    } catch (err) {
+      console.warn('[analyze] relay failed, serving locally:', err.message);
+    }
+  }
 
   const fresh = await getLatest(normalizeDeviceId(body.device_id)).catch(() => null);
   const reading = fresh ?? {
@@ -29,22 +43,27 @@ export const POST = withErrors(async (request) => {
     health_score: healthScore(reading),
   };
 
-  if (geminiEnabled(overrideKey)) {
+  if (aiEnabled(overrides)) {
     try {
-      const ai = await geminiAnalyze(reading, readingSummary(reading), overrideKey);
+      const ai = await aiAnalyze({ reading, summaryLine: readingSummary(reading), overrides });
       return jsonOk({
-        source: 'gemini',
+        source: ai.provider,
+        provider: ai.provider,
+        model: ai.model,
+        via: 'direct',
         summary: ai.summary,
         recommendations: ai.recommendations.length ? ai.recommendations : local.recommendations,
         sensor,
       });
     } catch (err) {
-      console.warn('[gemini-analyze] falling back to local:', err.message);
+      console.warn('[analyze] falling back to local:', err.message);
     }
   }
 
   return jsonOk({
     source: 'local',
+    provider: 'local-rules',
+    via: 'direct',
     summary: local.msg,
     recommendations: local.recommendations,
     sensor,

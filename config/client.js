@@ -9,6 +9,13 @@ export const STORAGE = {
   theme: 'em_theme',
   apiBase: 'em_api_base',
   geminiKey: 'em_gemini_key',
+  /** AI overrides — blank means "use whatever the server is configured with". */
+  aiOrder: 'em_ai_order',
+  aiLocalBase: 'em_ai_local_base',
+  aiLocalModel: 'em_ai_local_model',
+  aiGeminiBase: 'em_ai_gemini_base',
+  aiGeminiModel: 'em_ai_gemini_model',
+  aiRelay: 'em_ai_relay',
   pollMs: 'em_poll_ms',
   deviceId: 'em_device_id',
   chartHours: 'em_chart_hours',
@@ -23,6 +30,18 @@ export const TABS = [
   { id: 'environment', label: 'Environment' },
   { id: 'focus', label: 'Focus' },
   { id: 'hydro', label: 'Safety & Health' },
+];
+
+/**
+ * Provider-priority presets offered in Dev Settings. `value` is sent verbatim as
+ * the x-ai-order header; '' means "don't override, follow the server's order".
+ */
+export const AI_ORDER_PRESETS = [
+  { value: '', key: 'server' },
+  { value: 'local,gemini', key: 'localFirst' },
+  { value: 'gemini,local', key: 'geminiFirst' },
+  { value: 'local', key: 'localOnly' },
+  { value: 'gemini', key: 'geminiOnly' },
 ];
 
 export const CHART_RANGES = [
@@ -78,6 +97,16 @@ export const CLIENT_FALLBACK = {
   floodRefreshMs: 60000,
   govRefreshMs: 300000,
   geminiEnabled: false,
+  ai: {
+    order: ['local', 'gemini'],
+    available: [],
+    localBaseUrl: '',
+    localModel: '',
+    geminiBaseUrl: '',
+    geminiModel: '',
+    relayConfigured: false,
+    allowClientOverrides: true,
+  },
   focus: {
     fetchLimit: 120,
     pollMs: 20000,
