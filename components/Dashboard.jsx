@@ -12,6 +12,7 @@ import useDashboard from '@/hooks/useDashboard';
 import useAiSummary from '@/hooks/useAiSummary';
 import AiSummary from '@/components/AiSummary';
 import Header from '@/components/Header';
+import Sidebar from '@/components/Sidebar';
 import TabMenu from '@/components/TabMenu';
 import AlertBar from '@/components/AlertBar';
 import SectionHeader from '@/components/SectionHeader';
@@ -78,6 +79,18 @@ function DashboardInner() {
 
   return (
     <div className="shell">
+      <Sidebar
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        devices={dash.devices}
+        deviceId={dash.deviceId}
+        onSelectDevice={dash.setDevice}
+        latest={dash.latest}
+        onRefresh={dash.refresh}
+        onOpenSettings={() => setSettingsOpen(true)}
+        activeTab={tab}
+        onSelectTab={switchTab}
+      />
       <Header
         theme={theme}
         onToggleTheme={toggleTheme}

@@ -377,6 +377,90 @@ textarea {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
+/* ═══ SIDEBAR (desktop rail, ≥1024px) ═══
+   Ported from StreeFlood's `<aside data-app-sidebar>`: a fixed floating glass
+   column inset from all three edges. Hidden below 1024px, where the top bar
+   and its burger take over — the two are never visible together. */
+.sidebar {
+  display: none;
+  position: fixed;
+  top: 16px;
+  bottom: 16px;
+  left: 16px;
+  width: 15rem;
+  z-index: 90;
+}
+
+.sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 14px;
+  border-radius: 1.5rem;
+}
+
+.sidebar-div {
+  height: 1px;
+  background: var(--line);
+  flex-shrink: 0;
+}
+
+.sidebar .brand-text {
+  min-width: 0;
+}
+
+.sidebar .brand-name,
+.sidebar .brand-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-device {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sidebar-device .dev-select {
+  justify-content: space-between;
+}
+
+.sidebar-device .dev-select select {
+  flex: 1;
+  min-width: 0;
+  margin-left: 8px;
+}
+
+/* Controls sit on the bottom edge because .tab-menu.in-side takes the slack. */
+.sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (min-width: 1024px) {
+  .sidebar {
+    display: block;
+  }
+
+  /* The rail replaces the top bar and the standalone tab strip entirely. */
+  .hdr,
+  .tab-menu.standalone {
+    display: none;
+  }
+
+  /* Page content clears the fixed rail. The rail's width is added to max-width
+     too — padding alone eats into the centered 1400px and leaves a gap between
+     the rail and the content. */
+  .shell {
+    max-width: calc(1400px + 15rem + 32px);
+    padding-left: calc(15rem + 32px);
+  }
+}
+
 /* ═══ TAB MENU ═══
    Two placements, one component (components/TabMenu.jsx): `standalone` is the
    bar under the header on desktop, `in-hdr` lives inside the burger panel on
@@ -387,8 +471,37 @@ textarea {
   margin-top: 16px;
 }
 
-.tab-menu.in-hdr {
+.tab-menu.in-hdr,
+.tab-menu.in-side {
   display: none;
+}
+
+/* Sidebar nav: same borderless rows as the burger panel, but flex-1 so it
+   absorbs the free space and pins the controls below to the bottom edge. */
+@media (min-width: 1024px) {
+  .tab-menu.in-side {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin-top: 0;
+  }
+
+  .tab-menu.in-side .tab-item {
+    width: 100%;
+    justify-content: flex-start;
+    padding: 10px 12px;
+    border-radius: 1.125rem;
+    border-color: transparent;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  .tab-menu.in-side .tab-item.active {
+    background: var(--accent);
+    color: var(--accent-contrast);
+  }
 }
 
 .tab-item {

@@ -1,30 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { House, RotateCw, Settings, Sun, Moon, Menu, X, Languages } from 'lucide-react';
-import { DATA_AGE } from '@/config/client';
 import TabMenu from '@/components/TabMenu';
+import DeviceSelect from '@/components/DeviceSelect';
+import DataAge from '@/components/DataAge';
 import { useLang } from '@/hooks/useLang';
 
-function DataAge({ createdAt }) {
-  const { t } = useLang();
-  const [, force] = useState(0);
-  useEffect(() => {
-    const timer = setInterval(() => force((n) => n + 1), DATA_AGE.tickMs);
-    return () => clearInterval(timer);
-  }, []);
-  if (!createdAt) return null;
-  const mins = Math.round((Date.now() - Date.parse(createdAt)) / 60000);
-  if (!Number.isFinite(mins)) return null;
-  const color =
-    mins <= DATA_AGE.freshMin ? 'var(--lv-ok)' : mins <= DATA_AGE.staleMin ? 'var(--lv-warning)' : 'var(--lv-danger)';
-  return (
-    <span className="data-age" style={{ color }}>
-      {mins <= 1 ? t('header.agoJustNow') : t('header.agoMinutes', { n: mins })}
-    </span>
-  );
-}
-
+/** Top bar for narrow viewports; from 1024px up the Sidebar replaces it. */
 export default function Header({
   theme,
   onToggleTheme,
@@ -80,25 +63,7 @@ export default function Header({
         />
 
         <div className="hdr-mid">
-          <div className="dev-select">
-            <span>{t('header.device')}</span>
-            <select
-              value={deviceId ?? ''}
-              onChange={(e) => onSelectDevice(e.target.value)}
-              disabled={!devices.length}
-              aria-label={t('header.selectDevice')}
-            >
-              {devices.length ? (
-                devices.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))
-              ) : (
-                <option value="">{t('header.noData')}</option>
-              )}
-            </select>
-          </div>
+          <DeviceSelect devices={devices} deviceId={deviceId} onSelectDevice={onSelectDevice} />
           <DataAge createdAt={latest?.created_at} />
         </div>
 
