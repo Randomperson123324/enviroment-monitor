@@ -24,6 +24,11 @@ import modes
 from fixtures import PEOPLE, TWIN, Cat, P, detection as det, make_face
 from tracker import PersonTracker, iou
 
+# คอนโซล Windows ใช้ cp1252 เป็นค่าเริ่มต้น ซึ่งพิมพ์ภาษาไทยไม่ได้ — ถ้าไม่บังคับ utf-8
+# เทสจะตายตอน print แล้วดูเหมือน "โค้ดพัง" ทั้งที่ตรรกะยังถูก ซึ่งชวนวินิจฉัยผิดทาง
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 # main import cv2/mediapipe ตอนรันจริงเท่านั้น — ตรงนี้จึงยอมข้ามได้ถ้าไม่มี
 try:
     import main
