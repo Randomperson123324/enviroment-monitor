@@ -26,15 +26,25 @@ export const STORAGE = {
   /** Assistant window: docked/floating, its width, and its floating rect. */
   aiWindow: 'em_ai_window',
   activeTab: 'em_active_tab',
+  /** Which half of the safety tab was last shown (see HYDRO_VIEWS). */
+  hydroView: 'em_hydro_view',
   lang: 'em_lang',
 };
 
-/** Dashboard sections, grouped by the top-level menu. */
-export const TABS = [
-  { id: 'environment', label: 'Environment' },
-  { id: 'focus', label: 'Focus' },
-  { id: 'hydro', label: 'Safety & Health' },
-];
+/**
+ * Dashboard sections, grouped by the top-level menu. Names live in
+ * config/i18n.js under `tabs.<id>` so both languages get them — they used to be
+ * English literals here and stayed English with the UI switched to Thai.
+ */
+export const TABS = [{ id: 'environment' }, { id: 'focus' }, { id: 'hydro' }];
+
+/**
+ * The safety tab covers two unrelated questions — the water/weather situation
+ * outside, and the illness risk from conditions in the room. They are one tab
+ * because both answer "is it safe", but showing both at once made a long scroll
+ * of things you were not looking for, so the tab picks one.
+ */
+export const HYDRO_VIEWS = [{ id: 'water' }, { id: 'disease' }];
 
 /**
  * Provider-priority presets offered in Dev Settings. `value` is sent verbatim as

@@ -29,7 +29,7 @@ export default function TabMenu({ active, onSelect, className = '' }) {
             aria-current={active === tab.id ? 'page' : undefined}
           >
             <Icon size={17} strokeWidth={2.2} aria-hidden />
-            <span>{tab.label}</span>
+            <span>{t(`tabs.${tab.id}`)}</span>
           </button>
         );
       })}

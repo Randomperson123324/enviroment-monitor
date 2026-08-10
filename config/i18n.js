@@ -26,7 +26,12 @@ const DICT = {
       toggleTheme: 'สลับโหมดสว่าง/มืด',
     },
 
-    tabs: { menuLabel: 'เลือกหมวดข้อมูล' },
+    tabs: {
+      menuLabel: 'เลือกหมวดข้อมูล',
+      environment: 'สภาพแวดล้อม',
+      focus: 'การจดจ่อ',
+      hydro: 'ความปลอดภัยและเหตุฉุกเฉิน',
+    },
 
     /** Relative ages — see lib/format.js ageParts() */
     age: {
@@ -68,9 +73,7 @@ const DICT = {
       meta: 'ใช้ได้ตอนที่ไม่ได้พิมพ์ในช่องกรอก',
       hint: 'กด ? เพื่อดูคีย์ลัด',
       hintKey: 'ดูคีย์ลัดทั้งหมด',
-      tab1: 'ไปหมวด Environment',
-      tab2: 'ไปหมวด Focus',
-      tab3: 'ไปหมวด Safety & Health',
+      goTab: 'ไปหมวด{name}',
       refresh: 'รีเฟรชข้อมูลเดี๋ยวนี้',
       ai: 'เปิดผู้ช่วย AI',
       settings: 'เปิดหน้าตั้งค่า',
@@ -302,6 +305,8 @@ const DICT = {
     },
 
     hydro: {
+      view: { water: 'ข้อมูลอุทกวิทยา', disease: 'ความเสี่ยงโรค' },
+      viewLabel: 'เลือกข้อมูลที่จะแสดง',
       danger: 'มีจุดอันตราย {n} แห่ง — ระดับน้ำเกินเกณฑ์!',
       warning: 'มีจุดเฝ้าระวัง {n} แห่ง — ควรติดตามใกล้ชิด',
       normal: 'สถานการณ์น้ำปกติทุกจุดวัด',
@@ -370,7 +375,12 @@ const DICT = {
       toggleTheme: 'Toggle light/dark',
     },
 
-    tabs: { menuLabel: 'Choose a data section' },
+    tabs: {
+      menuLabel: 'Choose a data section',
+      environment: 'Environment',
+      focus: 'Focus',
+      hydro: 'Safety & Emergency',
+    },
 
     age: {
       now: 'just now',
@@ -410,9 +420,7 @@ const DICT = {
       meta: 'Active whenever you are not typing in a field',
       hint: 'Press ? for shortcuts',
       hintKey: 'all shortcuts',
-      tab1: 'Go to Environment',
-      tab2: 'Go to Focus',
-      tab3: 'Go to Safety & Health',
+      goTab: 'Go to {name}',
       refresh: 'Refresh data now',
       ai: 'Open the AI assistant',
       settings: 'Open settings',
@@ -644,6 +652,8 @@ const DICT = {
     },
 
     hydro: {
+      view: { water: 'Hydrology', disease: 'Disease risk' },
+      viewLabel: 'Choose what to show',
       danger: '{n} danger points — water level over threshold!',
       warning: '{n} watch points — monitor closely',
       normal: 'Water levels normal at every station',
