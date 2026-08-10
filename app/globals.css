@@ -3331,3 +3331,78 @@ textarea {
   font-size: 10.5px;
   margin: 6px 0 11px;
 }
+
+/* ═══ AIR-QUALITY CARD ═══
+   PM1 / PM2.5 / PM10 behind one header, sliding on a timer. Three tiles spent
+   half a row on a distinction the reader rarely acts on differently; this keeps
+   the dust story in one card and the row at three. */
+.air-chan {
+  margin-left: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--tile-accent) 12%, transparent);
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.air-slider {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.air-track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.air-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The channel picker doubles as the position indicator: a bare dot would say
+   "3 of something" without saying which, and the labels are what the reader is
+   choosing between. */
+.air-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.air-dot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 4px 6px;
+  border: 1px solid var(--line);
+  border-bottom: 2px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.air-dot:hover {
+  color: var(--ink-2);
+  background: var(--surface);
+}
+
+.air-dot.on {
+  color: var(--ink);
+  background: var(--surface);
+  /* The identity colour marks which channel is showing — the status colours
+     stay reserved for the meter below. */
+  border-bottom-color: var(--dot-color);
+}

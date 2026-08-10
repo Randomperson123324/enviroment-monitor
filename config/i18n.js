@@ -104,6 +104,10 @@ const DICT = {
         crit: '⚠️ อันตราย', bad2: 'แย่มาก', bad: 'เกินมาตรฐาน', okish: 'พอใช้', ok: 'สะอาด' },
       pm10: { label: 'ฝุ่น PM10', stat: 'PM10',
         crit: '⚠️ อันตราย', bad2: 'แย่มาก', bad: 'เกินมาตรฐาน', okish: 'พอใช้', ok: 'สะอาด' },
+      air: {
+        label: 'คุณภาพอากาศ',
+        show: 'แสดง{label}',
+      },
       tile: {
         barTitle: 'แถบแสดงค่าปัจจุบันเทียบกับช่วงที่เหมาะสม',
         comfortStart: 'ช่วงเหมาะสมเริ่ม {v} {unit}',
@@ -121,7 +125,7 @@ const DICT = {
       smoothing: 'ความลื่นของเส้นกราฟ',
       scoreTitle: 'คะแนนสุขภาพห้อง',
       avg: 'เฉลี่ย {v}',
-      airQuality: 'คุณภาพอากาศ',
+      airQuality: 'เกณฑ์ PM2.5',
       pmTitle: 'ฝุ่นละออง PM (µg/m³)',
       pmMeta: 'ค่าที่วัดได้จริง · เกณฑ์เตือนใช้ค่าเฉลี่ย {h} ชม.',
       hoursShort: '{h} ชม.',
@@ -444,6 +448,10 @@ const DICT = {
         crit: '⚠️ Dangerous', bad2: 'Very poor', bad: 'Over standard', okish: 'Fair', ok: 'Clean' },
       pm10: { label: 'PM10 dust', stat: 'PM10',
         crit: '⚠️ Dangerous', bad2: 'Very poor', bad: 'Over standard', okish: 'Fair', ok: 'Clean' },
+      air: {
+        label: 'Air quality',
+        show: 'Show {label}',
+      },
       tile: {
         barTitle: 'Current value vs. the ideal band',
         comfortStart: 'Ideal band starts at {v} {unit}',
@@ -461,7 +469,7 @@ const DICT = {
       smoothing: 'Line smoothing',
       scoreTitle: 'Room health score',
       avg: 'Avg {v}',
-      airQuality: 'Air quality',
+      airQuality: 'PM2.5 bands',
       pmTitle: 'Particulates PM (µg/m³)',
       pmMeta: 'Measured values · levels judged on the {h}h mean',
       hoursShort: '{h}h',

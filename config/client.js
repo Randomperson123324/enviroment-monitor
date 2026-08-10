@@ -112,6 +112,13 @@ export const DATA_AGE = {
 export const TOASTS = { ttlMs: 4000, max: 3 };
 
 /**
+ * How long the air-quality card shows one particulate channel before sliding to
+ * the next. Long enough to read a number and its status without feeling chased;
+ * the card pauses on hover/focus and stops entirely under reduced-motion.
+ */
+export const AIR_ROTATE_MS = 6000;
+
+/**
  * Client-side deadline for the dashboard/health polls.
  * Without one, an API base that accepts the connection and then never answers
  * leaves the in-flight guard set forever and the poll loop stops for good —
