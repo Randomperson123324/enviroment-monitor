@@ -2479,15 +2479,75 @@ textarea {
   min-height: 230px;
 }
 
+/* Greeting shown until the first message: dead centre of the message area,
+   because that is the whole panel until a conversation exists. Auto margins in a
+   flex column do the vertical half; align-items does the horizontal. */
 .chat-empty {
-  /* Auto margins in a flex column: the prompt sits in the middle of whatever
-     space the list has, rather than clinging to the top of a tall window. */
   margin: auto 0;
-  color: var(--muted);
-  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 18px;
   text-align: center;
-  padding: 28px 0;
-  line-height: 1.9;
+}
+
+.chat-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  color: var(--accent);
+}
+
+.chat-empty-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.chat-empty-hint {
+  /* Wide enough that neither language drops a single word onto its own line. */
+  max-width: 34ch;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+
+/* Accent glow rising from the bottom edge, under the input row. Sits behind the
+   content (the panel clips it), so it reads as depth rather than a band. */
+.ai-panel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 190px;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--accent) 17%, transparent),
+    color-mix(in srgb, var(--accent) 5%, transparent) 45%,
+    transparent
+  );
+}
+
+/* Everything the user reads or types stays above the glow. */
+.ai-panel > .subhdr,
+.chat-msgs,
+.chat-input-row {
+  position: relative;
+  z-index: 1;
+}
+
+/* A conversation long enough to scroll fades into that glow instead of being
+   cut off mid-line by the input row. */
+.chat-msgs {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent);
 }
 
 .chat-msg {

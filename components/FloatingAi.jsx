@@ -69,9 +69,15 @@ function ChatPane({ deviceId, settings, addLog, onSource }) {
       <div className="chat-msgs" ref={bodyRef}>
         {messages.length === 0 && (
           <div className="chat-empty">
-            {t('ai.chatEmpty1')}
-            <br />
-            {t('ai.chatEmpty2')}
+            <span className="chat-empty-mark">
+              <Bot size={22} strokeWidth={1.9} aria-hidden />
+            </span>
+            <p className="chat-empty-title">{t('ai.greeting')}</p>
+            <p className="chat-empty-hint">
+              {t('ai.chatEmpty1')}
+              <br />
+              {t('ai.chatEmpty2')}
+            </p>
           </div>
         )}
         {messages.map((m, i) => (
