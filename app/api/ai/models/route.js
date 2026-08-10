@@ -1,3 +1,4 @@
+import config from '@/config';
 import { listModels, providerReady, PROVIDERS } from '@/lib/ai/discovery';
 import { jsonOk, jsonError, query, aiOverridesFrom, withErrors } from '@/lib/api-helpers';
 
@@ -20,7 +21,10 @@ export const GET = withErrors(async (request) => {
   }
 
   try {
-    return jsonOk({ provider: id, models: await listModels(id, overrides) });
+    // Same budget the chain uses: this answers a button press, so it has to
+    // come back with a verdict rather than sit on the provider's full timeout.
+    const models = await listModels(id, overrides, { timeoutMs: config.ai.chainBudgetMs });
+    return jsonOk({ provider: id, models });
   } catch (err) {
     // A dead endpoint shouldn't blank the settings dialog — the field stays free text.
     return jsonOk({ provider: id, models: [], error: err.message });

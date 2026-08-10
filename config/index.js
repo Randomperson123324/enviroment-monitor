@@ -157,6 +157,19 @@ const config = {
       focusProviders: list('AI_SUMMARY_FOCUS_PROVIDERS', ['local']),
     },
 
+    /**
+     * Wall-clock budget for one request's whole provider chain, and the least
+     * time worth giving a provider.
+     *
+     * Without this the first provider's own timeout could consume the request:
+     * a local endpoint that is merely unreachable takes ~10s to fail on connect,
+     * and with AI_LOCAL_TIMEOUT_MS at two minutes a serverless function hits its
+     * own limit long before Gemini is ever asked — which reads to the user as
+     * "the cloud provider does not work" while it is perfectly fine.
+     */
+    chainBudgetMs: num('AI_CHAIN_BUDGET_MS', 20000),
+    minAttemptMs: num('AI_MIN_ATTEMPT_MS', 1500),
+
     /** Max chat-history turns forwarded to the model */
     maxHistoryTurns: num('AI_MAX_HISTORY_TURNS', num('GEMINI_MAX_HISTORY_TURNS', 10)),
     /** Server-side cache for the providers' model lists */
