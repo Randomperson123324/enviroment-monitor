@@ -4,9 +4,10 @@
 โหมดไม่ใช่ไปป์ไลน์คนละเส้น — เป็นแค่ **นโยบาย** ที่ทับค่าตั้งบางตัวของไปป์ไลน์เดิม
 ทำแบบนี้เพื่อไม่ให้มีโค้ดวิเคราะห์ใบหน้าสองชุดที่ต้องคอยแก้ให้ตรงกัน
 
-ตอนนี้มีสองโหมด
+ตอนนี้มีสามโหมด
   room    — วัดภาพรวมของห้อง ไม่แยกรายบุคคล ไม่เก็บลายเซ็นโครงหน้า
   person  — ติดตามทีละคนพร้อม re-ID (โหมดเดิม)
+  known   — รู้จักเฉพาะคนที่มีรูปใน faces/ · ไม่จำใครนอกเหนือจากนั้น
 
 ถ้าจะเพิ่มโหมดใหม่ ให้เพิ่ม Mode เข้า MODES แล้วโมดูลอื่นจะรับไปเองทั้งหมด
 """
@@ -17,6 +18,7 @@ from dataclasses import dataclass
 
 ROOM = "room"
 PERSON = "person"
+KNOWN = "known"
 
 
 @dataclass(frozen=True)
@@ -31,12 +33,19 @@ class Mode:
     report_person: bool          # ใส่คอลัมน์ person ลงตาราง focus ไหม
     per_person_hud: bool         # HUD แสดงทีละคน หรือแสดงภาพรวมห้อง
     eyes: bool                   # วัดการกะพริบตา · EAR · ความง่วง ไหม
+    gallery: bool = False        # อ่านรูปใน faces/ มาเทียบชื่อไหม
+    known_only: bool = False     # รายงานเฉพาะคนที่จับคู่รูปได้ · คนอื่นไม่มีแถวของตัวเอง
 
     def apply_to_tracker(self, tracker_cfg: dict) -> dict:
         """คืน tracker config ชุดใหม่ที่ผ่านนโยบายของโหมดนี้แล้ว (ไม่แก้ของเดิม)"""
         cfg = dict(tracker_cfg)
         if not self.reid:
             cfg["reid_enabled"] = False
+        # การ**เฉลี่ยลายเซ็นข้ามเฟรม** กับการ**จำคนที่ออกจากเฟรม** เป็นสองเรื่อง
+        # โหมด known ต้องมีอย่างแรก (ไม่งั้นไม่มีลายเซ็นที่นิ่งพอไปเทียบกับรูป)
+        # แต่ต้องไม่มีอย่างหลัง (ไม่เก็บ pool ของคนที่ไม่มีรูป) — ถ้าผูกสองเรื่องนี้ไว้
+        # ด้วยธงเดียว โหมด known จะเงียบสนิทโดยไม่มีใครรู้ว่าเพราะอะไร
+        cfg["learn_signatures"] = self.reid or self.gallery
         return cfg
 
 
@@ -63,10 +72,27 @@ MODES: dict[str, Mode] = {
         report_person=True,
         per_person_hud=True,
         eyes=True,
+        gallery=True,
+        known_only=False,
+    ),
+    KNOWN: Mode(
+        key=KNOWN,
+        label="เฉพาะคนในรูป",
+        summary="รู้จักแค่คนที่มีรูปใน faces/ · ไม่เก็บลายเซ็นของคนอื่นไว้จำ · คนที่ไม่มีรูปไม่ถูกบันทึก",
+        # ต้องคำนวณลายเซ็นเพื่อเทียบกับรูป แต่ไม่เอาไปสะสมเป็น pool ของคนแปลกหน้า
+        signatures=True,
+        reid=False,
+        report_person=True,
+        per_person_hud=True,
+        eyes=True,
+        gallery=True,
+        known_only=True,
     ),
 }
 
-ORDER = (ROOM, PERSON)          # ลำดับที่แสดงในเมนู — ห้องรวมขึ้นก่อนเพราะปลอดภัยกว่า
+# ลำดับที่แสดงในเมนู — ห้องรวมขึ้นก่อนเพราะปลอดภัยกว่า
+# known อยู่ท้ายเพราะต้องเตรียมรูปก่อนจึงจะใช้ได้ ไม่ใช่เปิดแล้วใช้ได้เลย
+ORDER = (ROOM, PERSON, KNOWN)
 DEFAULT = ROOM
 
 

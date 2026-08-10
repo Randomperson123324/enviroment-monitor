@@ -79,6 +79,9 @@ class FaceReading:
     pose_method: str
     # การแสดงออกบนใบหน้าที่นิ่งแล้ว (emotion.py) · None = ปิดไว้หรือไม่มี blendshapes
     emotion: str | None = None
+    # คะแนนดิบของทุกการแสดงออกในเฟรมนี้ {happy: 0.62, ...} · ไว้ให้ผู้ใช้ปรับ threshold
+    # ได้จากของจริงบนหน้าจอ แทนการเดา — ว่างเมื่อปิดฟีเจอร์หรือไม่มี blendshapes
+    emotion_scores: dict | None = None
     # ชื่อจากแกลเลอรีรูป (faces.py) · None = ไม่มีรูป หรือเทียบแล้วไม่มั่นใจ
     name: str | None = None
 
@@ -200,11 +203,19 @@ class _PersonState:
 
 class FaceAnalyzer:
     def __init__(
-        self, cfg: dict, mirror: bool, report_person: bool = True, track_eyes: bool = True
+        self,
+        cfg: dict,
+        mirror: bool,
+        report_person: bool = True,
+        track_eyes: bool = True,
+        known_only: bool = False,
     ):
         # report_person=False (โหมดห้องรวม) ทำให้คอลัมน์ person เป็น None เสมอ
         # บังคับไว้ตรงนี้ที่เดียว เพื่อไม่ให้ id หลุดออกไปทางเส้นทางใดเส้นทางหนึ่ง
         self.report_person = report_person
+        # known_only=True (โหมดเฉพาะคนในรูป) รายงานเฉพาะคนที่จับคู่กับรูปได้
+        # คนที่ไม่มีรูปจะถูกนับใน face_count แต่ไม่มีแถวของตัวเอง — ดู pop_window()
+        self.known_only = known_only
         # track_eyes=False (โหมดห้องรวม) ไม่คำนวณ EAR · ไม่นับกะพริบ · ไม่ตรวจความง่วง
         # ค่าที่เกี่ยวกับตาจะเป็นศูนย์/None ทั้งหมด ไม่ใช่ตัวเลขที่ไม่ได้วัดจริง
         self.track_eyes = track_eyes
@@ -469,6 +480,7 @@ class FaceAnalyzer:
             # อารมณ์: ใช้ blendshapes ชุดเดียวกับที่ตรวจการหลับตา ไม่มี inference เพิ่ม
             # เทียบเฉพาะใบหน้าที่ผ่าน quality เพราะใบหน้าเล็กให้ blendshape ที่ไม่แม่น
             emotion_label = None
+            emotion_scores = None
             if self.emotion_cfg.get("enabled") and usable:
                 if st.emotion is None:
                     st.emotion = em.EmotionState(
@@ -480,6 +492,9 @@ class FaceAnalyzer:
                     self.emotion_cfg["threshold"],
                     self.emotion_cfg["margin"],
                 )
+                # คะแนนดิบของเฟรมนี้ (ก่อนโหวตเสียงข้างมาก) — ราคาแค่เฉลี่ยเลข 52 ตัว
+                # จึงคิดไว้เสมอ ให้ฝั่งแสดงผลตัดสินใจว่าจะโชว์ไหม
+                emotion_scores = em.expression_scores(face.blendshapes) or None
 
             closed_for = (now - st.eye_closed_since) if st.eye_closed_since else 0.0
             readings.append(
@@ -504,6 +519,7 @@ class FaceAnalyzer:
                     blink_method=blink_method,
                     pose_method=pose_method,
                     emotion=emotion_label,
+                    emotion_scores=emotion_scores,
                     # ชื่อถูกใส่ไว้ใน track.state โดย main.py ตอนเทียบกับแกลเลอรีรูป
                     # analyzer ไม่รู้จัก faces.py เลย จึงทดสอบแยกกันได้
                     name=track.state.get("name"),
@@ -532,6 +548,12 @@ class FaceAnalyzer:
         for track in tracks:
             st = track.state.get("analyzer")
             if not isinstance(st, _PersonState):
+                continue
+            # โหมดเฉพาะคนในรูป: คนที่จับคู่รูปไม่ได้ ไม่เข้าสรุปเลย — ไม่ใช่แค่ไม่ถูกเลือก
+            # ถ้านับการหันหน้าของเขารวมเข้ามา ค่านั้นจะไปอยู่ในแถวของคนที่มีชื่อ
+            # แปลว่าพฤติกรรมของคนแปลกหน้าถูกบันทึกใต้ชื่อคนอื่น ซึ่งผิดกว่าการไม่มีข้อมูล
+            if self.known_only and not track.state.get("name"):
+                st.reset_window()
                 continue
             if st.calibrated:
                 people_measured += 1

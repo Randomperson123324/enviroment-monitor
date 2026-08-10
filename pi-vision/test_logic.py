@@ -519,6 +519,63 @@ check("โหมดห้องรวมปิด reid_enabled ให้อั�
 check("apply_to_tracker ไม่แก้ dict เดิม", base_tracker["reid_enabled"] is True)
 check("โหมดรายบุคคลไม่แตะค่า reid", person.apply_to_tracker(base_tracker)["reid_enabled"] is True)
 
+known = modes.get("known")
+check("โหมดเฉพาะคนในรูปอ่านแกลเลอรีและรายงานเฉพาะคนที่รู้จัก",
+      known.gallery and known.known_only)
+check("โหมดเฉพาะคนในรูปไม่ทำ re-ID (ไม่สะสม pool ของคนแปลกหน้า)", not known.reid)
+check("โหมดห้องรวมไม่อ่านแกลเลอรีรูปเลย", not room.gallery)
+check("โหมดรายบุคคลอ่านแกลเลอรีได้ แต่ไม่จำกัดเฉพาะคนที่รู้จัก",
+      person.gallery and not person.known_only)
+
+# ⚠️ กับดักที่ทำให้โหมดนี้ "เงียบสนิท" ได้: การเฉลี่ยลายเซ็นข้ามเฟรมเคยผูกอยู่กับ
+# reid_enabled ตัวเดียว ถ้ายังผูกอยู่ โหมด known (reid=False) จะไม่มีลายเซ็นให้เทียบ
+# กับรูปเลย → ไม่มีใครถูกจำ โดยไม่มี error ให้เห็น
+known_tracker = known.apply_to_tracker(base_tracker)
+check("โหมดเฉพาะคนในรูปยังเฉลี่ยลายเซ็นเพื่อเทียบกับรูป",
+      known_tracker["learn_signatures"] is True)
+check("แต่ปิดการจำคนที่ออกจากเฟรม", known_tracker["reid_enabled"] is False)
+check("โหมดห้องรวมไม่เฉลี่ยลายเซ็นเลย",
+      room.apply_to_tracker(base_tracker)["learn_signatures"] is False)
+
+# ต้องเป็นจริงในตัว tracker เอง ไม่ใช่แค่ในค่าตั้ง
+tkr_known = PersonTracker(known_tracker)
+tk_t = 0.0
+for _ in range(TRACKER_CFG["reid_min_samples"] + 5):
+    tk_known = tkr_known.assign([det(face_of("A"))], tk_t)[0]
+    tk_t += 0.1
+check("tracker เรียนลายเซ็นจริงแม้ปิด re-ID",
+      tk_known.signature_ready and tk_known.signature_n > 1,
+      f"(n={tk_known.signature_n})")
+check("ปิด re-ID แล้วไม่มีใครถูกเก็บไว้ในกลุ่มที่จำ", tkr_known.lost_count == 0)
+
+# การรายงาน: คนที่ไม่มีชื่อต้องไม่โผล่ในสรุป และต้องไม่ถูกนับรวมเข้าแถวของคนที่มีชื่อ
+a_known = az.FaceAnalyzer(CFG, mirror=True, known_only=True)
+named, stranger = FakeTrack(pid=11), FakeTrack(pid=12)
+named.state["name"] = "Ann"
+tk = 900.0
+for track in (named, stranger):
+    tk_end = feed(a_known, track, lambda _t: fi(make_face()), 1.0, tk)
+# คนแปลกหน้าหันหน้าไปมา ส่วนคนที่มีชื่อนั่งนิ่ง
+feed(a_known, named, lambda _t: fi(make_face()), 1.0, tk_end)
+feed(a_known, stranger, lambda _t: fi(make_face(yaw=0.5)), 1.0, tk_end)
+sum_known = a_known.pop_window([named, stranger], tk + CFG["window"]["seconds"] + 1)
+check("รายงานคนที่จับคู่รูปได้เท่านั้น",
+      sum_known is not None and sum_known.person == 11 and sum_known.name == "Ann",
+      f"(person={sum_known.person if sum_known else None})")
+check("การหันหน้าของคนแปลกหน้าไม่ถูกนับเข้าแถวของคนที่มีชื่อ",
+      sum_known is not None and sum_known.movement == 0,
+      f"(movement={sum_known.movement if sum_known else None})")
+
+# ไม่มีใครรู้จักในหน้าต่างนั้น = ไม่มีอะไรให้รายงาน (main.py ใช้เงื่อนไขนี้ตัดสินว่าจะไม่ส่ง)
+a_none = az.FaceAnalyzer(CFG, mirror=True, known_only=True)
+lone = FakeTrack(pid=13)
+feed(a_none, lone, lambda _t: fi(make_face()), 1.0, 1000.0)
+sum_none = a_none.pop_window([lone], 1000.0 + CFG["window"]["seconds"] + 1)
+check("ไม่มีคนที่รู้จักเลย → person/name ว่าง ไม่ใช่ของคนแปลกหน้า",
+      sum_none is not None and sum_none.person is None and sum_none.name is None)
+check("โหมดรายบุคคลยังรายงานคนที่ไม่มีชื่อได้ตามเดิม",
+      az.FaceAnalyzer(CFG, mirror=True).known_only is False)
+
 check("ชื่อโหมดที่ไม่รู้จักต้อง error ไม่ใช่เดาให้", _raises(lambda: modes.get("ห้อง")))
 check("เลือกด้วยเลขข้อได้", modes.parse_choice("1").key == modes.ORDER[0])
 check("เลือกด้วยชื่อได้", modes.parse_choice("PERSON ").key == "person")

@@ -294,6 +294,9 @@ CONFIG = {
         "hud_max_faces": _int("DISPLAY_HUD_MAX_FACES", 6),
         # พิมพ์สรุปลง console ทุกครั้งที่ปิดหน้าต่างสรุป
         "log_to_console": _bool("DISPLAY_LOG_TO_CONSOLE", True),
+        # โชว์คะแนนอารมณ์ดิบทั้งสี่ค่าใต้แต่ละคน — สลับได้ด้วยปุ่ม e ขณะรัน
+        # ใช้ตอนจะปรับ EMOTION_THRESHOLD ให้เข้ากับกล้องและแสงของห้องจริง
+        "show_emotion_scores": _bool("DISPLAY_EMOTION_SCORES", False),
     },
 }
 

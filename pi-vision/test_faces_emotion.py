@@ -26,6 +26,11 @@ import faces as fc
 import landmarks as lm
 from fixtures import PEOPLE, TWIN, Cat, make_face, noisy
 
+try:
+    import main                      # ต้องมี cv2/mediapipe — ไม่มีก็ข้ามส่วนป้ายบนจอ
+except Exception:                    # pragma: no cover
+    main = None
+
 # คอนโซล Windows ใช้ cp1252 เป็นค่าเริ่มต้น ซึ่งพิมพ์ภาษาไทยไม่ได้ — ถ้าไม่บังคับ utf-8
 # เทสจะตายตอน print แล้วดูเหมือน "โค้ดพัง" ทั้งที่ตรรกะยังถูก ซึ่งชวนวินิจฉัยผิดทาง
 if hasattr(sys.stdout, "reconfigure"):
@@ -231,6 +236,45 @@ with tempfile.TemporaryDirectory() as tmp:
     fc.ensure_directory(root / "faces")
     check("สร้างโฟลเดอร์ faces/ พร้อมคำอธิบายให้ผู้ใช้",
           (root / "faces" / "README.txt").exists())
+
+print("\n── หน้านิ่งต้องมองเห็นได้ ว่าไม่ใช่ฟีเจอร์พัง ──────────────")
+
+# ก่อนหน้านี้ทุกทางแสดงผลซ่อน neutral ไว้ ผลคือคนที่นั่งหน้านิ่ง (เวลาส่วนใหญ่)
+# ไม่เห็นอะไรเลย และสรุปว่าการอ่านอารมณ์ไม่ทำงาน — นี่คือเทสที่กันอาการนั้นกลับมา
+neutral_cats = [Cat("mouthSmileLeft", 0.02), Cat("mouthSmileRight", 0.02)]
+happy_cats = [Cat("mouthSmileLeft", 0.80), Cat("mouthSmileRight", 0.78)]
+
+check("หน้านิ่งได้คำตอบว่า neutral ไม่ใช่ None",
+      em.classify(neutral_cats, 0.35, 0.08) == (em.NEUTRAL, 0.02))
+check("ไม่มี blendshapes เลย = ไม่รู้ (None) ซึ่งคนละเรื่องกับ neutral",
+      em.classify(None, 0.35, 0.08) is None)
+check("คะแนนดิบอ่านได้ทุกการแสดงออก เพื่อเอาไปปรับ threshold",
+      set(em.expression_scores(happy_cats)) <= set(em.EXPRESSIONS)
+      and em.expression_scores(happy_cats)["happy"] > 0.7)
+
+if main is not None:
+    class R:
+        def __init__(self, emotion=None, scores=None, name=None, pid=3):
+            self.emotion, self.emotion_scores, self.name, self.person_id = \
+                emotion, scores, name, pid
+
+    check("HUD โชว์ neutral ออกมา ไม่เว้นว่าง", "neutral" in main._mood(R("neutral")))
+    check("HUD โชว์อารมณ์ที่อ่านได้", "happy" in main._mood(R("happy")))
+    check("ปิดฟีเจอร์ (emotion=None) จึงเว้นว่างได้ — คนละกรณีกับหน้านิ่ง",
+          main._mood(R(None)) == "")
+    check("คะแนนดิบเรียงจากมากไปน้อยให้อ่านง่าย",
+          main._mood_scores(R("happy", {"happy": 0.8, "sad": 0.1})).startswith("happy"))
+    check("ไม่มีคะแนนก็ไม่พัง", main._mood_scores(R("happy")) == "")
+
+    # โหมดเฉพาะคนในรูป: คนที่ไม่มีรูปต้องไม่ขึ้นหมายเลข เพราะหมายเลขสื่อว่า "จำได้"
+    check("โหมดปกติโชว์หมายเลข track", main._who(R(pid=3)) == "#3")
+    check("โหมดเฉพาะคนในรูปเขียน unknown แทนหมายเลข",
+          main._who(R(pid=3), known_only=True) == "unknown")
+    check("จำชื่อได้แล้วโชว์ชื่อทั้งสองโหมด",
+          main._who(R(name="Ann"), known_only=True) == "Ann"
+          and main._who(R(name="Ann")) == "Ann")
+else:
+    print("  skip ป้ายบนหน้าจอ — ไม่มี cv2/mediapipe ในเครื่องนี้")
 
 print("\n" + "─" * 56)
 if FAILURES:

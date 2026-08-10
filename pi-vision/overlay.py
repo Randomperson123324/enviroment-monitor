@@ -78,8 +78,14 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
     ถ้าพิมพ์ ใครที่ยืนดูจอก็ตามได้ว่ากรอบไหนคือใคร ซึ่งขัดกับที่โหมดนี้สัญญาไว้
     """
     show_id = display_cfg.get("show_person_id", True)
-    # ชื่อจากแกลเลอรีรูปแทนหมายเลข เมื่อจำได้ — ผู้ใช้อ่าน "สมชาย" ง่ายกว่า "#3"
-    who = reading.name or f"#{reading.person_id}"
+    # ชื่อจากแกลเลอรีรูปแทนหมายเลข เมื่อจำได้ — ผู้ใช้อ่าน "somchai" ง่ายกว่า "#3"
+    # โหมดเฉพาะคนในรูปเขียน "unknown" แทนหมายเลข เพราะหมายเลขสื่อว่าระบบกำลังจำคนนั้นอยู่
+    if reading.name:
+        who = reading.name
+    elif display_cfg.get("known_only"):
+        who = "unknown"
+    else:
+        who = f"#{reading.person_id}"
     tag = f"{who} " if show_id else ""
     h, w = img.shape[:2]
     x1, y1, x2, y2 = reading.box
@@ -112,8 +118,10 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
         )
         label = f"{tag}calibrating… look straight"
     else:
-        bits = [reading.name or f"#{reading.person_id}"] if show_id else []
-        if reading.emotion and reading.emotion != "neutral":
+        bits = [who] if show_id else []
+        # โชว์ neutral ด้วย ไม่ซ่อน — ป้ายที่หายไปตอนหน้านิ่งทำให้แยกไม่ออกว่า
+        # ฟีเจอร์ปิดอยู่หรือแค่ยังไม่มีอารมณ์ให้อ่าน (ดู _mood ใน main.py)
+        if reading.emotion:
             bits.append(reading.emotion)
         if display_cfg.get("show_eyes", True):
             bits.append(f"eye {reading.blink_score:.2f}")

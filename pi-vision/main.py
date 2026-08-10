@@ -5,13 +5,15 @@ pi-vision — ตรวจจับใบหน้า วัดการหั�
 โหมดนี้ยัง **ไม่ส่งข้อมูลออกนอกเครื่อง** — ตั้งใจให้รันดูผลและปรับ threshold ก่อน
 เมื่อค่าดูสมเหตุสมผลแล้ว ค่อยเอา WindowSummary.to_focus_row() ไปต่อกับ Supabase
 
-มีสองโหมด — ถ้าไม่ระบุ โปรแกรมจะถามให้เลือกตอนเปิด
-    ห้องรวม   นับคนและวัดสมาธิรวมของห้อง ไม่แยกรายบุคคล ไม่เก็บลายเซ็นใบหน้า
-    รายบุคคล  ติดตามแยกทีละคนด้วย id และจำ id ได้เมื่อออกไปแล้วกลับมา
+มีสามโหมด — ถ้าไม่ระบุ โปรแกรมจะถามให้เลือกตอนเปิด
+    ห้องรวม       นับคนและวัดสมาธิรวมของห้อง ไม่แยกรายบุคคล ไม่เก็บลายเซ็นใบหน้า
+    รายบุคคล      ติดตามแยกทีละคนด้วย id และจำ id ได้เมื่อออกไปแล้วกลับมา
+    เฉพาะคนในรูป   รู้จักแค่คนที่มีรูปใน faces/ · คนที่ไม่มีรูปไม่ถูกบันทึกเลย
 
 การใช้งาน
     python3 main.py                 # ถามโหมดแล้วเปิดหน้าต่างแสดงผล
     python3 main.py --mode room     # ข้ามคำถาม ใช้โหมดห้องรวมเลย
+    python3 main.py --mode known    # รู้จักเฉพาะคนที่มีรูปใน faces/
     python3 main.py --no-window     # ไม่มีจอ (SSH) พิมพ์สรุปลง console อย่างเดียว
     python3 main.py --source usb    # บังคับใช้ USB webcam
     python3 main.py --mesh          # วาด landmark ครบ 468 จุด
@@ -21,6 +23,7 @@ pi-vision — ตรวจจับใบหน้า วัดการหั�
     c         calibrate ท่านิ่งใหม่ทุกคน
     m         สลับการวาด mesh
     f         ลืมทุก id และลายเซ็นทันที (ความเป็นส่วนตัว)
+    e         สลับการโชว์คะแนนอารมณ์ดิบทั้งสี่ค่า (ใช้ปรับ EMOTION_THRESHOLD)
     v         เปิดเมนูเลือกกล้อง แล้วกดเลข 1–9 เพื่อสลับกล้อง
     space     พิมพ์สรุปหน้าต่างปัจจุบันทันทีโดยไม่ต้องรอครบเวลา
 
@@ -56,6 +59,7 @@ KEY_TOGGLE_MESH = ord("m")
 KEY_FLUSH = ord(" ")
 KEY_FORGET = ord("f")               # ลืมทุก id และลายเซ็นทันที (ความเป็นส่วนตัว)
 KEY_CAMERA_MENU = ord("v")          # เปิด/ปิดเมนูเลือกกล้อง (v = video source)
+KEY_EMOTION = ord("e")              # โชว์คะแนนอารมณ์ดิบ เพื่อดูว่า threshold เหมาะไหม
 WAIT_KEY_MS = 1
 FPS_SMOOTHING = 0.9                 # ยิ่งใกล้ 1 ยิ่งนิ่ง
 DOWNLOAD_CHUNK = 1 << 16
@@ -185,16 +189,36 @@ def build_photo_reader(model_cfg: dict):
     return detect, reader
 
 
-def _who(reading) -> str:
-    """ชื่อคนถ้าจำได้ ไม่งั้นเป็นหมายเลข track — ป้ายเดียวใช้ได้ทั้งสองกรณี"""
-    return reading.name if reading.name else f"#{reading.person_id}"
+def _who(reading, known_only: bool = False) -> str:
+    """
+    ชื่อคนถ้าจำได้ ไม่งั้นเป็นหมายเลข track — ป้ายเดียวใช้ได้ทั้งสองกรณี
+
+    โหมดเฉพาะคนในรูปไม่โชว์หมายเลขของคนที่ไม่มีรูป เพราะหมายเลขทำให้ดูเหมือนระบบ
+    "รู้จัก" คนนั้นอยู่ ทั้งที่โหมดนี้ตั้งใจไม่รู้จัก และไม่ได้บันทึกอะไรของเขาไว้เลย
+    """
+    if reading.name:
+        return reading.name
+    return "unknown" if known_only else f"#{reading.person_id}"
 
 
 def _mood(reading) -> str:
-    """อารมณ์แบบสั้นสำหรับ HUD · เว้นว่างเมื่อหน้านิ่งหรือปิดฟีเจอร์ไว้"""
-    if not reading.emotion or reading.emotion == "neutral":
+    """
+    อารมณ์แบบสั้นสำหรับ HUD — โชว์ neutral ด้วย ไม่ใช่เว้นว่าง
+
+    เดิมซ่อน neutral ไว้เพื่อลดความรก ผลคือคนที่นั่งหน้านิ่ง (ซึ่งเป็นเวลาส่วนใหญ่)
+    ไม่เห็นอะไรเลย และแยกไม่ออกว่าฟีเจอร์ปิดอยู่ พัง หรือแค่ยังไม่มีอารมณ์ให้อ่าน
+    """
+    if not reading.emotion:
         return ""
     return f"{reading.emotion:<9} "
+
+
+def _mood_scores(reading) -> str:
+    """คะแนนดิบทั้งสี่ค่าเรียงจากมากไปน้อย — ให้เห็นตัวเลขจริงก่อนไปปรับ threshold"""
+    if not reading.emotion_scores:
+        return ""
+    ranked = sorted(reading.emotion_scores.items(), key=lambda kv: kv[1], reverse=True)
+    return "  ".join(f"{k[:5]} {v:.2f}" for k, v in ranked)
 
 
 def _nth(seq, i):
@@ -229,8 +253,12 @@ def print_summary(summary: az.WindowSummary, threshold_per_min: float, mode: mod
     per_min = summary.movement_per_minute()
     flag = "  << เกินเกณฑ์" if per_min > threshold_per_min else ""
     ear = f"{summary.avg_ear:.3f}" if summary.avg_ear is not None else "-"
+    # ชื่อกับอารมณ์อยู่ในบรรทัดนี้ด้วย เพราะโหมด --no-window ไม่มี HUD ให้ดู
+    # ถ้าไม่พิมพ์ ค่าสองตัวนี้จะไม่มีทางถูกเห็นเลยตอนรันผ่าน SSH ทั้งที่ถูกส่งขึ้นฐานข้อมูล
+    who = f" name={summary.name}" if summary.name else ""
+    mood = f" emotion={summary.emotion}" if summary.emotion else ""
     print(
-        f"[{stamp}] person={summary.person} faces={summary.face_count} "
+        f"[{stamp}] person={summary.person}{who}{mood} faces={summary.face_count} "
         f"(usable {summary.usable_faces}) movement={summary.movement} ({per_min:.1f}/min) "
         f"blinks={summary.blinks} avgEAR={ear} | {dirs}{flag}"
     )
@@ -251,6 +279,10 @@ def handle_key(
         print("[pi-vision] calibrate ท่านิ่งใหม่ — มองตรงเข้ากล้อง")
     elif key == KEY_TOGGLE_MESH:
         display_cfg["draw_mesh"] = not display_cfg["draw_mesh"]
+    elif key == KEY_EMOTION:
+        display_cfg["show_emotion_scores"] = not display_cfg.get("show_emotion_scores")
+        state = "เปิด" if display_cfg["show_emotion_scores"] else "ปิด"
+        print(f"[pi-vision] คะแนนอารมณ์ดิบ: {state}")
     elif key == KEY_FORGET:
         tracker.forget_all()
         print("[pi-vision] ลืมทุก id และลายเซ็นโครงหน้าแล้ว")
@@ -394,6 +426,8 @@ def main() -> int:
     display_cfg = dict(cfg["display"])
     # โหมดห้องรวมต้องไม่โชว์ id บนภาพ ไม่งั้นคนที่ยืนดูจอตามได้ว่ากรอบไหนคือใคร
     display_cfg["show_person_id"] = mode.report_person
+    # โหมดเฉพาะคนในรูป: คนที่ไม่มีรูปขึ้นว่า unknown ไม่ใช่หมายเลข — ดู _who()
+    display_cfg["known_only"] = mode.known_only
     # โหมดที่ไม่วัดตาต้องไม่วาดจุดตาและไม่โชว์คะแนนตา — ไม่งั้นดูเหมือนวัดอยู่
     display_cfg["show_eyes"] = mode.eyes
     if not mode.eyes:
@@ -407,7 +441,8 @@ def main() -> int:
     landmarker = build_landmarker(cfg["model"])
     tracker = PersonTracker(tracker_cfg)
     an = az.FaceAnalyzer(cfg, mirror=cam_cfg["mirror"],
-                         report_person=mode.report_person, track_eyes=mode.eyes)
+                         report_person=mode.report_person, track_eyes=mode.eyes,
+                         known_only=mode.known_only)
 
     # ส่งข้อมูลขึ้น Supabase — ไม่ตั้ง url/key ก็แค่ไม่ส่ง โปรแกรมทำงานครบเหมือนเดิม
     uploader = up_mod.Uploader(cfg["supabase"])
@@ -425,7 +460,7 @@ def main() -> int:
     # โหมดห้องรวมไม่รายงานรายบุคคล จึงไม่โหลดแกลเลอรีเลย ไม่ใช่แค่ไม่แสดงชื่อ
     gallery = None
     photo_reader = None
-    if mode.report_person:
+    if mode.gallery:
         faces_dir = fc.ensure_directory(cfg["faces"]["dir"])
         try:
             detect_photo, photo_reader = build_photo_reader(cfg["model"])
@@ -438,6 +473,11 @@ def main() -> int:
             known = gallery.scan()
             if known:
                 print(f"[pi-vision] จำได้ {known} คนจากรูปใน {faces_dir}: {', '.join(gallery.names)}")
+            elif mode.known_only:
+                # โหมดนี้รู้จักคนจากรูปเท่านั้น ไม่มีรูป = ไม่มีใครถูกบันทึกเลย
+                # ไม่ปิดโปรแกรม เพราะแกลเลอรีถูกอ่านซ้ำทุก ๆ ไม่กี่วินาที วางรูปตอนนี้ก็ติด
+                print(f"[pi-vision] ! ยังไม่มีรูปใน {faces_dir} — โหมดนี้จะไม่บันทึกใครเลย")
+                print("[pi-vision]   วางรูป (ตั้งชื่อไฟล์เป็นชื่อคน) ลงโฟลเดอร์นั้นได้เลยตอนนี้")
             else:
                 print(f"[pi-vision] ยังไม่มีรูปใน {faces_dir} — ใช้หมายเลขแทนชื่อ")
             for path in gallery.skipped:
@@ -461,13 +501,23 @@ def main() -> int:
     )
     if not mode.signatures:
         print("[pi-vision] โหมดนี้ไม่คำนวณลายเซ็นโครงหน้าเลย — ไม่มีข้อมูลชีวมิติถูกเก็บ")
+    if mode.known_only:
+        print("[pi-vision] โหมดนี้ไม่เก็บลายเซ็นของคนที่ไม่มีรูปไว้จำ และไม่บันทึกข้อมูลของเขา")
+    if cfg["emotion"]["enabled"]:
+        # ประกาศให้รู้เหมือนที่ re-ID ประกาศ เพราะไม่งั้นคนที่หน้านิ่งจะไม่เห็นอะไรบนจอ
+        # แล้วสรุปว่าฟีเจอร์ไม่ทำงาน ทั้งที่ neutral คือคำตอบที่ถูกต้องของหน้านิ่ง
+        print(
+            f"[pi-vision] อ่านอารมณ์จากใบหน้าอยู่ (เกณฑ์ {cfg['emotion']['threshold']:.2f}) — "
+            "หน้านิ่งขึ้น neutral · กด e เพื่อดูคะแนนดิบ"
+        )
     if tracker_cfg["reid_enabled"]:
         print(
             "[pi-vision] re-ID เปิดอยู่ — จำลายเซ็นโครงหน้าไว้ใน RAM "
             f"{cfg['tracker']['reid_memory_seconds']:.0f} วินาที (ไม่เขียนลงดิสก์) · กด f เพื่อลืมทันที"
         )
     if display_cfg["enabled"]:
-        print("[pi-vision] ปุ่มลัด: q=ออก · c=calibrate ใหม่ · m=mesh · f=ลืม id · v=เลือกกล้อง · space=สรุปทันที")
+        print("[pi-vision] ปุ่มลัด: q=ออก · c=calibrate ใหม่ · m=mesh · f=ลืม id · "
+              "e=คะแนนอารมณ์ · v=เลือกกล้อง · space=สรุปทันที")
 
     fps = 0.0
     last_t = time.monotonic()
@@ -556,7 +606,11 @@ def main() -> int:
                 # payload คนละแบบตามโหมด — to_room_row() ไม่มีคอลัมน์ person เลย
                 # จึงไม่มีทางที่ id รายคนจะหลุดออกไปในโหมดห้องรวม
                 if mode.report_person:
-                    uploader.send(summary.to_focus_row())
+                    # โหมดเฉพาะคนในรูป: ไม่มีคนที่รู้จักในหน้าต่างนี้ = ไม่มีอะไรให้บันทึก
+                    # **ห้ามตกไปเข้าเงื่อนไขห้องรวม** — แถวห้องรวมคือค่าเฉลี่ยของทุกคน
+                    # ที่อยู่ในเฟรม ซึ่งรวมคนแปลกหน้าที่โหมดนี้สัญญาว่าจะไม่บันทึก
+                    if not (mode.known_only and not summary.name):
+                        uploader.send(summary.to_focus_row())
                 else:
                     uploader.send(summary.to_room_row(), room=True)
                 if display_cfg["log_to_console"]:
@@ -621,11 +675,12 @@ def main() -> int:
                 continue
 
             for i, r in enumerate(readings[: display_cfg["hud_max_faces"]]):
+                who = _who(r, mode.known_only)
                 if not r.usable:
-                    hud.append((f"{_who(r)} too far — q{r.quality*100:3.0f}%", "muted"))
+                    hud.append((f"{who} too far — q{r.quality*100:3.0f}%", "muted"))
                 elif r.calibrating:
                     hud.append(
-                        (f"{_who(r)} calibrating {r.calibration_progress*100:3.0f}%", "muted")
+                        (f"{who} calibrating {r.calibration_progress*100:3.0f}%", "muted")
                     )
                 else:
                     state = "DROWSY" if r.drowsy else (r.direction or "center")
@@ -637,11 +692,13 @@ def main() -> int:
                     )
                     hud.append(
                         (
-                            f"{_who(r)}{tag} {state:<7} {_mood(r)}{eye_bits}"
+                            f"{who}{tag} {state:<7} {_mood(r)}{eye_bits}"
                             f"mv {r.movement_in_window}  q{r.quality*100:3.0f}%",
                             "danger" if r.drowsy else ("warn" if r.direction else "ok"),
                         )
                     )
+                    if display_cfg.get("show_emotion_scores"):
+                        hud.append((f"    {_mood_scores(r)}", "muted"))
             if len(readings) > display_cfg["hud_max_faces"]:
                 hud.append((f"+{len(readings) - display_cfg['hud_max_faces']} more", "muted"))
             ov.draw_hud(frame, hud)

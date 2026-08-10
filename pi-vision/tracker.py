@@ -174,6 +174,10 @@ class PersonTracker:
 
         # re-identification — จำ id เมื่อคนออกจากเฟรมแล้วกลับมา
         self.reid_enabled = tracker_cfg["reid_enabled"]
+        # เฉลี่ยลายเซ็นข้ามเฟรมไหม — คนละเรื่องกับการจำคนที่ออกจากเฟรม
+        # re-ID ต้องใช้ แต่การเทียบกับ**รูปในโฟลเดอร์** ก็ต้องใช้เหมือนกันโดยไม่ต้องมี pool
+        # ไม่ระบุ = ตามค่า reid_enabled เพื่อให้ config เก่าได้พฤติกรรมเดิมเป๊ะ
+        self.learn_signatures = tracker_cfg.get("learn_signatures", self.reid_enabled)
         self.reid_memory_seconds = tracker_cfg["reid_memory_seconds"]
         self.reid_threshold = tracker_cfg["reid_threshold"]
         self.reid_min_size = tracker_cfg["reid_min_size"]
@@ -362,10 +366,12 @@ class PersonTracker:
             result[di] = track
 
         # เรียนลายเซ็นจากใบหน้าที่ใหญ่พอเท่านั้น — ใบหน้าเล็กให้ landmark ที่ไม่แม่น
-        if self.reid_enabled:
+        if self.learn_signatures:
             for di, det in enumerate(detections):
                 if det.size >= self.reid_min_size:
                     result[di].learn_signature(det.signature, self.reid_max_samples)
+        # ส่วนการ**เทียบกับคนที่หายไป** ทำเฉพาะเมื่อเปิด re-ID จริง ๆ
+        if self.reid_enabled:
             self._resolve_pending_reid(detections, result)
 
         return result  # type: ignore[return-value]
