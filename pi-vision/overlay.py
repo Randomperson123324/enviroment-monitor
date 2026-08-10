@@ -78,7 +78,9 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
     ถ้าพิมพ์ ใครที่ยืนดูจอก็ตามได้ว่ากรอบไหนคือใคร ซึ่งขัดกับที่โหมดนี้สัญญาไว้
     """
     show_id = display_cfg.get("show_person_id", True)
-    tag = f"#{reading.person_id} " if show_id else ""
+    # ชื่อจากแกลเลอรีรูปแทนหมายเลข เมื่อจำได้ — ผู้ใช้อ่าน "สมชาย" ง่ายกว่า "#3"
+    who = reading.name or f"#{reading.person_id}"
+    tag = f"{who} " if show_id else ""
     h, w = img.shape[:2]
     x1, y1, x2, y2 = reading.box
     p1 = (int(x1 * w), int(y1 * h))
@@ -110,7 +112,9 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
         )
         label = f"{tag}calibrating… look straight"
     else:
-        bits = [f"#{reading.person_id}"] if show_id else []
+        bits = [reading.name or f"#{reading.person_id}"] if show_id else []
+        if reading.emotion and reading.emotion != "neutral":
+            bits.append(reading.emotion)
         if display_cfg.get("show_eyes", True):
             bits.append(f"eye {reading.blink_score:.2f}")
         if reading.direction:

@@ -115,6 +115,11 @@ def install_fakes(monkey_state):
     monkey_state["landmarker"] = landmarker
     main.build_landmarker = lambda cfg: landmarker
 
+    # ตัวอ่านรูปปลอม — คืน landmark ของคนคนหนึ่ง เพื่อให้เส้นทาง "จำชื่อจากรูป"
+    # ถูกเดินจริงในลูป ไม่ใช่ข้ามไปเพราะสร้างตัวอ่านไม่ได้
+    fake_reader = types.SimpleNamespace(close=lambda: None)
+    main.build_photo_reader = lambda cfg: (lambda path: None, fake_reader)
+
     # mediapipe ปลอม — main import ข้างในฟังก์ชัน จึงยัดเข้า sys.modules ได้
     fake_mp = types.ModuleType("mediapipe")
     fake_mp.Image = lambda image_format=None, data=None: object()

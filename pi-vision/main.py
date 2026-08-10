@@ -40,6 +40,7 @@ from pathlib import Path
 import cv2
 
 import analyzer as az
+import faces as fc
 import landmarks as lm
 import modes
 import overlay as ov
@@ -146,6 +147,53 @@ def build_landmarker(model_cfg: dict):
         output_facial_transformation_matrixes=model_cfg["transform_matrix"],
     )
     return vision.FaceLandmarker.create_from_options(options)
+
+
+def build_photo_reader(model_cfg: dict):
+    """
+    ตัวอ่านใบหน้าจาก **ไฟล์รูป** — FaceLandmarker อีกตัวในโหมด IMAGE
+
+    ต้องแยกจากตัวหลักเพราะตัวหลักอยู่โหมด VIDEO ซึ่งคาดว่าเฟรมจะเรียงตามเวลา
+    ป้อนรูปนิ่งเข้าไปคั่นกลางจะทำให้ตัวติดตามภายในของมันสับสน
+
+    คืนฟังก์ชัน `detect(path) -> landmarks | None` ให้ faces.py เอาไปใช้
+    ตัว landmarker ถูกสร้างครั้งเดียวและปิดเมื่อเลิกใช้
+    """
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision
+    import mediapipe as mp
+
+    options = vision.FaceLandmarkerOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=str(ensure_model(model_cfg))),
+        running_mode=vision.RunningMode.IMAGE,
+        num_faces=1,                      # รูปลงทะเบียนควรมีใบหน้าเดียว
+        min_face_detection_confidence=model_cfg["min_detection_confidence"],
+    )
+    reader = vision.FaceLandmarker.create_from_options(options)
+
+    def detect(path):
+        image = cv2.imread(str(path))
+        if image is None:
+            return None
+        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        result = reader.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
+        if not result or not result.face_landmarks:
+            return None
+        return result.face_landmarks[0]
+
+    return detect, reader
+
+
+def _who(reading) -> str:
+    """ชื่อคนถ้าจำได้ ไม่งั้นเป็นหมายเลข track — ป้ายเดียวใช้ได้ทั้งสองกรณี"""
+    return reading.name if reading.name else f"#{reading.person_id}"
+
+
+def _mood(reading) -> str:
+    """อารมณ์แบบสั้นสำหรับ HUD · เว้นว่างเมื่อหน้านิ่งหรือปิดฟีเจอร์ไว้"""
+    if not reading.emotion or reading.emotion == "neutral":
+        return ""
+    return f"{reading.emotion:<9} "
 
 
 def _nth(seq, i):
@@ -360,6 +408,28 @@ def main() -> int:
     an = az.FaceAnalyzer(cfg, mirror=cam_cfg["mirror"],
                          report_person=mode.report_person, track_eyes=mode.eyes)
 
+    # แกลเลอรีใบหน้าจากรูปในโฟลเดอร์ — ว่างไว้ = ระบบใช้ id ตัวเลขเหมือนเดิมทุกอย่าง
+    # โหมดห้องรวมไม่รายงานรายบุคคล จึงไม่โหลดแกลเลอรีเลย ไม่ใช่แค่ไม่แสดงชื่อ
+    gallery = None
+    photo_reader = None
+    if mode.report_person:
+        faces_dir = fc.ensure_directory(cfg["faces"]["dir"])
+        try:
+            detect_photo, photo_reader = build_photo_reader(cfg["model"])
+        except Exception as exc:
+            # การจำชื่อเป็นของเสริม — ถ้าตัวอ่านรูปสร้างไม่ได้ ให้เดินต่อด้วยหมายเลข
+            # ไม่ใช่ล้มทั้งบริการ เพราะการวัดการจดจ่อยังทำงานได้ครบโดยไม่มีชื่อ
+            print(f"[pi-vision] อ่านรูปใบหน้าไม่ได้ ({exc}) — ใช้หมายเลขแทนชื่อ")
+        else:
+            gallery = fc.FaceGallery(faces_dir, cfg["faces"], fc.landmark_extractor(detect_photo))
+            known = gallery.scan()
+            if known:
+                print(f"[pi-vision] จำได้ {known} คนจากรูปใน {faces_dir}: {', '.join(gallery.names)}")
+            else:
+                print(f"[pi-vision] ยังไม่มีรูปใน {faces_dir} — ใช้หมายเลขแทนชื่อ")
+            for path in gallery.skipped:
+                print(f"[pi-vision] ข้ามรูปนี้ หาใบหน้าไม่เจอ: {path}")
+
     # นำเข้าตรงนี้เพราะต้องใช้หลัง mediapipe พร้อมแล้วเท่านั้น
     import mediapipe as mp
 
@@ -446,6 +516,23 @@ def main() -> int:
                 )
 
             tracks = tracker.assign(detections, now)
+
+            # เทียบกับแกลเลอรีรูป แล้วเก็บชื่อไว้ใน track.state ให้ analyzer หยิบไปใช้
+            # ทำที่นี่เพราะ state อยู่กับ track จึงรอดการ re-ID และไม่ต้องเทียบซ้ำทุกเฟรม
+            if gallery is not None:
+                if gallery.maybe_rescan(now) and gallery.enabled:
+                    print(f"[pi-vision] อ่านรูปใหม่: {', '.join(gallery.names)}")
+                if gallery.enabled:
+                    for track, det in zip(tracks, detections):
+                        if track.state.get("name"):
+                            continue        # จำได้แล้ว ไม่ต้องเทียบซ้ำ
+                        if not track.signature_ready:
+                            continue        # ลายเซ็นยังไม่นิ่งพอ — เทียบตอนนี้ได้คำตอบมั่ว
+                        hit = gallery.identify(track.signature, det.size)
+                        if hit:
+                            track.state["name"] = hit[0]
+                            print(f"[pi-vision] #{track.person_id} คือ {hit[0]} (ห่าง {hit[1]:.3f})")
+
             faces = list(zip(tracks, inputs))
 
             frame_size = (frame.shape[1], frame.shape[0])
@@ -515,10 +602,10 @@ def main() -> int:
 
             for i, r in enumerate(readings[: display_cfg["hud_max_faces"]]):
                 if not r.usable:
-                    hud.append((f"#{r.person_id} too far — q{r.quality*100:3.0f}%", "muted"))
+                    hud.append((f"{_who(r)} too far — q{r.quality*100:3.0f}%", "muted"))
                 elif r.calibrating:
                     hud.append(
-                        (f"#{r.person_id} calibrating {r.calibration_progress*100:3.0f}%", "muted")
+                        (f"{_who(r)} calibrating {r.calibration_progress*100:3.0f}%", "muted")
                     )
                 else:
                     state = "DROWSY" if r.drowsy else (r.direction or "center")
@@ -530,7 +617,7 @@ def main() -> int:
                     )
                     hud.append(
                         (
-                            f"#{r.person_id}{tag} {state:<7} {eye_bits}"
+                            f"{_who(r)}{tag} {state:<7} {_mood(r)}{eye_bits}"
                             f"mv {r.movement_in_window}  q{r.quality*100:3.0f}%",
                             "danger" if r.drowsy else ("warn" if r.direction else "ok"),
                         )
@@ -552,6 +639,8 @@ def main() -> int:
     finally:
         camera.close()
         landmarker.close()
+        if photo_reader is not None:
+            photo_reader.close()
         if display_cfg["enabled"]:
             cv2.destroyAllWindows()
 

@@ -489,7 +489,13 @@ if summary:
     check("direction ครบ 4 ทิศ", set(summary.direction) == set(az.DIRECTIONS))
     check("usable_faces ถูกนับ", summary.usable_faces == 1, f"(ได้ {summary.usable_faces})")
     check("to_focus_row มีคอลัมน์ครบตามตาราง focus",
-          set(summary.to_focus_row()) == {"person", "movement", "direction", "face_count"})
+          set(summary.to_focus_row())
+          == {"person", "movement", "direction", "face_count", "name", "emotion"})
+    # None = "ไม่รู้" ไม่ใช่ "ไม่มี" — ไม่มีรูปในแกลเลอรีและยังไม่เห็นการแสดงออก
+    # ปลายทางต้องแยกสองอย่างนี้ออกจากกันได้
+    check("ยังไม่รู้ชื่อ/อารมณ์ → คอลัมน์เป็น None ไม่ใช่ค่าว่าง",
+          summary.to_focus_row()["name"] is None
+          and summary.to_focus_row()["emotion"] is None)
     check("ตัวนับถูกรีเซ็ต", sum(tk7.state["analyzer"].window_dirs.values()) == 0)
 
 # ── 12. โหมดการทำงาน ────────────────────────────────────

@@ -17,6 +17,7 @@ import statistics
 from collections import deque
 from dataclasses import dataclass, field
 
+import emotion as em
 import landmarks as lm
 
 # ชื่อทิศทาง — ต้องตรงกับที่ components/FocusSection.jsx ใช้เป๊ะ ๆ
@@ -76,6 +77,10 @@ class FaceReading:
     usable: bool                     # ผ่านเกณฑ์ quality ไหม
     blink_method: str
     pose_method: str
+    # การแสดงออกบนใบหน้าที่นิ่งแล้ว (emotion.py) · None = ปิดไว้หรือไม่มี blendshapes
+    emotion: str | None = None
+    # ชื่อจากแกลเลอรีรูป (faces.py) · None = ไม่มีรูป หรือเทียบแล้วไม่มั่นใจ
+    name: str | None = None
 
 
 @dataclass
@@ -100,6 +105,12 @@ class WindowSummary:
     # None = ยังไม่มีใบหน้าที่ calibrate เสร็จให้วัด (ต่างจาก 0.0 ที่แปลว่าไม่มีใครมองตรงเลย)
     attention_ratio: float | None = None
     people_measured: int = 0         # จำนวนคนที่มีข้อมูลจริงในหน้าต่างนี้
+    # การแสดงออกของคนที่รายงาน (person) ตอนปิดหน้าต่าง
+    emotion: str | None = None
+    # ชื่อของคนนั้นถ้าจำได้จากแกลเลอรีรูป — person ยังเป็นเลข track เหมือนเดิม
+    # เก็บทั้งสองอย่างเพราะเป็นตัวตนต่างชนิด: เลขคือ "คนเดิมในเซสชันนี้"
+    # ชื่อคือ "คนนี้คือใคร" และอาจไม่รู้ก็ได้
+    name: str | None = None
 
     @property
     def duration(self) -> float:
@@ -116,12 +127,19 @@ class WindowSummary:
         return self.movement_per_minute() / max(self.people_measured, 1)
 
     def to_focus_row(self) -> dict:
-        """แปลงเป็น payload ที่ INSERT ลงตาราง focus ได้ตรง ๆ"""
+        """
+        แปลงเป็น payload ที่ INSERT ลงตาราง focus ได้ตรง ๆ
+
+        `name` และ `emotion` ต้องมีคอลัมน์รองรับก่อน (ดู README หัวข้อฐานข้อมูล)
+        ค่าที่เป็น None แปลว่า "ไม่รู้" ไม่ใช่ "ไม่มี" — ปลายทางอย่าตีความเป็นค่าว่าง
+        """
         return {
             "person": self.person,
             "movement": self.movement,
             "direction": dict(self.direction),
             "face_count": self.face_count,
+            "name": self.name,
+            "emotion": self.emotion,
         }
 
     def to_room_row(self) -> dict:
@@ -168,6 +186,9 @@ class _PersonState:
     blink_times: deque = field(default_factory=deque)
     drowsy: bool = False
 
+    # ตัวกรองอารมณ์ของคนนี้ (emotion.EmotionState) — สร้างครั้งแรกที่ใช้
+    emotion: object = None
+
     # ตัวนับภายในหน้าต่างปัจจุบัน
     window_dirs: dict = field(default_factory=empty_direction_counts)
     window_blinks: int = 0
@@ -191,6 +212,8 @@ class FaceAnalyzer:
         self.blink_cfg = cfg["blink"]
         self.window_cfg = cfg["window"]
         self.quality_cfg = cfg["quality"]
+        # อาจไม่มีคีย์นี้ถ้ามีใครส่ง config เก่าเข้ามา — ปิดฟีเจอร์ดีกว่าพังทั้งไพป์ไลน์
+        self.emotion_cfg = cfg.get("emotion", {"enabled": False})
 
         # ภาพที่พลิกกระจกแล้วทำให้ทิศในภาพตรงกับทิศของตัวผู้ใช้เอง
         # ถ้าไม่พลิกต้องสลับป้าย Left/Right ไม่งั้นแดชบอร์ดจะรายงานกลับข้าง
@@ -443,6 +466,21 @@ class FaceAnalyzer:
                 if direction is None:
                     self._center_samples += 1
 
+            # อารมณ์: ใช้ blendshapes ชุดเดียวกับที่ตรวจการหลับตา ไม่มี inference เพิ่ม
+            # เทียบเฉพาะใบหน้าที่ผ่าน quality เพราะใบหน้าเล็กให้ blendshape ที่ไม่แม่น
+            emotion_label = None
+            if self.emotion_cfg.get("enabled") and usable:
+                if st.emotion is None:
+                    st.emotion = em.EmotionState(
+                        window=self.emotion_cfg["window_frames"],
+                        hold=self.emotion_cfg["hold_frames"],
+                    )
+                emotion_label = st.emotion.update(
+                    face.blendshapes,
+                    self.emotion_cfg["threshold"],
+                    self.emotion_cfg["margin"],
+                )
+
             closed_for = (now - st.eye_closed_since) if st.eye_closed_since else 0.0
             readings.append(
                 FaceReading(
@@ -465,6 +503,10 @@ class FaceAnalyzer:
                     usable=usable,
                     blink_method=blink_method,
                     pose_method=pose_method,
+                    emotion=emotion_label,
+                    # ชื่อถูกใส่ไว้ใน track.state โดย main.py ตอนเทียบกับแกลเลอรีรูป
+                    # analyzer ไม่รู้จัก faces.py เลย จึงทดสอบแยกกันได้
+                    name=track.state.get("name"),
                 )
             )
 
@@ -483,6 +525,8 @@ class FaceAnalyzer:
         total_dirs = empty_direction_counts()
         total_blinks = 0
         busiest_person, busiest_moves = None, -1
+        # ชื่อและอารมณ์ของคนที่ถูกรายงาน เก็บคู่กับ id เพื่อไม่ให้หลุดไปคนละคน
+        busiest_name, busiest_emotion = None, None
         people_measured = 0
 
         for track in tracks:
@@ -499,6 +543,8 @@ class FaceAnalyzer:
             # การบันทึก id ชั่วคราวลงฐานข้อมูลทำให้ข้อมูลของคนเดียวกันกระจัดกระจาย
             if moves > busiest_moves and not getattr(track, "provisional", False):
                 busiest_person, busiest_moves = track.person_id, moves
+                busiest_name = track.state.get("name")
+                busiest_emotion = st.emotion.label if st.emotion is not None else None
             st.reset_window()
 
         summary = WindowSummary(
@@ -514,6 +560,9 @@ class FaceAnalyzer:
             occupancy=self.occupancy(),
             attention_ratio=self.attention_ratio(),
             people_measured=people_measured,
+            # โหมดห้องรวมไม่รายงานรายบุคคล ชื่อจึงต้องเงียบไปด้วย ไม่ใช่แค่ id
+            name=busiest_name if self.report_person else None,
+            emotion=busiest_emotion,
         )
 
         self._window_start = now
