@@ -3560,19 +3560,21 @@ textarea {
   /* Docked: shares the screen with the page rather than covering it. The width
      arrives as --ai-dock-w from useAiWindow, which also stamps data-ai-docked
      on <html> so the layout can react without prop-threading. */
+  /*
+    Snapped, but floating — the same treatment as the nav rail on the other side:
+    inset from all three edges, fully rounded, its own border and shadow. Flush to
+    the screen edge it read as part of the browser chrome, and the page appeared to
+    run underneath it; the gap is what makes it a separate surface.
+  */
   .ai-float.docked {
-    top: 0;
-    right: 0;
-    bottom: 0;
+    top: var(--rail-inset);
+    right: var(--rail-inset);
+    bottom: var(--rail-inset);
     left: auto;
-    height: 100vh;
-    height: 100dvh;
-    border-radius: 0;
-    /* A snapped window needs a real edge against the page it sits beside: a
-       hairline alone disappeared into the glass, so the line carries a shadow
-       cast leftward over the content. */
-    border-left: 1px solid var(--line-strong);
-    box-shadow: var(--seam-shadow);
+    height: auto;
+    border-radius: 1.5rem;
+    border: 1px solid var(--line-strong);
+    box-shadow: var(--glass-shadow), var(--seam-shadow);
     transform-origin: right center;
     animation: ai-dock-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
@@ -3583,15 +3585,15 @@ textarea {
 
   /* The page keeps its own space beside the docked panel. */
   :root[data-ai-docked] .shell {
-    padding-right: calc(var(--ai-dock-w, 0px) + clamp(14px, 3vw, 28px));
+    padding-right: calc(var(--ai-dock-w, 0px) + var(--rail-inset) + clamp(14px, 3vw, 28px));
     /* The centring max-width has to grow by the same amount or the content
        drifts left as the panel widens. */
-    max-width: calc(1400px + 15rem + 32px + var(--ai-dock-w, 0px));
+    max-width: calc(1400px + 15rem + 32px + var(--ai-dock-w, 0px) + var(--rail-inset));
   }
 
   /* ...and so does the button, which is fixed to the same corner. */
   :root[data-ai-docked] .fab {
-    right: calc(var(--fab-inset) + var(--ai-dock-w, 0px));
+    right: calc(var(--fab-inset) + var(--ai-dock-w, 0px) + var(--rail-inset));
   }
 
   .ai-float.floating {
