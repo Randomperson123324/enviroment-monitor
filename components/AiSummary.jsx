@@ -56,12 +56,18 @@ export default function AiSummary({ data, loading, error, onRefresh, title, styl
       {loading && !data ? (
         <div className="ai-rec info">{t('aiSummary.loading')}</div>
       ) : failed ? (
+        /* A quiet note, not an alarm: the AI summary is commentary on the data,
+           so its outage must not read louder than the sensor readings below it.
+           It used to render as a full-width danger block at the top of every
+           tab, which looked like the room itself was in trouble. */
         <>
-          <div className="ai-rec danger">
-            <TriangleAlert size={15} strokeWidth={2.2} aria-hidden />{' '}
-            {pinned
-              ? t('aiSummary.failedPinned', { providers: pinned, msg: message })
-              : t('aiSummary.failed', { msg: message })}
+          <div className="ai-note">
+            <TriangleAlert size={14} strokeWidth={2.2} aria-hidden />
+            <span>
+              {pinned
+                ? t('aiSummary.failedPinned', { providers: pinned, msg: message })
+                : t('aiSummary.failed', { msg: message })}
+            </span>
           </div>
           {pinned ? <div className="analyze-hint">{t('aiSummary.pinnedNote', { providers: pinned })}</div> : null}
         </>

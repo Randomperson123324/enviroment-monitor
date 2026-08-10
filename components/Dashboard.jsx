@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Gauge } from 'lucide-react';
 import { STORAGE, TABS } from '@/config/client';
 import { LanguageProvider, useLang } from '@/hooks/useLang';
@@ -10,7 +10,13 @@ import useLogs from '@/hooks/useLogs';
 import useServerConfig from '@/hooks/useServerConfig';
 import useDashboard from '@/hooks/useDashboard';
 import useAiSummary from '@/hooks/useAiSummary';
+import useDataStatus from '@/hooks/useDataStatus';
+import useToasts from '@/hooks/useToasts';
+import useShortcuts from '@/hooks/useShortcuts';
 import AiSummary from '@/components/AiSummary';
+import { StatusNotice } from '@/components/DataStatus';
+import Toasts from '@/components/Toasts';
+import ShortcutHelp from '@/components/ShortcutHelp';
 import Header from '@/components/Header';
 import Sidebar from '@/components/Sidebar';
 import TabMenu from '@/components/TabMenu';
@@ -43,7 +49,10 @@ function DashboardInner() {
   const { logs, addLog, clearLogs } = useLogs();
   const serverCfg = useServerConfig(settings.apiBase, addLog);
   const dash = useDashboard({ settings, serverCfg, addLog });
+  const status = useDataStatus(dash.latest?.created_at);
+  const { toasts, notify, dismiss } = useToasts();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState(TABS[0].id);
 
   // One cached summary per tab, generated server-side at most every 30 min.
@@ -72,38 +81,64 @@ function DashboardInner() {
     if (TABS.some((t) => t.id === saved)) setTab(saved);
   }, []);
 
-  const switchTab = (id) => {
+  const switchTab = useCallback((id) => {
     setTab(id);
     localStorage.setItem(STORAGE.activeTab, id);
-  };
+  }, []);
+
+  /** Confirms only what happened: a 403 from a wrong API base is not a refresh. */
+  const refresh = useCallback(async () => {
+    const res = await dash.refresh();
+    if (res?.ok === false) notify(t('toast.refreshFailed', { msg: res.error }), 'err');
+    else if (res?.ok) notify(t('toast.refreshed'));
+  }, [dash, notify, t]);
+
+  /**
+   * Keyboard shortcuts (see SHORTCUTS in config/client.js). `close` unwinds the
+   * topmost layer only, so Esc from the help sheet doesn't also shut Settings.
+   */
+  const shortcutHandlers = useMemo(
+    () => ({
+      tab1: () => switchTab(TABS[0].id),
+      tab2: () => switchTab(TABS[1].id),
+      tab3: () => switchTab(TABS[2].id),
+      refresh,
+      theme: toggleTheme,
+      settings: () => setSettingsOpen(true),
+      help: () => setHelpOpen((o) => !o),
+      ai: () => window.dispatchEvent(new CustomEvent('env-monitor:open-ai')),
+      close: () => {
+        if (helpOpen) setHelpOpen(false);
+        else if (settingsOpen) setSettingsOpen(false);
+      },
+    }),
+    [switchTab, refresh, toggleTheme, helpOpen, settingsOpen]
+  );
+  useShortcuts(shortcutHandlers);
 
   return (
     <div className="shell">
-      <Sidebar
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        devices={dash.devices}
-        deviceId={dash.deviceId}
-        onSelectDevice={dash.setDevice}
-        latest={dash.latest}
-        onRefresh={dash.refresh}
-        onOpenSettings={() => setSettingsOpen(true)}
-        activeTab={tab}
-        onSelectTab={switchTab}
-      />
+      <Sidebar activeTab={tab} onSelectTab={switchTab} />
       <Header
         theme={theme}
         onToggleTheme={toggleTheme}
         devices={dash.devices}
         deviceId={dash.deviceId}
         onSelectDevice={dash.setDevice}
-        latest={dash.latest}
-        onRefresh={dash.refresh}
+        status={status}
+        onRefresh={refresh}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenHelp={() => setHelpOpen(true)}
         activeTab={tab}
         onSelectTab={switchTab}
       />
       <AlertBar latest={dash.latest} />
+      {/* Says outright when the page is showing history rather than the room —
+          or when it cannot reach the API at all. */}
+      <StatusNotice
+        status={status}
+        api={{ ok: dash.apiOk, error: dash.apiError, base: settings.apiBase }}
+      />
 
       {/* Desktop only — on mobile the same nav lives inside the burger panel. */}
       <TabMenu active={tab} onSelect={switchTab} className="standalone" />
@@ -111,14 +146,14 @@ function DashboardInner() {
       {tab === 'environment' && (
         <>
           <section className="section-gap">
-            <SectionHeader
-              Icon={Gauge}
-              title={t('env.statusNow')}
-              meta={dash.latest?.device_id ? t('env.deviceMeta', { id: dash.latest.device_id }) : ''}
-            />
+            {/* No device meta here: the top bar names the device and its
+                freshness, and repeating it made the two disagree while a poll
+                was in flight. */}
+            <SectionHeader Icon={Gauge} title={t('env.statusNow')} />
             <Overview
               latest={dash.latest}
               theme={theme}
+              status={status}
               summary={envAi.data}
               summaryStyle={settings.aiSummaryStyle}
               summaryLoading={envAi.loading}
@@ -176,7 +211,14 @@ function DashboardInner() {
       )}
 
       <div className="section-gap">
-        <LogPanel logs={logs} onClear={clearLogs} onRefresh={dash.refresh} />
+        <LogPanel
+          logs={logs}
+          onClear={() => {
+            clearLogs();
+            notify(t('toast.logCleared'), 'info');
+          }}
+          onRefresh={refresh}
+        />
       </div>
 
       <FloatingAi
@@ -187,6 +229,9 @@ function DashboardInner() {
         addLog={addLog}
       />
 
+      <Toasts toasts={toasts} onDismiss={dismiss} />
+      {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
+
       {settingsOpen && (
         <SettingsModal
           settings={settings}
@@ -194,6 +239,7 @@ function DashboardInner() {
           onSave={(patch) => {
             save(patch);
             addLog(`Config saved — poll ${(patch.pollMs ?? settings.pollMs) / 1000}s`, 'info');
+            notify(t('toast.saved'));
             setSettingsOpen(false);
           }}
           onClose={() => setSettingsOpen(false)}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Plug } from 'lucide-react';
 import { AI_ORDER_PRESETS, AI_SUMMARY_STYLES } from '@/config/client';
 import { SENSORS } from '@/config/sensors';
 import { aiHeaders } from '@/lib/ai-client';
@@ -83,6 +83,86 @@ function ModelField({ label, provider, apiBase, headers, value, onChange, placeh
   );
 }
 
+/** Shared shell for the two "test connection" rows. */
+function TestRow({ onRun, state }) {
+  const { t } = useLang();
+  return (
+    <p className="field-hint test-row">
+      <button className="mini-btn" onClick={onRun} disabled={state?.level === 'busy'}>
+        <Plug size={13} strokeWidth={2.4} aria-hidden /> {t('settings.test')}
+      </button>
+      {state ? (
+        <span className={`test-result ${state.level}`} role="status" aria-live="polite">
+          {state.text}
+        </span>
+      ) : null}
+    </p>
+  );
+}
+
+/**
+ * Does the address in the API-server field actually serve this dashboard?
+ *
+ * Getting this field wrong breaks every request the page makes, and the app
+ * kept showing the last reading it had managed to load, so the mistake was
+ * invisible. Checking /api/health also rejects an address that answers HTTP but
+ * is some other service (an AI endpoint, say) rather than this app.
+ */
+function ApiBaseTest({ apiBase }) {
+  const { t } = useLang();
+  const [state, setState] = useState(null);
+
+  const run = async () => {
+    setState({ level: 'busy', text: t('settings.testing') });
+    try {
+      const r = await fetch(`${apiBase}/api/health`, { cache: 'no-store' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json().catch(() => ({}));
+      if (d.ok !== true) throw new Error(t('settings.apiTestNotThisApp'));
+      setState({
+        level: d.supabase_ok ? 'ok' : 'warn',
+        text: d.supabase_ok ? t('settings.apiTestOk') : t('settings.apiTestNoDb'),
+      });
+    } catch (e) {
+      setState({ level: 'err', text: t('settings.testFail', { msg: e.message }) });
+    }
+  };
+
+  return <TestRow onRun={run} state={state} />;
+}
+
+/**
+ * On-demand reachability check for one provider.
+ *
+ * The model picker above silently degrades to a text box when an endpoint is
+ * unreachable, which hides *why* — the difference between a wrong URL, a closed
+ * port and a bad key was invisible until you read the server log. This asks the
+ * same endpoint and shows the server's actual error instead.
+ */
+function ProviderTest({ provider, apiBase, headers }) {
+  const { t } = useLang();
+  const [state, setState] = useState(null);
+
+  const run = async () => {
+    setState({ level: 'busy', text: t('settings.testing') });
+    try {
+      const r = await fetch(`${apiBase}/api/ai/models?provider=${provider}`, {
+        headers,
+        cache: 'no-store',
+      });
+      const d = await r.json().catch(() => ({}));
+      const message = d.error || (r.ok ? '' : `HTTP ${r.status}`);
+      if (message) setState({ level: 'err', text: t('settings.testFail', { msg: message }) });
+      else if (!d.models?.length) setState({ level: 'warn', text: t('settings.testEmpty') });
+      else setState({ level: 'ok', text: t('settings.testOk', { n: d.models.length }) });
+    } catch (e) {
+      setState({ level: 'err', text: t('settings.testFail', { msg: e.message }) });
+    }
+  };
+
+  return <TestRow onRun={run} state={state} />;
+}
+
 export default function SettingsModal({ settings, serverCfg, onSave, onClose }) {
   const { t } = useLang();
   const [apiBase, setApiBase] = useState(settings.apiBase);
@@ -144,6 +224,7 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
             placeholder={t('settings.apiBasePlaceholder')}
           />
         </div>
+        <ApiBaseTest apiBase={apiBase} />
         <p className="field-hint">
           {t('settings.ingestHintPre')} <code>POST /api/ingest</code> {t('settings.ingestHintMid')}{' '}
           <code>{INGEST_FIELDS}</code>
@@ -186,6 +267,7 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
             placeholder={ai.localBaseUrl || 'http://host:port'}
           />
         </div>
+        <ProviderTest provider="local" apiBase={apiBase} headers={probeHeaders} />
         <ModelField
           label={t('settings.aiLocalModel')}
           provider="local"
@@ -214,6 +296,7 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
             placeholder={ai.geminiBaseUrl || ''}
           />
         </div>
+        <ProviderTest provider="gemini" apiBase={apiBase} headers={probeHeaders} />
         <ModelField
           label={t('settings.aiGeminiModel')}
           provider="gemini"

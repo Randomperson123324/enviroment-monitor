@@ -1,11 +1,21 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { STORAGE, CHART_VIEW_DEFAULTS } from '@/config/client';
+import { STORAGE, CHART_VIEW_DEFAULTS, API_TIMEOUT_MS } from '@/config/client';
 import { SENSORS } from '@/config/sensors';
 import { translate } from '@/config/i18n';
 
 /** "อุณหภูมิ 27.4 °C · PM2.5 12 µg/m³" — only the values the device reported. */
+/** A request that never answers must still fail, or the poll loop stalls. */
+function withDeadline() {
+  return { cache: 'no-store', signal: AbortSignal.timeout(API_TIMEOUT_MS) };
+}
+
+/** AbortError reads as "TimeoutError: signal timed out" — say it plainly. */
+function reason(err) {
+  return err.name === 'TimeoutError' ? `timeout ${API_TIMEOUT_MS / 1000}s` : err.message;
+}
+
 function readingLine(row) {
   return SENSORS.filter((s) => row[s.field] != null)
     .map((s) => `${translate('th', `sensor.${s.id}.stat`)} ${Number(row[s.field]).toFixed(s.dp)} ${s.unit}`)
@@ -29,6 +39,14 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
   const [smooth, setSmoothState] = useState(CHART_VIEW_DEFAULTS.smooth);
   const [pollTick, setPollTick] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  /**
+   * Whether the last poll reached the API at all (null until the first try).
+   * Kept separate from the data: with a wrong "API server" address every poll
+   * fails while the last good reading stays on screen, so the dashboard looked
+   * alive and merely out of date. Only the system log knew otherwise.
+   */
+  const [apiOk, setApiOk] = useState(null);
+  const [apiError, setApiError] = useState('');
 
   const inFlight = useRef(false);
   const lastReadingId = useRef(null);
@@ -52,7 +70,7 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
   }, []);
 
   const fetchDashboard = useCallback(async () => {
-    if (inFlight.current) return;
+    if (inFlight.current) return { ok: null };
     inFlight.current = true;
     try {
       const q = new URLSearchParams({
@@ -60,7 +78,7 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
         history_limit: String(CHART_VIEW_DEFAULTS.maxPoints),
       });
       if (deviceRef.current) q.set('device_id', deviceRef.current);
-      const r = await fetch(`${settings.apiBase}/api/dashboard?${q}`, { cache: 'no-store' });
+      const r = await fetch(`${settings.apiBase}/api/dashboard?${q}`, withDeadline());
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const pack = await r.json();
 
@@ -84,8 +102,16 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
         }
       }
       setPollTick((t) => t + 1);
+      setApiOk(true);
+      setApiError('');
+      return { ok: true };
     } catch (e) {
-      addLog(`โหลดข้อมูลไม่สำเร็จ: ${e.message}`, 'err');
+      addLog(`โหลดข้อมูลไม่สำเร็จ: ${reason(e)}`, 'err');
+      setApiOk(false);
+      setApiError(reason(e));
+      // Returned, not just stored: the caller that triggered this (the refresh
+      // button) has to report what actually happened rather than assume success.
+      return { ok: false, error: reason(e) };
     } finally {
       inFlight.current = false;
       setLoaded(true);
@@ -94,7 +120,7 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
 
   const checkHealth = useCallback(async () => {
     try {
-      const r = await fetch(`${settings.apiBase}/api/health`, { cache: 'no-store' });
+      const r = await fetch(`${settings.apiBase}/api/health`, withDeadline());
       const d = await r.json();
       setHealth({
         supabaseOk: !!d.supabase_ok,
@@ -158,10 +184,11 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
     localStorage.setItem(STORAGE.chartSmooth, String(n));
   }, []);
 
-  const refresh = useCallback(() => {
-    checkHealth();
-    fetchDashboard();
+  /** Resolves with the fetch outcome so the UI can confirm or report failure. */
+  const refresh = useCallback(async () => {
     addLog('รีเฟรชข้อมูลแล้ว', 'info');
+    checkHealth();
+    return fetchDashboard();
   }, [checkHealth, fetchDashboard, addLog]);
 
   return {
@@ -175,6 +202,8 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
     smooth,
     pollTick,
     loaded,
+    apiOk,
+    apiError,
     setDevice,
     setHours,
     setSmooth,

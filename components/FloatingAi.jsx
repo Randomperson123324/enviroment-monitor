@@ -190,6 +190,16 @@ export default function FloatingAi({ latest, deviceId, settings, serverAi, addLo
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('recs');
   const [lastSource, setLastSource] = useState(null);
+
+  // The "/" shortcut lives in Dashboard (one global key listener for the app) and
+  // reaches the assistant through this event, so the panel keeps owning its own
+  // open state instead of having it lifted into the page for one keystroke.
+  useEffect(() => {
+    const openPanel = () => setOpen(true);
+    window.addEventListener('env-monitor:open-ai', openPanel);
+    return () => window.removeEventListener('env-monitor:open-ai', openPanel);
+  }, []);
+
   // Until something answers we can only name the chain the server would use.
   const source =
     sourceLabel(t, lastSource) || (serverAi?.length ? serverAi.join(' → ') : t('ai.local'));

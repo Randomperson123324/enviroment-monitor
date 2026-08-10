@@ -96,13 +96,47 @@ export const GOV_LEVELS = {
 
 export const CHAT_MAX_TURNS = 20;
 
-/** Header freshness indicator: minutes before the reading turns amber/red. */
+/**
+ * Freshness thresholds for the newest reading, in minutes.
+ * `live` up to freshMin · `stale` up to offlineMin · `offline` beyond it — a
+ * device that stopped days ago is a different situation from one that skipped
+ * a poll, and the UI must not present the two the same way.
+ */
 export const DATA_AGE = {
   freshMin: 3,
   staleMin: 15,
+  offlineMin: 60,
   /** Re-render cadence of the age label */
   tickMs: 10000,
 };
+
+/** Toast behaviour: how long a message stays, and how many stack at once. */
+export const TOASTS = { ttlMs: 4000, max: 3 };
+
+/**
+ * Client-side deadline for the dashboard/health polls.
+ * Without one, an API base that accepts the connection and then never answers
+ * leaves the in-flight guard set forever and the poll loop stops for good —
+ * silently, with the last good reading still on screen.
+ */
+export const API_TIMEOUT_MS = 15000;
+
+/**
+ * Global keyboard shortcuts, single keys only (no modifiers) so they stay
+ * memorable; `keys` are matched case-insensitively and ignored while typing.
+ * `key` is the i18n suffix under `shortcuts.*` for the help sheet.
+ */
+export const SHORTCUTS = [
+  { id: 'tab1', keys: ['1'], key: 'tab1' },
+  { id: 'tab2', keys: ['2'], key: 'tab2' },
+  { id: 'tab3', keys: ['3'], key: 'tab3' },
+  { id: 'refresh', keys: ['r'], key: 'refresh' },
+  { id: 'ai', keys: ['/'], key: 'ai' },
+  { id: 'settings', keys: ['s'], key: 'settings' },
+  { id: 'theme', keys: ['t'], key: 'theme' },
+  { id: 'help', keys: ['?'], key: 'help' },
+  { id: 'close', keys: ['Escape'], key: 'close' },
+];
 
 /** Bounds for the focus "movement per minute" threshold input. */
 export const FOCUS_THRESHOLD_INPUT = { min: 1, max: 99 };

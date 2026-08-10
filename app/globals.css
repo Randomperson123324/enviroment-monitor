@@ -2843,3 +2843,401 @@ textarea {
     text-align: left;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UX PASS — one home per control, honest data state, keyboard + feedback
+   Appended deliberately: these rules refine the glass language above rather
+   than replace it, and a few of them override earlier blocks (the desktop
+   `display: none` on the top bar, the oversized score ring).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Focus ring ───
+   One visible ring for every control, keyboard-only so pointer users never see
+   it. Previously nothing but the browser default showed, and glass surfaces
+   swallowed that almost completely. */
+:where(button, a, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+/* ─── Top bar at every width ───
+   The rail used to hide it and carry a second copy of these controls. */
+@media (min-width: 1024px) {
+  .hdr {
+    display: flex;
+  }
+
+  /* The rail already shows the brand; two of them is noise. */
+  .hdr .brand {
+    display: none;
+  }
+
+  .hdr-mid {
+    flex: 0 1 auto;
+  }
+
+  .hdr-right {
+    margin-left: auto;
+  }
+}
+
+.sidebar-hint {
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+/* ─── Data freshness ───
+   State in words, with colour only reinforcing it. */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.status-pill.live {
+  color: var(--lv-ok);
+  border-color: color-mix(in srgb, var(--lv-ok) 32%, transparent);
+  background: color-mix(in srgb, var(--lv-ok) 10%, transparent);
+}
+
+.status-pill.stale {
+  color: var(--lv-warning);
+  border-color: color-mix(in srgb, var(--lv-warning) 32%, transparent);
+  background: color-mix(in srgb, var(--lv-warning) 10%, transparent);
+}
+
+.status-pill.offline {
+  color: var(--lv-danger);
+  border-color: color-mix(in srgb, var(--lv-danger) 32%, transparent);
+  background: color-mix(in srgb, var(--lv-danger) 10%, transparent);
+}
+
+.status-pill.none {
+  color: var(--muted);
+}
+
+.status-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 15px;
+  border-radius: 1rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.status-notice > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.status-notice.stale {
+  border-color: color-mix(in srgb, var(--lv-warning) 30%, transparent);
+  background: color-mix(in srgb, var(--lv-warning) 8%, transparent);
+}
+
+.status-notice.offline {
+  border-color: color-mix(in srgb, var(--lv-danger) 30%, transparent);
+  background: color-mix(in srgb, var(--lv-danger) 8%, transparent);
+}
+
+/* ─── Score card, compact ───
+   Was a 200px-tall hero holding two lines of text, which pushed the sensor
+   tiles out of the first screen. Now a header strip for the page. */
+.overview {
+  gap: 20px;
+  padding: 16px 20px;
+  align-items: center;
+}
+
+.ring-wrap {
+  width: 104px;
+  height: 104px;
+}
+
+.ring-track,
+.ring-fill {
+  stroke-width: 9;
+}
+
+.ring-num {
+  font-size: 28px;
+}
+
+.ov-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.ov-score-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Timestamp sits in the head row now, so its old block spacing would gap. */
+.ov-head .ov-ts {
+  margin: 0;
+}
+
+.ov-title {
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* Stale data must not look authoritative: the ring recedes and the value
+   reads as a record rather than a live measurement. */
+.overview.is-stale .ring-wrap,
+.overview.is-stale .ov-title {
+  opacity: 0.6;
+}
+
+/* ─── AI outage, demoted ───
+   Commentary failing is not the room failing. */
+.ai-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  padding: 8px 0 2px;
+}
+
+.ai-note > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--lv-warning);
+}
+
+.src-tag.warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--lv-warning);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Toasts ───
+   Bottom-centre, clear of the AI button in the bottom-right corner. */
+.toast-stack {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+  width: max-content;
+  max-width: min(92vw, 460px);
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--glass-shadow-sm);
+  font-size: 13px;
+  animation: toast-in 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.toast.ok > svg {
+  color: var(--lv-ok);
+}
+
+.toast.err > svg {
+  color: var(--lv-danger);
+}
+
+.toast.info > svg {
+  color: var(--lv-info);
+}
+
+.toast-text {
+  min-width: 0;
+}
+
+.toast-x {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.toast-x:hover {
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ─── Shortcut sheet ─── */
+.keys-modal {
+  width: 420px;
+}
+
+.keys-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.keys-head h3 {
+  margin-bottom: 0;
+}
+
+.keys-list {
+  list-style: none;
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.keys-list li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--line);
+  font-size: 13.5px;
+}
+
+.keys-list li:first-child {
+  border-top: 0;
+}
+
+.keys-combo {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 58px;
+}
+
+.keys-list kbd {
+  min-width: 26px;
+  padding: 3px 7px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 7px;
+  background: var(--surface);
+  font-family: var(--font-mono), monospace;
+  font-size: 11.5px;
+  text-align: center;
+  color: var(--ink);
+}
+
+.keys-desc {
+  color: var(--ink-2);
+}
+
+/* ─── Connection test row (Settings) ─── */
+.test-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: -6px;
+  margin-bottom: 14px;
+}
+
+.test-result {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.test-result.ok {
+  color: var(--lv-ok);
+}
+
+.test-result.warn {
+  color: var(--lv-warning);
+}
+
+.test-result.err {
+  color: var(--lv-danger);
+}
+
+@media (max-width: 640px) {
+  .hdr-mid {
+    flex-wrap: wrap;
+  }
+
+  /* Thumb-sized targets on the row that gets used most. */
+  .hdr-right .icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .overview {
+    gap: 14px;
+  }
+
+  .ov-head {
+    justify-content: center;
+  }
+
+  .toast-stack {
+    bottom: 84px;
+  }
+}
+
+.sidebar-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.sidebar-hint kbd {
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: var(--font-mono), monospace;
+  font-size: 10.5px;
+  text-align: center;
+}

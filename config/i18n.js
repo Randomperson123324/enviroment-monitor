@@ -22,12 +22,62 @@ const DICT = {
       noData: '— รอข้อมูล —',
       refresh: 'รีเฟรชข้อมูล',
       settings: 'ตั้งค่า',
+      help: 'คีย์ลัดและวิธีใช้',
       toggleTheme: 'สลับโหมดสว่าง/มืด',
-      agoJustNow: '● เมื่อสักครู่',
-      agoMinutes: '● {n} นาทีที่แล้ว',
     },
 
     tabs: { menuLabel: 'เลือกหมวดข้อมูล' },
+
+    /** Relative ages — see lib/format.js ageParts() */
+    age: {
+      now: 'เมื่อสักครู่',
+      min: '{n} นาทีที่แล้ว',
+      hour: '{n} ชม.ที่แล้ว',
+      day: '{n} วันที่แล้ว',
+    },
+
+    /** Bare durations for labels that add their own framing ("ออฟไลน์ {age}"). */
+    ageShort: { now: 'ไม่ถึงนาที', min: '{n} นาที', hour: '{n} ชม.', day: '{n} วัน' },
+
+    status: {
+      live: 'ข้อมูลสด',
+      stale: 'ค้าง {age}',
+      offline: 'ออฟไลน์ {age}',
+      none: 'ยังไม่มีข้อมูล',
+      at: 'ข้อมูลล่าสุด {ts}',
+      staleTag: 'ค่าเก่า',
+      staleBanner: 'ข้อมูลล่าสุด {ts} ({age}) — ตัวเลขบนหน้านี้เป็นค่าเก่า ไม่ใช่สภาพห้องตอนนี้',
+      offlineBanner: 'อุปกรณ์ไม่ส่งข้อมูลมา {age} — ค่าล่าสุดที่มีคือของวันที่ {ts} ทั้งหน้านี้จึงเป็นข้อมูลย้อนหลัง',
+      noneBanner: 'ยังไม่เคยได้รับข้อมูลจากอุปกรณ์นี้ — ตรวจว่าอุปกรณ์ส่งเข้า POST /api/ingest แล้วหรือยัง',
+      apiDown:
+        'ติดต่อเซิร์ฟเวอร์ API ไม่ได้ ({base}) — {msg} · ตัวเลขบนหน้านี้ค้างอยู่ที่ค่าล่าสุดที่โหลดได้ ตรวจช่อง "ที่อยู่เซิร์ฟเวอร์ API" ในหน้าตั้งค่า (เว้นว่าง = เซิร์ฟเวอร์เดียวกับหน้าเว็บ)',
+      apiSameOrigin: 'เซิร์ฟเวอร์เดียวกับหน้าเว็บ',
+    },
+
+    toast: {
+      refreshed: 'อัปเดตข้อมูลแล้ว',
+      refreshFailed: 'รีเฟรชไม่สำเร็จ: {msg}',
+      saved: 'บันทึกการตั้งค่าแล้ว',
+      logCleared: 'ล้างบันทึกระบบแล้ว',
+      summaryRefreshed: 'สั่งสรุปใหม่แล้ว',
+      dismiss: 'ปิดข้อความ',
+    },
+
+    shortcuts: {
+      title: 'คีย์ลัด',
+      meta: 'ใช้ได้ตอนที่ไม่ได้พิมพ์ในช่องกรอก',
+      hint: 'กด ? เพื่อดูคีย์ลัด',
+      hintKey: 'ดูคีย์ลัดทั้งหมด',
+      tab1: 'ไปหมวด Environment',
+      tab2: 'ไปหมวด Focus',
+      tab3: 'ไปหมวด Safety & Health',
+      refresh: 'รีเฟรชข้อมูลเดี๋ยวนี้',
+      ai: 'เปิดผู้ช่วย AI',
+      settings: 'เปิดหน้าตั้งค่า',
+      theme: 'สลับโหมดสว่าง/มืด',
+      help: 'เปิด/ปิดรายการคีย์ลัด',
+      close: 'ปิดหน้าต่างที่เปิดอยู่',
+    },
 
     env: { statusNow: 'สถานะปัจจุบัน', deviceMeta: 'อุปกรณ์ {id}' },
 
@@ -114,6 +164,14 @@ const DICT = {
       ingestHintMid: 'ด้วยค่าเหล่านี้ (ค่าที่อ่านไม่ได้ให้ส่ง null ห้ามส่ง 0):',
       pollSec: 'ความถี่อัปเดตข้อมูล (วินาที)',
       cancel: 'ยกเลิก', save: 'บันทึก',
+      test: 'ทดสอบการเชื่อมต่อ',
+      testing: 'กำลังทดสอบ...',
+      testOk: 'เชื่อมต่อได้ · พบ {n} โมเดล',
+      testEmpty: 'เชื่อมต่อได้ แต่ปลายทางไม่มีโมเดลให้ใช้',
+      testFail: 'ไม่สำเร็จ: {msg}',
+      apiTestOk: 'ใช้งานได้ · ต่อฐานข้อมูลได้',
+      apiTestNoDb: 'เซิร์ฟเวอร์ตอบ แต่ต่อฐานข้อมูลไม่ได้',
+      apiTestNotThisApp: 'ที่อยู่นี้ตอบกลับ แต่ไม่ใช่เซิร์ฟเวอร์ของแดชบอร์ดนี้',
 
       aiSection: 'ผู้ช่วย AI',
       aiSummaryStyle: 'รูปแบบการแสดงสรุปของ AI',
@@ -175,8 +233,8 @@ const DICT = {
       refresh: 'สรุปใหม่ตอนนี้',
       generatedAt: 'สรุปเมื่อ {time}',
       nextRefresh: 'จะสรุปใหม่อัตโนมัติเวลา {time}',
-      failed: '⚠️ สรุปไม่สำเร็จ: {msg}',
-      failedPinned: '⚠️ AI ในเครื่อง ({providers}) ใช้งานไม่ได้: {msg}',
+      failed: 'สรุปไม่สำเร็จ: {msg}',
+      failedPinned: 'AI ในเครื่อง ({providers}) ใช้งานไม่ได้: {msg}',
       pinnedNote:
         'หมวดนี้ใช้ AI ในเครื่อง ({providers}) เท่านั้น จะไม่ส่งข้อมูลกล้องไปยัง Gemini หรือบริการภายนอก',
     },
@@ -310,12 +368,60 @@ const DICT = {
       noData: '— waiting —',
       refresh: 'Refresh data',
       settings: 'Settings',
+      help: 'Shortcuts & help',
       toggleTheme: 'Toggle light/dark',
-      agoJustNow: '● just now',
-      agoMinutes: '● {n} min ago',
     },
 
     tabs: { menuLabel: 'Choose a data section' },
+
+    age: {
+      now: 'just now',
+      min: '{n} min ago',
+      hour: '{n}h ago',
+      day: '{n}d ago',
+    },
+
+    ageShort: { now: 'under a minute', min: '{n} min', hour: '{n}h', day: '{n}d' },
+
+    status: {
+      live: 'Live',
+      stale: 'Stale · {age}',
+      offline: 'Offline · {age}',
+      none: 'No data yet',
+      at: 'Last reading {ts}',
+      staleTag: 'old value',
+      staleBanner: 'Last reading {ts} ({age}) — the numbers on this page are old, not the room right now',
+      offlineBanner: 'No data from this device for {age} — the newest reading is from {ts}, so this whole page is history',
+      noneBanner: 'No reading has ever arrived from this device — check that it posts to POST /api/ingest',
+      apiDown:
+        'Cannot reach the API server ({base}) — {msg} · the numbers here are frozen at the last reading that loaded. Check the "API server URL" field in Settings (blank = the same server as this page).',
+      apiSameOrigin: 'same server as this page',
+    },
+
+    toast: {
+      refreshed: 'Data updated',
+      refreshFailed: 'Refresh failed: {msg}',
+      saved: 'Settings saved',
+      logCleared: 'System log cleared',
+      summaryRefreshed: 'Summary regenerating',
+      dismiss: 'Dismiss',
+    },
+
+    shortcuts: {
+      title: 'Keyboard shortcuts',
+      meta: 'Active whenever you are not typing in a field',
+      hint: 'Press ? for shortcuts',
+      hintKey: 'all shortcuts',
+      tab1: 'Go to Environment',
+      tab2: 'Go to Focus',
+      tab3: 'Go to Safety & Health',
+      refresh: 'Refresh data now',
+      ai: 'Open the AI assistant',
+      settings: 'Open settings',
+      theme: 'Toggle light/dark',
+      help: 'Show/hide this list',
+      close: 'Close whatever is open',
+    },
 
     env: { statusNow: 'Current status', deviceMeta: 'Device {id}' },
 
@@ -402,6 +508,14 @@ const DICT = {
       ingestHintMid: 'with these values (send null, never 0, for a sensor you cannot read):',
       pollSec: 'Data refresh interval (seconds)',
       cancel: 'Cancel', save: 'Save',
+      test: 'Test connection',
+      testing: 'Testing...',
+      testOk: 'Reachable · {n} models',
+      testEmpty: 'Reachable, but the endpoint offers no models',
+      testFail: 'Failed: {msg}',
+      apiTestOk: 'Working · database reachable',
+      apiTestNoDb: 'Server answers, but cannot reach the database',
+      apiTestNotThisApp: 'Something answers at this address, but it is not this dashboard',
 
       aiSection: 'AI assistant',
       aiSummaryStyle: 'AI summary style',
@@ -463,8 +577,8 @@ const DICT = {
       refresh: 'Summarize again now',
       generatedAt: 'Summarized at {time}',
       nextRefresh: 'Refreshes automatically at {time}',
-      failed: '⚠️ Summary failed: {msg}',
-      failedPinned: '⚠️ On-device AI ({providers}) is unavailable: {msg}',
+      failed: 'Summary failed: {msg}',
+      failedPinned: 'On-device AI ({providers}) is unavailable: {msg}',
       pinnedNote:
         'This tab uses on-device AI ({providers}) only — camera data is never sent to Gemini or any external service.',
     },
