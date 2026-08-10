@@ -44,6 +44,7 @@ import faces as fc
 import landmarks as lm
 import modes
 import overlay as ov
+import uploader as up_mod
 from camera import Camera, CameraError, list_cameras
 from config import CONFIG
 from tracker import Detection, PersonTracker
@@ -408,6 +409,18 @@ def main() -> int:
     an = az.FaceAnalyzer(cfg, mirror=cam_cfg["mirror"],
                          report_person=mode.report_person, track_eyes=mode.eyes)
 
+    # ส่งข้อมูลขึ้น Supabase — ไม่ตั้ง url/key ก็แค่ไม่ส่ง โปรแกรมทำงานครบเหมือนเดิม
+    uploader = up_mod.Uploader(cfg["supabase"])
+    if uploader.enabled:
+        table = cfg["supabase"]["room_table"] if not mode.report_person else cfg["supabase"]["focus_table"]
+        if table:
+            print(f"[pi-vision] ส่งข้อมูลขึ้นตาราง {table}")
+        else:
+            print("[pi-vision] โหมดนี้ยังไม่มีตารางรองรับ — ไม่ส่งข้อมูล")
+        uploader.start()
+    else:
+        print("[pi-vision] ไม่ได้ตั้ง SUPABASE_URL/KEY — แสดงผลบนจอเท่านั้น")
+
     # แกลเลอรีใบหน้าจากรูปในโฟลเดอร์ — ว่างไว้ = ระบบใช้ id ตัวเลขเหมือนเดิมทุกอย่าง
     # โหมดห้องรวมไม่รายงานรายบุคคล จึงไม่โหลดแกลเลอรีเลย ไม่ใช่แค่ไม่แสดงชื่อ
     gallery = None
@@ -539,8 +552,15 @@ def main() -> int:
             readings = an.update(faces, now, dt, frame_size)
 
             summary = an.pop_window(tracks, now)
-            if summary and display_cfg["log_to_console"]:
-                print_summary(summary, threshold, mode)
+            if summary:
+                # payload คนละแบบตามโหมด — to_room_row() ไม่มีคอลัมน์ person เลย
+                # จึงไม่มีทางที่ id รายคนจะหลุดออกไปในโหมดห้องรวม
+                if mode.report_person:
+                    uploader.send(summary.to_focus_row())
+                else:
+                    uploader.send(summary.to_room_row(), room=True)
+                if display_cfg["log_to_console"]:
+                    print_summary(summary, threshold, mode)
 
             if not display_cfg["enabled"]:
                 continue
@@ -639,6 +659,7 @@ def main() -> int:
     finally:
         camera.close()
         landmarker.close()
+        uploader.close()
         if photo_reader is not None:
             photo_reader.close()
         if display_cfg["enabled"]:

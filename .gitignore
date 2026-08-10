@@ -5,3 +5,12 @@ out/
 .env*.local
 npm-debug.log*
 .DS_Store
+
+# pi-vision — ต้องไม่หลุดขึ้น repo:
+#   faces/  = ภาพใบหน้าของคนจริง (ข้อมูลส่วนบุคคล) · เก็บแค่คำอธิบายไว้
+#   .env    = คีย์ Supabase ของเครื่องนั้น (README บอกให้ผู้ใช้สร้างไฟล์นี้เอง)
+#   queue.jsonl = ข้อมูลที่ยังส่งไม่ได้ เป็นของชั่วคราวประจำเครื่อง
+pi-vision/faces/*
+!pi-vision/faces/README.txt
+pi-vision/.env
+pi-vision/queue.jsonl

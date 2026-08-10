@@ -161,6 +161,26 @@ CONFIG = {
         "good_interocular_px": _num("QUALITY_GOOD_INTEROCULAR_PX", 90),
     },
 
+    # ── ส่งข้อมูลขึ้น Supabase ───────────────────────────────
+    # ไม่ใส่ url/key = ไม่ส่งอะไรเลย (โปรแกรมยังทำงานและแสดงผลบนจอตามปกติ)
+    "supabase": {
+        "url": _str("SUPABASE_URL", ""),
+        "key": _str("SUPABASE_ANON_KEY", ""),
+        "focus_table": _str("SUPABASE_FOCUS_TABLE", "focus"),
+        # โหมดห้องรวมมี payload คนละแบบ ต้องมีตารางของตัวเอง
+        # เว้นว่าง = โหมดนั้นไม่ส่งข้อมูล (ยังไม่มีตารางรองรับในโครงงานนี้)
+        "room_table": _str("SUPABASE_ROOM_TABLE", ""),
+        "timeout_seconds": _num("SUPABASE_TIMEOUT_SECONDS", 10.0),
+        # คิวบนดิสก์เผื่อเน็ตหลุด — เก็บเป็น JSON บรรทัดละแถว
+        "queue_path": _str("SUPABASE_QUEUE_PATH", str(BASE_DIR / "queue.jsonl")),
+        # เกินนี้ทิ้งแถวเก่าสุดก่อน (FIFO) — ข้อมูลใหม่มีค่ากว่าข้อมูลเก่าที่ส่งไม่ผ่าน
+        # และการโตไม่จำกัดจะกินการ์ด SD จนเต็ม
+        "queue_max": _int("SUPABASE_QUEUE_MAX", 5000),
+        # หน่วงก่อนลองใหม่ เพิ่มเป็นเท่าตัวทุกครั้งที่ล้มเหลว จนถึงเพดาน
+        "retry_base_seconds": _num("SUPABASE_RETRY_BASE_SECONDS", 1.0),
+        "retry_max_seconds": _num("SUPABASE_RETRY_MAX_SECONDS", 60.0),
+    },
+
     # ── อารมณ์จากการแสดงออกบนใบหน้า ──────────────────────────
     # อ่านจาก blendshapes ที่เปิดใช้อยู่แล้วเพื่อตรวจการหลับตา จึงไม่มีโมเดลเพิ่ม
     # และไม่มี inference รอบที่สอง — ดูขอบเขตของสิ่งที่บอกได้ใน emotion.py
