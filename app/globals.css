@@ -2451,7 +2451,11 @@ textarea {
 
 /* Chat */
 .chat-msgs {
-  height: 230px;
+  /* Takes whatever height the panel has left. It used to be a fixed 230px, which
+     is fine for a popover sized by its content but leaves a window with an
+     explicit height showing everything bunched at the top over dead space. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 14px 16px;
   display: flex;
@@ -2459,7 +2463,15 @@ textarea {
   gap: 9px;
 }
 
+/* The popover has no height of its own, so the list still needs a floor there. */
+.ai-float:not(.docked):not(.floating) .chat-msgs {
+  min-height: 230px;
+}
+
 .chat-empty {
+  /* Auto margins in a flex column: the prompt sits in the middle of whatever
+     space the list has, rather than clinging to the top of a tall window. */
+  margin: auto 0;
   color: var(--muted);
   font-size: 13px;
   text-align: center;
