@@ -80,6 +80,51 @@ itself. Responses report `via: 'relay' | 'direct'`.
 [demo box, raw IP]  --AI_RELAY_URL-->  [enviroment-monitor.vercel.app]  -->  [local endpoint / Gemini]
 ```
 
+## Running the local model, and reaching it from a hosted deployment
+
+`scripts/start-local-ai.ps1` starts the whole chain and verifies it:
+
+```powershell
+.\scripts\start-local-ai.ps1            # Ollama + a Cloudflare tunnel
+.\scripts\start-local-ai.ps1 -NoTunnel  # Ollama only (dashboard on this machine)
+```
+
+It prints the URL to paste into Settings → **ที่อยู่ AI ในเครื่อง** and copies it
+to the clipboard, then checks `/v1/models` **through** the tunnel before saying it
+worked — a tunnel that resolves is not the same as a tunnel the model answers on.
+
+### Why the tunnel needs `--http-host-header`
+
+Ollama refuses any request whose `Host` is not local (its guard against a web
+page you happen to have open driving your model). cloudflared forwards the public
+hostname as `Host` by default, so the model answers **403 with an empty body**,
+which Cloudflare relays verbatim — it looks like Cloudflare blocked you.
+
+Reproduce the whole thing without a tunnel:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:11434/v1/models        # 200
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H 'Host: something.trycloudflare.com' http://127.0.0.1:11434/v1/models        # 403
+```
+
+So the tunnel must rewrite the header, which is what the script does:
+
+```
+cloudflared tunnel --url http://localhost:11434 --http-host-header localhost:11434
+```
+
+Widening Ollama instead (`OLLAMA_HOST=0.0.0.0`, `OLLAMA_ORIGINS=*`) also works but
+exposes the model to everything on the LAN; the rewrite keeps it on loopback.
+
+> The tunnel is **only** for letting a hosted deployment reach this machine. When
+> the dashboard runs locally, the model is called server-side from the same
+> machine, so `http://127.0.0.1:11434` needs no tunnel at all.
+>
+> ⚠️ The tunnel URL belongs in the **local AI endpoint** field, never in **API
+> server URL** — that field is where the dashboard's own API lives, and pointing
+> it at the model server breaks every request the page makes.
+
 ## Demo runbook (raw IP, e.g. DEPA)
 
 1. Serve the dashboard from the box; note its LAN address, e.g. `192.168.1.50:3000`.
