@@ -22,8 +22,14 @@
 
 **สิ่งที่วิธีนี้ทำได้และทำไม่ได้:** ลายเซ็นคือสัดส่วนโครงหน้า 8 ค่า (landmarks.face_signature)
 แยกคนที่โครงหน้าต่างกันได้ แต่ **ไม่ใช่ระบบยืนยันตัวตน** พี่น้องหน้าคล้ายกันอาจแยกไม่ออก
-จึงตั้งกฎว่า **ไม่มั่นใจให้ตอบว่าไม่รู้** แล้วปล่อยให้ใช้ id ตัวเลขต่อ ดีกว่าติดชื่อผิดคน
 ถ้าต้องการความแม่นระดับยืนยันตัวตน ต้องใช้โมเดล face embedding ซึ่งเป็นงานแยก
+
+**โหมดการตัดสิน (`FACES_GUESS`)** — ค่าเริ่มต้นคือ `true` = **เดาคนที่ใกล้ที่สุดเสมอ**
+ตามที่ผู้ใช้ต้องการ ไม่ตอบว่าไม่รู้ · ที่ต้องรู้คือการเดาไม่ได้ทำให้แม่นขึ้น มันแค่ย้าย
+ความผิดพลาดจาก "ไม่มีชื่อ" ไปเป็น "ชื่อผิด" ซึ่งมองไม่เห็นจากปลายทาง เพราะข้อมูลของ
+คนแปลกหน้าจะไปกองอยู่ใต้ชื่อคนที่มีรูปที่หน้าคล้ายที่สุด โดยไม่มีอะไรบอกว่าเกิดขึ้น
+จึงยังคืน `confident` มาด้วยทุกครั้ง เพื่อให้หน้าจอเติม `?` ต่อท้ายชื่อที่ยังไม่มั่นใจได้
+ตั้ง `FACES_GUESS=false` เพื่อกลับไปเป็น "ไม่มั่นใจให้ใช้หมายเลขแทน"
 """
 
 from __future__ import annotations
@@ -114,6 +120,8 @@ class FaceGallery:
         self.threshold = cfg["threshold"]
         self.ratio = cfg["ratio"]
         self.min_size = cfg["min_size"]
+        # เดาคนที่ใกล้ที่สุดเสมอ แทนการตอบว่าไม่รู้ (ดูหัวไฟล์)
+        self.guess = cfg.get("guess", True)
         self.rescan_seconds = cfg["rescan_seconds"]
         self._extract = extract
         self.people: dict[str, KnownPerson] = {}
@@ -161,17 +169,22 @@ class FaceGallery:
         return True
 
     # ── การเทียบ ─────────────────────────────────────────
-    def identify(self, signature, face_size: float) -> tuple[str, float] | None:
+    def identify(self, signature, face_size: float):
         """
-        ชื่อของคนที่ลายเซ็นตรงที่สุด คืน None เมื่อ**ไม่มั่นใจ**
+        ชื่อของคนที่ลายเซ็นตรงที่สุด — คืน `(ชื่อ, ระยะ, มั่นใจไหม)`
 
-        เกณฑ์เดียวกับ re-identification ใน tracker.py เพราะเป็นปัญหาเดียวกัน:
-          1. ใบหน้าต้องใหญ่พอ — ใบหน้าเล็กให้ landmark ที่ไม่แม่น
-          2. ระยะต้องต่ำกว่า threshold
-          3. ratio test — ตัวที่ใกล้สุดต้องดีกว่าอันดับสองชัดเจน มีสองคนคล้ายกันพอ ๆ กัน
-             แปลว่าแยกไม่ออก จึงไม่เดา
+        คืน `None` เมื่อ**เทียบไม่ได้เลย** ซึ่งคนละเรื่องกับ "เทียบแล้วไม่มั่นใจ":
+        ไม่มีรูปในแกลเลอรี · ยังไม่มีลายเซ็น · ใบหน้าเล็กเกินกว่าจะให้ landmark ที่ใช้ได้
+        (ใบหน้าเล็กไม่ได้ให้คำตอบที่ "มั่นใจน้อย" มันให้คำตอบที่เป็นสัญญาณรบกวนล้วน ๆ
+        การเดาจากมันจึงไม่ใช่การเดาที่มีข้อมูล — เป็นการสุ่ม)
 
-        การติดชื่อผิดคนแย่กว่าการไม่ติดชื่อมาก เพราะข้อมูลของสองคนจะปนกันโดยไม่มีใครรู้
+        `มั่นใจ` = ผ่านเกณฑ์เดียวกับ re-identification ใน tracker.py ซึ่งเป็นปัญหาเดียวกัน
+          1. ระยะต่ำกว่า threshold
+          2. ratio test — ตัวที่ใกล้สุดดีกว่าอันดับสองอย่างชัดเจน · สองคนคล้ายกันพอ ๆ กัน
+             แปลว่าแยกไม่ออกจริง ๆ
+
+        `guess=True` (ค่าเริ่มต้น) คืนชื่อที่ใกล้ที่สุดแม้ไม่ผ่านเกณฑ์ ให้ผู้เรียกตัดสินใจ
+        ว่าจะแสดงต่างจากชื่อที่มั่นใจไหม · `guess=False` คืน None เมื่อไม่ผ่านเกณฑ์
         """
         if not self.people or not signature or face_size < self.min_size:
             return None
@@ -180,11 +193,12 @@ class FaceGallery:
             (signature_distance(p.signature, signature), p.name) for p in self.people.values()
         )
         best, name = scored[0]
-        if best >= self.threshold:
+        confident = best < self.threshold and not (
+            len(scored) > 1 and best > scored[1][0] * self.ratio
+        )
+        if not confident and not self.guess:
             return None
-        if len(scored) > 1 and best > scored[1][0] * self.ratio:
-            return None
-        return name, best
+        return name, best, confident
 
     @property
     def names(self) -> list[str]:

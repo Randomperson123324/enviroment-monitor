@@ -11,11 +11,11 @@ pi-vision — ตรวจจับใบหน้า วัดการหั�
     เฉพาะคนในรูป   รู้จักแค่คนที่มีรูปใน faces/ · คนที่ไม่มีรูปไม่ถูกบันทึกเลย
 
 การใช้งาน
-    python3 main.py                 # ถามโหมดแล้วเปิดหน้าต่างแสดงผล
+    python3 main.py                 # ถามโหมดและกล้อง แล้วเปิดหน้าต่างแสดงผล
     python3 main.py --mode room     # ข้ามคำถาม ใช้โหมดห้องรวมเลย
     python3 main.py --mode known    # รู้จักเฉพาะคนที่มีรูปใน faces/
     python3 main.py --no-window     # ไม่มีจอ (SSH) พิมพ์สรุปลง console อย่างเดียว
-    python3 main.py --source usb    # บังคับใช้ USB webcam
+    python3 main.py --source usb    # บังคับใช้ USB webcam (ข้ามคำถามเรื่องกล้อง)
     python3 main.py --mesh          # วาด landmark ครบ 468 จุด
 
 ปุ่มลัดขณะรัน
@@ -101,6 +101,64 @@ def resolve_mode(cli_mode: str | None, env_mode: str, stream=None) -> modes.Mode
         if chosen is not None:
             return chosen
         print("  พิมพ์เลขข้อหรือชื่อโหมด")
+
+
+def choose_camera(cam_cfg: dict, scan=None, stream=None) -> dict:
+    """
+    ถามว่าจะใช้กล้องตัวไหน **ก่อน**เปิดโปรแกรม — คืน cam_cfg ชุดใหม่ (ไม่แก้ของเดิม)
+
+    ลำดับเดียวกับการเลือกโหมด: flag `--source` > `CAMERA_ASK=false` > ถาม
+    ไม่มี TTY (systemd · cron · ท่อ) จะไม่ค้างรอ input แต่ใช้ค่าใน .env แล้วเดินต่อ
+
+    เจอกล้องตัวเดียวก็ไม่ถาม — คำถามที่มีคำตอบเดียวไม่ใช่ตัวเลือก แค่ทำให้เริ่มช้าลง
+    หาไม่เจอเลยก็ไม่ถาม ปล่อยให้ Camera.open() รายงานปัญหาจริงซึ่งบอกสาเหตุได้ดีกว่า
+
+    `scan` แยกออกมาเป็นพารามิเตอร์เพื่อให้ทดสอบได้โดยไม่ต้องมีกล้องจริง
+    """
+    scan = scan or list_cameras
+    stream = stream if stream is not None else sys.stdin
+    if not (hasattr(stream, "isatty") and stream.isatty()):
+        return cam_cfg
+
+    print("[pi-vision] กำลังสำรวจกล้อง…")
+    try:
+        cams = scan(cam_cfg)
+    except Exception as exc:               # การสำรวจล้มไม่ควรทำให้เปิดโปรแกรมไม่ได้
+        print(f"[pi-vision] สำรวจกล้องไม่ได้ ({exc}) — ใช้ค่าใน .env")
+        return cam_cfg
+
+    if not cams:
+        print("[pi-vision] ไม่พบกล้อง — จะลองเปิดตามค่าใน .env")
+        return cam_cfg
+    if len(cams) == 1:
+        print(f"[pi-vision] พบกล้องตัวเดียว: {cams[0]['label']}")
+        return _with_camera(cam_cfg, cams[0])
+
+    print("")
+    print("  เลือกกล้อง")
+    for i, cam in enumerate(cams, start=1):
+        mark = " (ใช้อยู่)" if cam.get("current") else ""
+        print(f"    {i}) {cam['label']}{mark}")
+    print("")
+    while True:
+        try:
+            raw = input("  เลือก [1]: ").strip()
+        except EOFError:
+            return _with_camera(cam_cfg, cams[0])
+        if not raw:
+            return _with_camera(cam_cfg, cams[0])
+        if raw.isdigit() and 1 <= int(raw) <= len(cams):
+            return _with_camera(cam_cfg, cams[int(raw) - 1])
+        print(f"  พิมพ์เลข 1-{len(cams)}")
+
+
+def _with_camera(cam_cfg: dict, choice: dict) -> dict:
+    """ใส่กล้องที่เลือกลง cam_cfg — usb_index เก็บเป็นสตริงเหมือนที่มาจาก .env"""
+    picked = dict(cam_cfg)
+    picked["source"] = choice["source"]
+    if choice["source"] == "usb" and choice.get("index") is not None:
+        picked["usb_index"] = str(choice["index"])
+    return picked
 
 
 def ensure_model(model_cfg: dict) -> Path:
@@ -191,14 +249,14 @@ def build_photo_reader(model_cfg: dict):
 
 def _who(reading, known_only: bool = False) -> str:
     """
-    ชื่อคนถ้าจำได้ ไม่งั้นเป็นหมายเลข track — ป้ายเดียวใช้ได้ทั้งสองกรณี
+    ชื่อคนถ้าเทียบกับรูปได้ ไม่งั้นเป็นหมายเลข track
 
-    โหมดเฉพาะคนในรูปไม่โชว์หมายเลขของคนที่ไม่มีรูป เพราะหมายเลขทำให้ดูเหมือนระบบ
-    "รู้จัก" คนนั้นอยู่ ทั้งที่โหมดนี้ตั้งใจไม่รู้จัก และไม่ได้บันทึกอะไรของเขาไว้เลย
+    `?` ต่อท้าย = เดาจากคนที่ใกล้ที่สุด แต่ยังไม่ผ่านเกณฑ์ความมั่นใจ (ตรงกับที่ `#5?`
+    ใช้อยู่แล้วสำหรับ id ที่ยังไม่แน่) — ชื่อที่ไม่มี `?` คือชื่อที่ผ่านเกณฑ์
     """
     if reading.name:
-        return reading.name
-    return "unknown" if known_only else f"#{reading.person_id}"
+        return reading.name if reading.name_confident else f"{reading.name}?"
+    return f"#{reading.person_id}"
 
 
 def _mood(reading) -> str:
@@ -421,12 +479,15 @@ def main() -> int:
 
     cam_cfg = dict(cfg["camera"])
     if args.source:
-        cam_cfg["source"] = args.source
+        cam_cfg["source"] = args.source        # ระบุมาแล้ว = ไม่ต้องถาม
+    elif cam_cfg.get("ask", True):
+        # ถามก่อนดาวน์โหลดโมเดลและเปิดกล้อง เพื่อไม่ให้ผู้ใช้รอแล้วค่อยมาเจอคำถาม
+        cam_cfg = choose_camera(cam_cfg)
 
     display_cfg = dict(cfg["display"])
     # โหมดห้องรวมต้องไม่โชว์ id บนภาพ ไม่งั้นคนที่ยืนดูจอตามได้ว่ากรอบไหนคือใคร
     display_cfg["show_person_id"] = mode.report_person
-    # โหมดเฉพาะคนในรูป: คนที่ไม่มีรูปขึ้นว่า unknown ไม่ใช่หมายเลข — ดู _who()
+    # โหมดเฉพาะคนในรูป: ใช้ชื่อจากรูปเป็นป้ายหลัก (มี `?` เมื่อเป็นการเดา) — ดู _who()
     display_cfg["known_only"] = mode.known_only
     # โหมดที่ไม่วัดตาต้องไม่วาดจุดตาและไม่โชว์คะแนนตา — ไม่งั้นดูเหมือนวัดอยู่
     display_cfg["show_eyes"] = mode.eyes
@@ -587,14 +648,24 @@ def main() -> int:
                     print(f"[pi-vision] อ่านรูปใหม่: {', '.join(gallery.names)}")
                 if gallery.enabled:
                     for track, det in zip(tracks, detections):
-                        if track.state.get("name"):
-                            continue        # จำได้แล้ว ไม่ต้องเทียบซ้ำ
+                        # ชื่อที่ยัง**ไม่มั่นใจ**ให้เทียบซ้ำเรื่อย ๆ เพราะลายเซ็นนิ่งขึ้นทุกเฟรม
+                        # การล็อกคำเดาแรกไว้ตลอดกาลทำให้คำเดาที่แย่ที่สุด (ตอนข้อมูลน้อยสุด)
+                        # กลายเป็นคำตอบสุดท้าย · ชื่อที่มั่นใจแล้วถือว่าจบ ไม่เทียบซ้ำ
+                        if track.state.get("name_confident"):
+                            continue
                         if not track.signature_ready:
                             continue        # ลายเซ็นยังไม่นิ่งพอ — เทียบตอนนี้ได้คำตอบมั่ว
                         hit = gallery.identify(track.signature, det.size)
-                        if hit:
-                            track.state["name"] = hit[0]
-                            print(f"[pi-vision] #{track.person_id} คือ {hit[0]} (ห่าง {hit[1]:.3f})")
+                        if not hit:
+                            continue
+                        name, distance, confident = hit
+                        changed = track.state.get("name") != name
+                        track.state["name"] = name
+                        track.state["name_confident"] = confident
+                        if changed or confident:
+                            mark = "" if confident else " (เดา ยังไม่มั่นใจ)"
+                            print(f"[pi-vision] #{track.person_id} คือ {name}"
+                                  f" (ห่าง {distance:.3f}){mark}")
 
             faces = list(zip(tracks, inputs))
 

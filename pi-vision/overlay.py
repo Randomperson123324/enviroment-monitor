@@ -78,12 +78,10 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
     ถ้าพิมพ์ ใครที่ยืนดูจอก็ตามได้ว่ากรอบไหนคือใคร ซึ่งขัดกับที่โหมดนี้สัญญาไว้
     """
     show_id = display_cfg.get("show_person_id", True)
-    # ชื่อจากแกลเลอรีรูปแทนหมายเลข เมื่อจำได้ — ผู้ใช้อ่าน "somchai" ง่ายกว่า "#3"
-    # โหมดเฉพาะคนในรูปเขียน "unknown" แทนหมายเลข เพราะหมายเลขสื่อว่าระบบกำลังจำคนนั้นอยู่
+    # ชื่อจากแกลเลอรีรูปแทนหมายเลข เมื่อเทียบได้ — ผู้ใช้อ่าน "somchai" ง่ายกว่า "#3"
+    # `?` = เดาจากคนที่ใกล้ที่สุดแต่ยังไม่ผ่านเกณฑ์ (ความหมายเดียวกับ `#5?` ของ id ชั่วคราว)
     if reading.name:
-        who = reading.name
-    elif display_cfg.get("known_only"):
-        who = "unknown"
+        who = reading.name if getattr(reading, "name_confident", True) else f"{reading.name}?"
     else:
         who = f"#{reading.person_id}"
     tag = f"{who} " if show_id else ""

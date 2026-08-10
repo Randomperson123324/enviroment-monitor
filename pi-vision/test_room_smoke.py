@@ -103,7 +103,7 @@ class FakeLandmarker:
 
 
 def install_fakes(monkey_state, only_face=None, photo_face=None,
-                  faces_dir=None, window_seconds=None):
+                  faces_dir=None, window_seconds=None, guess=None):
     import cv2
 
     import camera as cam
@@ -129,6 +129,10 @@ def install_fakes(monkey_state, only_face=None, photo_face=None,
     cam.Camera.read = lambda self: frame.copy()
     cam.Camera.close = lambda self: None
 
+    # ตัวเลือกกล้องเป็นขั้นตอนถาม-ตอบตอนเปิดโปรแกรม — ต้องไม่ค้างรอ input ในเทส
+    monkey_state["choose_camera"] = main.choose_camera
+    main.choose_camera = lambda cfg, **kw: cfg
+
     landmarker = FakeLandmarker(only=only_face)
     monkey_state["landmarker"] = landmarker
     main.build_landmarker = lambda cfg: landmarker
@@ -146,6 +150,9 @@ def install_fakes(monkey_state, only_face=None, photo_face=None,
     if window_seconds is not None:
         monkey_state["window_seconds"] = main.CONFIG["window"]["seconds"]
         main.CONFIG["window"]["seconds"] = window_seconds
+    if guess is not None:
+        monkey_state["guess"] = main.CONFIG["faces"]["guess"]
+        main.CONFIG["faces"]["guess"] = guess
 
     # ตัวส่งปลอม — เก็บแถวที่ "ถูกส่ง" ไว้ตรวจ โดยไม่แตะเครือข่ายจริง
     sent = []
@@ -204,10 +211,13 @@ def run(mode_key, **kw):
     finally:
         # คืนค่าที่ยืมมาแก้ ไม่งั้นการรันรอบถัดไปจะเห็นค่าที่เพี้ยนแล้ว
         main.up_mod.Uploader = state["uploader_cls"]
+        main.choose_camera = state["choose_camera"]
         if "faces_dir" in state:
             main.CONFIG["faces"]["dir"] = state["faces_dir"]
         if "window_seconds" in state:
             main.CONFIG["window"]["seconds"] = state["window_seconds"]
+        if "guess" in state:
+            main.CONFIG["faces"]["guess"] = state["guess"]
     return code, state
 
 
@@ -266,21 +276,38 @@ with tempfile.TemporaryDirectory() as gallery_dir:
     check("[known] ลูปจบด้วยสถานะปกติ", code == 0, f"(ได้ {code})")
     check("[known] คนที่มีรูปขึ้นชื่อบนจอ",
           any("Ann" in t for t in drawn), f"(ที่วาด {drawn[:3]})")
-    check("[known] ไม่มีหมายเลข track หลุดขึ้นจอแทนชื่อ",
-          not [t for t in drawn if "#" in t], f"(หลุด {[t for t in drawn if '#' in t][:3]})")
+    check("[known] ชื่อที่ตรงกับรูปไม่มี ? ต่อท้าย",
+          not any("Ann?" in t for t in drawn), f"({[t for t in drawn if 'Ann' in t][:2]})")
     check("[known] มีแถวถูกส่งขึ้นฐานข้อมูล", len(sent) > 0, f"(ได้ {len(sent)} แถว)")
     check("[known] ทุกแถวมีชื่อกำกับ ไม่มีแถวที่ name เป็น null",
           bool(sent) and all(r["name"] == "Ann" for r in sent),
           f"({[r.get('name') for r in sent[:3]]})")
 
-    # คนแปลกหน้า: แกลเลอรีมีแค่ Ann และใบหน้าที่เห็นเป็นสัดส่วนอื่น
+    # ── ราคาของ FACES_GUESS=true เขียนไว้เป็นเทส ──────────
+    # แกลเลอรีมีแค่ Ann · ใบหน้าที่เห็นเป็นสัดส่วนอื่น (คนละคนชัดเจน)
+    # ตามที่สั่งไว้ ระบบต้อง**เดา** ไม่ใช่ตอบว่าไม่รู้ ผลคือคนแปลกหน้าได้ชื่อ "Ann?"
+    # บนจอ **และแถวของเขาถูกบันทึกใต้ชื่อ Ann** — นี่คือสิ่งที่แลกมา ไม่ใช่บั๊ก
+    # ถ้าวันหนึ่งพฤติกรรมนี้ไม่โอเค สลับ FACES_GUESS=false (เทสถัดไปยืนยันว่าใช้ได้)
     code2, state2 = run("known", only_face=STRANGER, photo_face=ME,
                         faces_dir=gallery_dir, window_seconds=0.5)
     drawn2, sent2 = state2["drawn"], state2["sent"]
-    check("[known] คนที่ไม่มีรูปขึ้นว่า unknown", any("unknown" in t for t in drawn2),
+    check("[known/guess] คนที่ไม่มีรูปก็ยังได้ชื่อ ไม่มีคำว่า unknown บนจอ",
+          not any("unknown" in t for t in drawn2) and any("Ann" in t for t in drawn2),
           f"(ที่วาด {drawn2[:3]})")
-    check("[known] ไม่ติดชื่อคนอื่นให้คนแปลกหน้า", not any("Ann" in t for t in drawn2))
-    check("[known] คนที่ไม่มีรูปไม่ถูกบันทึกเลย", sent2 == [], f"(ส่งไป {sent2[:2]})")
+    check("[known/guess] ชื่อที่เดาต้องมี ? ต่อท้ายเสมอ",
+          any("Ann?" in t for t in drawn2),
+          f"({[t for t in drawn2 if 'Ann' in t][:2]})")
+    check("[known/guess] และแถวของเขาถูกบันทึกใต้ชื่อ Ann (ราคาของการเดา)",
+          bool(sent2) and all(r["name"] == "Ann" for r in sent2),
+          f"(ส่งไป {[r.get('name') for r in sent2[:2]]})")
+
+    # ── FACES_GUESS=false ต้องกลับไปปฏิเสธได้จริง ──────────
+    code3, state3 = run("known", only_face=STRANGER, photo_face=ME,
+                        faces_dir=gallery_dir, window_seconds=0.5, guess=False)
+    drawn3, sent3 = state3["drawn"], state3["sent"]
+    check("[known/strict] ไม่ติดชื่อคนอื่นให้คนแปลกหน้า",
+          not any("Ann" in t for t in drawn3), f"({[t for t in drawn3 if 'Ann' in t][:2]})")
+    check("[known/strict] คนที่ไม่มีรูปไม่ถูกบันทึกเลย", sent3 == [], f"(ส่งไป {sent3[:2]})")
 
 # โหมดรายบุคคลต้องไม่ถูกกระทบ — ยังบันทึกทุกคนแม้ไม่มีรูป
 code3, state3 = run("person", only_face=STRANGER, photo_face=None, window_seconds=0.5)

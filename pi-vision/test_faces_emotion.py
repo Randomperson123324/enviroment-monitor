@@ -11,7 +11,10 @@
   - หน้านิ่งต้องได้ neutral ไม่ใช่การเดาอารมณ์ให้ครบทุกเฟรม
   - สองอารมณ์ที่คะแนนใกล้กันต้องได้ neutral ไม่ใช่สุ่มเลือกข้าง
   - การพูด (jawOpen กระโดดเป็นเฟรม ๆ) ต้องไม่เปลี่ยนอารมณ์ที่รายงาน
-  - **คนที่ไม่มีในแกลเลอรีต้องไม่ถูกติดชื่อ** และหน้าคล้ายกันต้องปฏิเสธ ไม่ใช่เดา
+  - การเดา (FACES_GUESS=true) ต้องคืน `confident=False` ทุกครั้งที่ไม่ผ่านเกณฑ์
+    ไม่ใช่คืนชื่อเปล่า ๆ ที่ดูเหมือนชื่อที่มั่นใจ
+  - **โหมดไม่เดา (FACES_GUESS=false) ต้องยังปฏิเสธได้จริง** — คนที่ไม่มีในแกลเลอรี
+    และหน้าคล้ายกันต้องไม่ถูกติดชื่อ
   - วางรูปใหม่แล้วระบบเห็นเอง โดยไม่ต้องรีสตาร์ต
 
 รัน:  python3 test_faces_emotion.py
@@ -121,7 +124,10 @@ check("เฟรมที่ไม่มี blendshapes ไม่รีเซ็
 
 print("\n── แกลเลอรีใบหน้าจากรูป ───────────────────────────────")
 
-CFG = {"threshold": 0.045, "ratio": 0.75, "min_size": 0.12, "rescan_seconds": 0.0}
+# สองนโยบายของการตัดสิน — เทสทั้งคู่ เพราะสลับได้ด้วย FACES_GUESS
+CFG = {"threshold": 0.045, "ratio": 0.75, "min_size": 0.12, "rescan_seconds": 0.0,
+       "guess": True}
+CFG_STRICT = {**CFG, "guess": False}
 
 
 def gallery_for(mapping, directory, cfg=CFG):
@@ -149,14 +155,31 @@ with tempfile.TemporaryDirectory() as tmp:
 
     hit_a = g.identify(sig_a, face_size=0.3)
     check("เจอ Ann จากใบหน้าของ A", hit_a is not None and hit_a[0] == "Ann", f"({hit_a})")
+    check("ตรงกับรูปเป๊ะ → มั่นใจ (ไม่มี ? บนจอ)", hit_a is not None and hit_a[2] is True)
     hit_b = g.identify(sig_b, face_size=0.3)
     check("เจอ Bee จากใบหน้าของ B", hit_b is not None and hit_b[0] == "Bee", f"({hit_b})")
 
-    # ข้อสำคัญที่สุด: คนที่ไม่ได้ลงทะเบียนต้องไม่ถูกติดชื่อของคนอื่น
-    check("คนที่ไม่มีในแกลเลอรี (C) ต้องไม่ถูกติดชื่อ", g.identify(sig_c, face_size=0.3) is None)
+    # ── นโยบาย "เดาเสมอ" (ค่าเริ่มต้น ตามที่ผู้ใช้สั่ง) ──
+    # C ไม่มีในแกลเลอรี แต่ต้องได้ชื่อ **พร้อมธงว่าไม่มั่นใจ** ไม่ใช่ได้ชื่อเปล่า ๆ
+    hit_c = g.identify(sig_c, face_size=0.3)
+    check("คนที่ไม่มีในแกลเลอรีก็ยังได้ชื่อที่ใกล้ที่สุด (ไม่ตอบว่าไม่รู้)",
+          hit_c is not None and hit_c[0] in ("Ann", "Bee"), f"({hit_c})")
+    check("แต่ต้องบอกว่าไม่มั่นใจ เพื่อให้หน้าจอเติม ? ต่อท้าย",
+          hit_c is not None and hit_c[2] is False, f"({hit_c})")
 
-    check("ใบหน้าเล็กเกินเกณฑ์ → ไม่เทียบ", g.identify(sig_a, face_size=0.05) is None)
-    check("ไม่มีลายเซ็น → ไม่เทียบ", g.identify(None, face_size=0.3) is None)
+    # ── นโยบายเดิม "ไม่มั่นใจไม่เดา" ต้องยังใช้ได้จริง ──
+    g_strict = gallery_for({"Ann": PEOPLE["A"], "Bee": PEOPLE["B"]}, root, CFG_STRICT)
+    g_strict.scan()
+    check("FACES_GUESS=false → คนที่ไม่มีในแกลเลอรีไม่ถูกติดชื่อ",
+          g_strict.identify(sig_c, face_size=0.3) is None)
+    check("FACES_GUESS=false → คนที่มีรูปยังจำได้ปกติ",
+          (g_strict.identify(sig_a, face_size=0.3) or [None])[0] == "Ann")
+
+    # เทียบไม่ได้เลย ≠ เทียบแล้วไม่มั่นใจ — สองกรณีนี้คืน None ทั้งคู่แม้เปิดการเดา
+    # เพราะการเดาจากสัญญาณรบกวนล้วน ๆ ไม่ใช่การเดา เป็นการสุ่ม
+    check("ใบหน้าเล็กเกินเกณฑ์ → ไม่เทียบเลย แม้เปิดการเดา",
+          g.identify(sig_a, face_size=0.05) is None)
+    check("ไม่มีลายเซ็น → ไม่เทียบเลย แม้เปิดการเดา", g.identify(None, face_size=0.3) is None)
 
 def live_signature(shape, frames=20, level=0.015, seed=7):
     """
@@ -183,6 +206,7 @@ with tempfile.TemporaryDirectory() as tmp:
     hit = g_solo.identify(live_a, face_size=0.3)
     check("ใบหน้าจากกล้อง (เฉลี่ยเฟรมที่สั่น) ยังจำ Ann ได้", hit is not None and hit[0] == "Ann",
           f"({hit})")
+    check("และมั่นใจ ไม่ใช่แค่เดาถูก", hit is not None and hit[2] is True, f"({hit})")
 
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
@@ -193,17 +217,22 @@ with tempfile.TemporaryDirectory() as tmp:
     live_a = live_signature(PEOPLE["A"])
     d_ann = lm.signature_distance(g.people["Ann"].signature, live_a)
     d_twin = lm.signature_distance(g.people["Twin"].signature, live_a)
-    # หน้าคล้ายกันมาก → ratio test ต้องปฏิเสธ ดีกว่าติดชื่อผิดคน
+    # หน้าคล้ายกันมาก (ระยะต่างกันแค่ 1%) — กรณีที่ "ใกล้ที่สุด" ไม่มีความหมาย
+    detail = f"(Ann {d_ann:.4f} · Twin {d_twin:.4f} · ratio {d_ann / max(d_twin, 1e-9):.2f})"
+    hit_twin = g.identify(live_a, face_size=0.3)
+    check("หน้าคล้ายกัน: เดาไปข้างหนึ่งตามที่สั่ง", hit_twin is not None, detail)
+    check("แต่ต้องติดธงว่าไม่มั่นใจ — นี่คือกรณีที่การเดาผิดได้ง่ายที่สุด",
+          hit_twin is not None and hit_twin[2] is False, detail)
     check(
-        "สองคนหน้าคล้ายกันในแกลเลอรี → ปฏิเสธ ไม่เดา",
-        g.identify(live_a, face_size=0.3) is None,
-        f"(Ann {d_ann:.4f} · Twin {d_twin:.4f} · ratio {d_ann / max(d_twin, 1e-9):.2f})",
-    )
-    check(
-        "และเหตุผลที่ปฏิเสธคือ ratio test ไม่ใช่ threshold",
+        "และเหตุผลที่ไม่มั่นใจคือ ratio test ไม่ใช่ threshold",
         d_ann < g.threshold,
         f"(Ann {d_ann:.4f} < {g.threshold})",
     )
+
+    g_twin_strict = gallery_for({"Ann": PEOPLE["A"], "Twin": TWIN}, root, CFG_STRICT)
+    g_twin_strict.scan()
+    check("FACES_GUESS=false → หน้าคล้ายกันปฏิเสธ ไม่เดา",
+          g_twin_strict.identify(live_a, face_size=0.3) is None, detail)
 
 with tempfile.TemporaryDirectory() as tmp:
     root = Path(tmp)
@@ -254,9 +283,10 @@ check("คะแนนดิบอ่านได้ทุกการแสด�
 
 if main is not None:
     class R:
-        def __init__(self, emotion=None, scores=None, name=None, pid=3):
+        def __init__(self, emotion=None, scores=None, name=None, pid=3, sure=True):
             self.emotion, self.emotion_scores, self.name, self.person_id = \
                 emotion, scores, name, pid
+            self.name_confident = sure
 
     check("HUD โชว์ neutral ออกมา ไม่เว้นว่าง", "neutral" in main._mood(R("neutral")))
     check("HUD โชว์อารมณ์ที่อ่านได้", "happy" in main._mood(R("happy")))
@@ -266,13 +296,13 @@ if main is not None:
           main._mood_scores(R("happy", {"happy": 0.8, "sad": 0.1})).startswith("happy"))
     check("ไม่มีคะแนนก็ไม่พัง", main._mood_scores(R("happy")) == "")
 
-    # โหมดเฉพาะคนในรูป: คนที่ไม่มีรูปต้องไม่ขึ้นหมายเลข เพราะหมายเลขสื่อว่า "จำได้"
-    check("โหมดปกติโชว์หมายเลข track", main._who(R(pid=3)) == "#3")
-    check("โหมดเฉพาะคนในรูปเขียน unknown แทนหมายเลข",
-          main._who(R(pid=3), known_only=True) == "unknown")
-    check("จำชื่อได้แล้วโชว์ชื่อทั้งสองโหมด",
-          main._who(R(name="Ann"), known_only=True) == "Ann"
-          and main._who(R(name="Ann")) == "Ann")
+    # ยังไม่มีชื่อ (ลายเซ็นไม่นิ่งพอ/แกลเลอรีว่าง) → หมายเลข track ไม่ใช่คำว่า unknown
+    check("ยังเทียบไม่ได้ → โชว์หมายเลข track", main._who(R(pid=3)) == "#3")
+    check("ไม่มีคำว่า unknown บนจอแล้ว",
+          "unknown" not in main._who(R(pid=3), known_only=True))
+    check("ชื่อที่มั่นใจโชว์เปล่า ๆ", main._who(R(name="Ann")) == "Ann")
+    check("ชื่อที่เดาโชว์ ? ต่อท้าย — ผู้ดูจอต้องแยกออกจากชื่อที่มั่นใจ",
+          main._who(R(name="Ann", sure=False)) == "Ann?")
 else:
     print("  skip ป้ายบนหน้าจอ — ไม่มี cv2/mediapipe ในเครื่องนี้")
 

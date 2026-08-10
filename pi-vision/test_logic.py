@@ -593,6 +593,64 @@ else:
     check("ไม่มี TTY ไม่ค้างรอ input",
           main.resolve_mode(None, "", stream=io.StringIO()).key == modes.DEFAULT)
 
+# ── 12b. เลือกกล้องก่อนเปิดโปรแกรม ──────────────────────
+print("\n12b. เลือกกล้องก่อนเปิดโปรแกรม")
+if main is None:
+    print("  skip — ไม่มี cv2/mediapipe ในเครื่องนี้")
+else:
+    CAMS = [
+        {"source": "csi", "index": None, "label": "CSI camera"},
+        {"source": "usb", "index": 0, "label": "USB camera 0", "current": True},
+        {"source": "usb", "index": 2, "label": "USB camera 2"},
+    ]
+    BASE_CAM = {"source": "auto", "usb_index": "0", "width": 640}
+
+    class Tty(io.StringIO):
+        """stdin ปลอมที่อ้างว่าเป็น TTY — ตัวเลือกจะถามเฉพาะเมื่อมีคนตอบได้"""
+
+        def isatty(self):
+            return True
+
+    def pick(answers, cams=CAMS, cfg=None):
+        """ตอบคำถามด้วยบรรทัดที่กำหนด แล้วคืน cam_cfg ที่ได้"""
+        import builtins
+
+        replies = list(answers)
+        real_input = builtins.input
+        builtins.input = lambda *_a: replies.pop(0)
+        try:
+            return main.choose_camera(cfg or BASE_CAM, scan=lambda c: cams, stream=Tty())
+        finally:
+            builtins.input = real_input
+
+    picked = pick(["3"])
+    check("เลือกข้อ 3 → ได้ USB index 2",
+          picked["source"] == "usb" and picked["usb_index"] == "2", f"({picked})")
+    check("ค่าอื่นใน cam_cfg ไม่ถูกแตะ", picked["width"] == 640)
+    check("ไม่แก้ dict เดิม", BASE_CAM["source"] == "auto")
+
+    check("เลือก CSI → ไม่ยัด usb_index ให้",
+          pick(["1"])["source"] == "csi" and pick(["1"])["usb_index"] == "0")
+    check("กด Enter เฉย ๆ = ตัวแรกในรายการ", pick([""])["source"] == "csi")
+    check("พิมพ์มั่วแล้วถามซ้ำ ไม่ใช่เดาให้", pick(["ก", "9", "2"])["usb_index"] == "0")
+
+    # ไม่มีใครตอบได้ = ต้องไม่ค้าง · นี่คือกรณี systemd/cron ซึ่งจะทำให้บริการไม่ขึ้นเลย
+    quiet = main.choose_camera(BASE_CAM, scan=lambda c: CAMS, stream=io.StringIO())
+    check("ไม่มี TTY → ไม่ถาม ใช้ค่าใน .env", quiet == BASE_CAM)
+
+    one = main.choose_camera(BASE_CAM, scan=lambda c: [CAMS[2]], stream=Tty())
+    check("เจอกล้องตัวเดียว → ไม่ถาม เลือกให้เลย", one["usb_index"] == "2", f"({one})")
+
+    none_found = main.choose_camera(BASE_CAM, scan=lambda c: [], stream=Tty())
+    check("ไม่เจอกล้องเลย → ไม่ถาม ปล่อยให้ Camera.open รายงานปัญหาจริง",
+          none_found == BASE_CAM)
+
+    def boom(_cfg):
+        raise OSError("v4l2 หาย")
+
+    check("การสำรวจล้มเหลว → ไม่ทำให้เปิดโปรแกรมไม่ได้",
+          main.choose_camera(BASE_CAM, scan=boom, stream=Tty()) == BASE_CAM)
+
 # ── 13. ค่าระดับห้อง ────────────────────────────────────
 print("\n13. ค่าระดับห้อง")
 a8 = az.FaceAnalyzer(CFG, mirror=True, report_person=False, track_eyes=False)

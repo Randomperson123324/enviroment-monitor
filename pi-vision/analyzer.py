@@ -82,8 +82,11 @@ class FaceReading:
     # คะแนนดิบของทุกการแสดงออกในเฟรมนี้ {happy: 0.62, ...} · ไว้ให้ผู้ใช้ปรับ threshold
     # ได้จากของจริงบนหน้าจอ แทนการเดา — ว่างเมื่อปิดฟีเจอร์หรือไม่มี blendshapes
     emotion_scores: dict | None = None
-    # ชื่อจากแกลเลอรีรูป (faces.py) · None = ไม่มีรูป หรือเทียบแล้วไม่มั่นใจ
+    # ชื่อจากแกลเลอรีรูป (faces.py) · None = ไม่มีรูป หรือยังเทียบไม่ได้
     name: str | None = None
+    # ชื่อนั้นผ่านเกณฑ์ความมั่นใจไหม — False = เดาจากคนที่ใกล้ที่สุด (FACES_GUESS)
+    # แยกไว้เพื่อให้หน้าจอเติม `?` ได้ ไม่ใช่ให้ชื่อที่เดากับชื่อที่มั่นใจดูเหมือนกัน
+    name_confident: bool = True
 
 
 @dataclass
@@ -523,6 +526,7 @@ class FaceAnalyzer:
                     # ชื่อถูกใส่ไว้ใน track.state โดย main.py ตอนเทียบกับแกลเลอรีรูป
                     # analyzer ไม่รู้จัก faces.py เลย จึงทดสอบแยกกันได้
                     name=track.state.get("name"),
+                    name_confident=bool(track.state.get("name_confident", True)),
                 )
             )
 
