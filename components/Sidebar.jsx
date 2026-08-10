@@ -19,26 +19,35 @@ export default function Sidebar({ activeTab, onSelectTab }) {
   const { t } = useLang();
 
   return (
-    <aside className="sidebar" aria-label={t('tabs.menuLabel')}>
-      <div className="panel sidebar-inner">
-        <div className="brand">
-          <div className="brand-mark">
-            <House size={21} strokeWidth={2} aria-hidden />
+    <>
+      {/*
+        Screen-edge hover target, active only while the rail is folded away (CSS
+        gates it on data-rail-peek). It is a sibling, not a child: inside the
+        rail it would travel with the rail's transform and stop covering the edge
+        exactly when it is needed.
+      */}
+      <div className="rail-edge" aria-hidden />
+      <aside className="sidebar" aria-label={t('tabs.menuLabel')}>
+        <div className="panel sidebar-inner">
+          <div className="brand">
+            <div className="brand-mark">
+              <House size={21} strokeWidth={2} aria-hidden />
+            </div>
+            <div className="brand-text">
+              <div className="brand-name">ENV Monitor</div>
+              <div className="brand-sub">{t('header.brandSub')}</div>
+            </div>
           </div>
-          <div className="brand-text">
-            <div className="brand-name">ENV Monitor</div>
-            <div className="brand-sub">{t('header.brandSub')}</div>
+
+          <div className="sidebar-div" />
+
+          <TabMenu active={activeTab} onSelect={onSelectTab} className="in-side" />
+
+          <div className="sidebar-hint">
+            <kbd>?</kbd> {t('shortcuts.hintKey')}
           </div>
         </div>
-
-        <div className="sidebar-div" />
-
-        <TabMenu active={activeTab} onSelect={onSelectTab} className="in-side" />
-
-        <div className="sidebar-hint">
-          <kbd>?</kbd> {t('shortcuts.hintKey')}
-        </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }

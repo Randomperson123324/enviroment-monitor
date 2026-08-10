@@ -3551,6 +3551,29 @@ textarea {
     gap: 8px;
   }
 
+  /* The bar has four children, and space-between spread them across its whole
+     width — the provider tag ended up floating in the middle with the two
+     buttons far apart. The title absorbs the slack instead, so the tag and the
+     buttons group at the right where window controls belong. */
+  .ai-winbar .ai-float-title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .ai-winbar .src-tag {
+    /* Long model names must not push the controls off the bar. */
+    max-width: 40%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Tighter between the two controls than between them and the tag, so they
+     read as one group. */
+  .ai-winbtn + .ai-winbtn {
+    margin-left: -4px;
+  }
+
   .ai-float.dragging .ai-winbar {
     cursor: grabbing;
   }
@@ -3659,16 +3682,35 @@ textarea {
    Set by useAiWindow when a wide docked assistant leaves too little room for the
    dashboard: the rail slides out of the way, leaving a strip to hover. */
 @media (min-width: 1024px) {
+  /*
+    The strip stops at the rail's own left inset rather than at the screen edge.
+    That is what stops the flicker: parked at the very edge, the strip sat to the
+    LEFT of where the revealed rail begins, so revealing it moved the rail out
+    from under the pointer — hover lost, rail collapsed, pointer back on the
+    strip, over and over. Ending the travel at the inset keeps the strip inside
+    the revealed rail's own box, so the pointer never leaves it.
+  */
   :root[data-rail-peek] .sidebar {
-    /* Its own inset has to come off the travel, or the strip left on screen
-       would be the inset rather than --rail-peek. */
-    transform: translateX(calc(-100% + var(--rail-peek) - var(--rail-inset)));
+    transform: translateX(calc(-100% + var(--rail-peek)));
   }
 
-  /* Hover or keyboard focus brings it back — focus-within so tabbing into the
-     nav is not a dead end for anyone not using a mouse. */
+  /* A throw of the mouse at the screen edge should still work, so an invisible
+     strip lives there permanently and reveals the rail through :has(). */
+  :root[data-rail-peek] .rail-edge {
+    display: block;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: calc(var(--rail-inset) + var(--rail-peek));
+    z-index: 89;
+  }
+
+  /* Hover, the edge strip, or keyboard focus brings it back — focus-within so
+     tabbing into the nav is not a dead end for anyone not using a mouse. */
   :root[data-rail-peek] .sidebar:hover,
-  :root[data-rail-peek] .sidebar:focus-within {
+  :root[data-rail-peek] .sidebar:focus-within,
+  :root[data-rail-peek]:has(.rail-edge:hover) .sidebar {
     transform: none;
   }
 
@@ -3682,7 +3724,7 @@ textarea {
     content: '';
     position: absolute;
     top: 50%;
-    right: 5px;
+    right: 4px;
     width: 4px;
     height: 54px;
     margin-top: -27px;
@@ -3710,4 +3752,9 @@ textarea {
   :root[data-rail-peek] .flood-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Hidden unless the rail is folded away (see the peek block above). */
+.rail-edge {
+  display: none;
 }
