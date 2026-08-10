@@ -1,8 +1,14 @@
-import { Noto_Sans_Thai_Looped, IBM_Plex_Mono } from 'next/font/google';
+import { Noto_Serif_Thai, IBM_Plex_Mono } from 'next/font/google';
 import { STORAGE } from '@/config/client';
 import './globals.css';
 
-const sans = Noto_Sans_Thai_Looped({
+/**
+ * UI face. Noto Serif Thai carries Latin as well as Thai, so one family covers
+ * both languages and the interface does not change character when the language
+ * toggle flips. The variable stays named --font-sans: everything downstream asks
+ * for "the UI font", and renaming it would touch every rule for no gain.
+ */
+const ui = Noto_Serif_Thai({
   subsets: ['thai', 'latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-sans',
@@ -29,7 +35,7 @@ export default function RootLayout({ children }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBoot }} />
       </head>
-      <body className={`${sans.variable} ${mono.variable}`}>{children}</body>
+      <body className={`${ui.variable} ${mono.variable}`}>{children}</body>
     </html>
   );
 }

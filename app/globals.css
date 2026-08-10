@@ -79,7 +79,7 @@ html {
 body {
   background-color: var(--page);
   color: var(--ink);
-  font-family: var(--font-sans), 'Noto Sans Thai Looped', 'Noto Sans Thai', sans-serif;
+  font-family: var(--font-sans), 'Noto Serif Thai', 'Noto Sans Thai', serif;
   font-size: 15px;
   line-height: 1.6;
   min-height: 100dvh;
