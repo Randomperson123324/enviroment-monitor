@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bot, X, ArrowUp } from 'lucide-react';
+import { Bot, X, ArrowUp, PanelRight, PictureInPicture2 } from 'lucide-react';
 import { CHAT_MAX_TURNS } from '@/config/client';
 import { aiJsonHeaders } from '@/lib/ai-client';
 import { useLang } from '@/hooks/useLang';
+import useAiWindow from '@/hooks/useAiWindow';
 
 /** "gemma4-e4b (via relay)" — what actually answered, not what's configured. */
 function sourceLabel(t, res) {
@@ -159,6 +160,15 @@ export default function FloatingAi({ deviceId, settings, serverAi, addLog }) {
     else setOpen(true);
   };
 
+  // Desktop only: docked to the right edge, draggable out, snappable, resizable.
+  const win = useAiWindow(open && !closing);
+
+  const style = win.floating
+    ? { left: win.rect.x, top: win.rect.y, width: win.rect.w, height: win.rect.h }
+    : win.docked
+      ? { width: win.dockWidth }
+      : undefined;
+
   // Until something answers we can only name the chain the server would use.
   const source =
     sourceLabel(t, lastSource) || (serverAi?.length ? serverAi.join(' → ') : t('ai.local'));
@@ -167,28 +177,93 @@ export default function FloatingAi({ deviceId, settings, serverAi, addLog }) {
     <>
       {open && (
         <div
-          className={`panel ai-panel ai-float ${closing ? 'closing' : ''}`}
+          ref={win.panelRef}
+          className={[
+            'panel ai-panel ai-float',
+            closing ? 'closing' : '',
+            win.docked ? 'docked' : '',
+            win.floating ? 'floating' : '',
+            win.busy ? 'dragging' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          style={style}
           role="dialog"
           aria-label={t('ai.dialog')}
           // Child animations bubble here too, so only the panel's own counts.
           onAnimationEnd={(e) => {
             if (e.target === e.currentTarget && closing) finishClose();
           }}
+          onPointerMove={win.onPointerMove}
+          onPointerUp={win.onPointerUp}
+          onPointerCancel={win.onPointerUp}
         >
-          <div className="subhdr">
+          {/* Title bar: the drag handle on desktop, a plain header on mobile. */}
+          <div
+            className="subhdr ai-winbar"
+            onPointerDown={win.startMove}
+            onDoubleClick={win.desktop ? win.toggleDock : undefined}
+          >
             <span className="panel-title ai-float-title">
               <Bot size={17} strokeWidth={2.2} aria-hidden /> {t('ai.title')}
             </span>
             <span className="src-tag">{source}</span>
+            {win.desktop && (
+              <button
+                className="icon-btn ai-winbtn"
+                onClick={win.toggleDock}
+                title={win.docked ? t('ai.undock') : t('ai.dock')}
+                aria-label={win.docked ? t('ai.undock') : t('ai.dock')}
+              >
+                {win.docked ? (
+                  <PictureInPicture2 size={15} strokeWidth={2.2} aria-hidden />
+                ) : (
+                  <PanelRight size={15} strokeWidth={2.2} aria-hidden />
+                )}
+              </button>
+            )}
+            {win.desktop && (
+              <button
+                className="icon-btn ai-winbtn"
+                onClick={() => setClosing(true)}
+                title={t('ai.close')}
+                aria-label={t('ai.close')}
+              >
+                <X size={15} strokeWidth={2.4} aria-hidden />
+              </button>
+            )}
           </div>
+
           <ChatPane
             deviceId={deviceId}
             settings={settings}
             addLog={addLog}
             onSource={setLastSource}
           />
+
+          {/* Resize handles. The docked panel only owns its left edge — the other
+              three sides are the screen. */}
+          {win.docked && (
+            <div
+              className="ai-grip left"
+              onPointerDown={(e) => win.startResize(e, 'left')}
+              role="separator"
+              aria-label={t('ai.resize')}
+            />
+          )}
+          {win.floating && (
+            <>
+              <div className="ai-grip left" onPointerDown={(e) => win.startResize(e, 'left')} role="separator" aria-label={t('ai.resize')} />
+              <div className="ai-grip right" onPointerDown={(e) => win.startResize(e, 'right')} role="separator" aria-label={t('ai.resize')} />
+              <div className="ai-grip bottom" onPointerDown={(e) => win.startResize(e, 'bottom')} role="separator" aria-label={t('ai.resize')} />
+              <div className="ai-grip corner" onPointerDown={(e) => win.startResize(e, 'bottom-right')} role="separator" aria-label={t('ai.resize')} />
+            </>
+          )}
         </div>
       )}
+
+      {/* Drop preview for the snap zone, so the edge shows what a release does. */}
+      {win.snapping && <div className="ai-snap-hint" aria-hidden />}
       <button
         className={`fab ${open && !closing ? 'open' : ''}`}
         onClick={toggle}

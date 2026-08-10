@@ -23,6 +23,8 @@ export const STORAGE = {
   chartHours: 'em_chart_hours',
   chartSmooth: 'em_chart_smooth',
   focusThreshold: 'em_focus_threshold',
+  /** Assistant window: docked/floating, its width, and its floating rect. */
+  aiWindow: 'em_ai_window',
   activeTab: 'em_active_tab',
   lang: 'em_lang',
 };
@@ -142,6 +144,31 @@ export const SHORTCUTS = [
   { id: 'help', keys: ['?'], key: 'help' },
   { id: 'close', keys: ['Escape'], key: 'close' },
 ];
+
+/**
+ * Where the desktop layout starts. Must stay in step with the 1024px media
+ * queries in app/globals.css (sidebar rail, docked assistant): above it the
+ * assistant behaves like a window, below it it stays a popover over the button.
+ */
+export const DESKTOP_MIN_WIDTH = 1024;
+
+/**
+ * The assistant window on desktop: docked to the right edge by default, dragged
+ * out into a floating window, snapped back by dropping it near that edge.
+ * Sizes in px; the dock width and the floating rect are both user-adjustable and
+ * remembered in STORAGE.aiWindow.
+ */
+export const AI_WINDOW = {
+  dockWidth: 400,
+  minWidth: 320,
+  /** Keeps the dashboard readable no matter how wide the panel is dragged. */
+  maxWidthRatio: 0.55,
+  floatWidth: 420,
+  floatHeight: 560,
+  minHeight: 320,
+  /** How close to the right edge a drop counts as "snap back to docked". */
+  snapZone: 72,
+};
 
 /** Bounds for the focus "movement per minute" threshold input. */
 export const FOCUS_THRESHOLD_INPUT = { min: 1, max: 99 };

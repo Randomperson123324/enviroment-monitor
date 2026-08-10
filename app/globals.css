@@ -3465,3 +3465,165 @@ textarea {
   font-size: 12px;
   line-height: 1.65;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ASSISTANT AS A WINDOW (desktop only)
+   Docked to the right edge by default, dragged out into a floating window,
+   dropped near that edge to snap back. Below the desktop breakpoint none of
+   these rules apply and the panel stays the popover that grows out of its
+   button — see .ai-float above.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (min-width: 1024px) {
+  /* Docked: shares the screen with the page rather than covering it. The width
+     arrives as --ai-dock-w from useAiWindow, which also stamps data-ai-docked
+     on <html> so the layout can react without prop-threading. */
+  .ai-float.docked {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    border-left: 1px solid var(--line-strong);
+    transform-origin: right center;
+    animation: ai-dock-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .ai-float.docked.closing {
+    animation: ai-dock-out 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  /* The page keeps its own space beside the docked panel. */
+  :root[data-ai-docked] .shell {
+    padding-right: calc(var(--ai-dock-w, 0px) + clamp(14px, 3vw, 28px));
+    /* The centring max-width has to grow by the same amount or the content
+       drifts left as the panel widens. */
+    max-width: calc(1400px + 15rem + 32px + var(--ai-dock-w, 0px));
+  }
+
+  /* ...and so does the button, which is fixed to the same corner. */
+  :root[data-ai-docked] .fab {
+    right: calc(var(--fab-inset) + var(--ai-dock-w, 0px));
+  }
+
+  .ai-float.floating {
+    right: auto;
+    bottom: auto;
+    border-radius: 1.25rem;
+    box-shadow: var(--glass-shadow);
+    transform-origin: center center;
+    animation: none;
+  }
+
+  /* A window is moved by its title bar, so say so — but leave the buttons and
+     the source tag clickable. */
+  .ai-winbar {
+    cursor: grab;
+    user-select: none;
+    gap: 8px;
+  }
+
+  .ai-float.dragging .ai-winbar {
+    cursor: grabbing;
+  }
+
+  .ai-winbar .src-tag,
+  .ai-winbar .ai-winbtn {
+    cursor: default;
+  }
+
+  .ai-winbtn {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Grips: invisible but generous hit areas on the edges being pulled. */
+  .ai-grip {
+    position: absolute;
+    z-index: 2;
+  }
+
+  .ai-grip.left,
+  .ai-grip.right {
+    top: 0;
+    bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+  }
+
+  .ai-grip.left {
+    left: -2px;
+  }
+
+  .ai-grip.right {
+    right: -2px;
+  }
+
+  .ai-grip.bottom {
+    left: 0;
+    right: 0;
+    bottom: -2px;
+    height: 8px;
+    cursor: ns-resize;
+  }
+
+  .ai-grip.corner {
+    right: 0;
+    bottom: 0;
+    width: 18px;
+    height: 18px;
+    cursor: nwse-resize;
+  }
+
+  /* The docked panel's one grip reads as a seam against the page. */
+  .ai-float.docked .ai-grip.left::after {
+    content: '';
+    position: absolute;
+    inset: 0 3px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background-color 0.2s ease;
+  }
+
+  .ai-float.docked .ai-grip.left:hover::after {
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  /* Where a release would snap the window back to. */
+  .ai-snap-hint {
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: min(400px, 42vw);
+    z-index: 360;
+    pointer-events: none;
+    border-radius: 1rem;
+    border: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);
+    background: var(--accent-soft);
+    animation: ai-expand 0.18s ease both;
+  }
+}
+
+@keyframes ai-dock-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ai-dock-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}

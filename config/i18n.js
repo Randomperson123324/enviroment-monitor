@@ -214,6 +214,9 @@ const DICT = {
       chatEmpty2: 'ข้อมูลเซ็นเซอร์จะถูกแนบไปอัตโนมัติ',
       chatPlaceholder: 'ถามเกี่ยวกับสภาพแวดล้อม...',
       send: 'ส่ง', close: 'ปิดผู้ช่วย AI', openAi: 'เปิดผู้ช่วย AI', dialog: 'ผู้ช่วย AI',
+      dock: 'เข้าเทียบขอบขวา',
+      undock: 'ดึงออกเป็นหน้าต่างลอย',
+      resize: 'ลากเพื่อปรับขนาด',
       chatError: '⚠️ ขออภัย เกิดข้อผิดพลาด: {msg}',
     },
 
@@ -552,6 +555,9 @@ const DICT = {
       chatEmpty2: 'Sensor data is attached automatically',
       chatPlaceholder: 'Ask about the environment...',
       send: 'Send', close: 'Close AI assistant', openAi: 'Open AI assistant', dialog: 'AI assistant',
+      dock: 'Snap to the right edge',
+      undock: 'Pull out into a floating window',
+      resize: 'Drag to resize',
       chatError: '⚠️ Sorry, an error occurred: {msg}',
     },
 
