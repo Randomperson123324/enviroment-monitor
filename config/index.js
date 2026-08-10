@@ -169,6 +169,13 @@ const config = {
      */
     chainBudgetMs: num('AI_CHAIN_BUDGET_MS', 20000),
     minAttemptMs: num('AI_MIN_ATTEMPT_MS', 1500),
+    /**
+     * How many alternative models to try after a pinned one is refused. More than
+     * one because a provider's list order is not usefulness order, but bounded:
+     * each rejection is cheap, yet a quota-based refusal is worth respecting
+     * rather than hammering down the whole list.
+     */
+    modelRetryMax: num('AI_MODEL_RETRY_MAX', 3),
 
     /** Max chat-history turns forwarded to the model */
     maxHistoryTurns: num('AI_MAX_HISTORY_TURNS', num('GEMINI_MAX_HISTORY_TURNS', 10)),
