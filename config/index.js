@@ -139,6 +139,12 @@ const config = {
      */
     summary: {
       ttlMs: num('AI_SUMMARY_TTL_MS', 30 * 60 * 1000),
+      /**
+       * Failures are cached too (a dead endpoint must not be hammered on every
+       * tab switch) but for far less time than a good answer: fixing a key or a
+       * URL should show up in a couple of minutes, not half an hour.
+       */
+      failureTtlMs: num('AI_SUMMARY_FAILURE_TTL_MS', 2 * 60 * 1000),
       maxRecs: num('AI_SUMMARY_MAX_RECS', 4),
       /** Rows of camera history folded into the focus summary */
       focusRows: num('AI_SUMMARY_FOCUS_ROWS', 200),

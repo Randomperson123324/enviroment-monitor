@@ -19,7 +19,10 @@ const METRICS = [
   { id: 'score', statKey: 'stats.scoreLabel', unit: null, key: 'health_score', dp: 0, color: (colors) => colors.score },
 ];
 
-const fmt = (v, dp) => (v != null && Number.isFinite(v) ? v.toFixed(dp) : '--');
+// `Number(null)` is 0, so a column the device never reported must be rejected
+// before conversion — otherwise "not read" prints as a reading of zero.
+const fmt = (v, dp) =>
+  v != null && v !== '' && Number.isFinite(Number(v)) ? Number(v).toFixed(dp) : '--';
 
 /**
  * Aggregate summary as a data table — one row per metric, columns for the
@@ -68,7 +71,7 @@ export default function StatsTable({ stats, latest, theme, loading }) {
                         {label}
                       </span>
                     </td>
-                    <td className="num strong">{fmt(Number(latest?.[m.key]), m.dp)}</td>
+                    <td className="num strong">{fmt(latest?.[m.key], m.dp)}</td>
                     <td className="num">{fmt(block?.min, m.dp)}</td>
                     <td className="num">{fmt(block?.avg, m.dp)}</td>
                     <td className="num">{fmt(block?.max, m.dp)}</td>

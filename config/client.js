@@ -144,12 +144,19 @@ export const CLIENT_FALLBACK = {
   streefloodUrl: '',
 };
 
-/** Validated chart palette (series hexes unchanged; chrome matches the soft surfaces). */
+/**
+ * Validated chart palette (series hexes unchanged; chrome matches the soft surfaces).
+ * The three PM series take violet/orange/pink slots from ID_SERIES_PALETTE below,
+ * so they stay separable from each other and from temp/hum/gas under CVD.
+ */
 export const CHART_COLORS = {
   light: {
     temp: '#e34948',
     hum: '#2a78d6',
     gas: '#eda100',
+    pm1: '#e87ba4',
+    pm25: '#4a3aa7',
+    pm10: '#eb6834',
     score: '#1baf7a',
     focus: '#4a3aa7',
     focusOver: '#d03b3b',
@@ -163,6 +170,9 @@ export const CHART_COLORS = {
     temp: '#e66767',
     hum: '#3987e5',
     gas: '#c98500',
+    pm1: '#d55181',
+    pm25: '#9085e9',
+    pm10: '#d95926',
     score: '#199e70',
     focus: '#9085e9',
     focusOver: '#d03b3b',

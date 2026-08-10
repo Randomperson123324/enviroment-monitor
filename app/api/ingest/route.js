@@ -7,11 +7,21 @@ import { jsonOk, jsonError, withErrors } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
 
-/** Accepted aliases per canonical field (Arduino firmware may send short names). */
+/**
+ * Accepted aliases per canonical field (Arduino firmware may send short names).
+ *
+ * ⚠️ Never list 'pm10' as an alias of pm1: some libraries name PM1.0 "pm10",
+ * which collides with PM10 exactly, and pick() would take the wrong value with
+ * no error to see. Collectors must send the canonical names — the aliases are
+ * only for compatibility.
+ */
 const FIELD_ALIASES = {
   temperature: ['temperature', 'temp', 't'],
   humidity: ['humidity', 'hum', 'h'],
   gas_ppm: ['gas_ppm', 'gas', 'g'],
+  pm1: ['pm1', 'pm1_0'],
+  pm25: ['pm25', 'pm2_5'],
+  pm10: ['pm10'],
   sound: ['sound'],
   light: ['light'],
   gas_digital: ['gas_digital'],
@@ -26,8 +36,9 @@ function pick(body, aliases) {
 }
 
 /**
- * POST /api/ingest — sensor upload endpoint for the Arduino UNO Q.
- * Body: {device_id, temperature|temp, humidity|hum, gas_ppm|gas, ...}
+ * POST /api/ingest — sensor upload endpoint for the room devices.
+ * Body: {device_id, temperature|temp, humidity|hum, gas_ppm|gas, pm1, pm25, pm10, ...}
+ * A sensor that cannot be read must be omitted or sent as null, never 0.
  */
 export const POST = withErrors(async (request) => {
   const body = await request.json().catch(() => null);

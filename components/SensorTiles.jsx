@@ -5,7 +5,13 @@ import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import { SENSORS } from '@/config/sensors';
 import { CHART_COLORS } from '@/config/client';
-import { buildHistView, smoothSeries, gradientFill, tooltipOptions } from '@/lib/chart-utils';
+import {
+  buildHistView,
+  smoothSeries,
+  gradientFill,
+  tooltipOptions,
+  trailingMean,
+} from '@/lib/chart-utils';
 import { useLang } from '@/hooks/useLang';
 
 // Mini sparklines read as a trend, not a data table — smooth harder than the
@@ -17,8 +23,16 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
   const { t } = useLang();
   const raw = latest?.[sensor.field];
   const value = raw != null && Number.isFinite(Number(raw)) ? Number(raw) : null;
-  const level = value != null ? sensor.level(value) : null;
   const color = colors[sensor.id];
+
+  // The tile always shows the live number, but a sensor may ask to be *classified*
+  // on a rolling mean instead (PM: its thresholds are 24-hour standards, so a
+  // single dusty frame must not flip the badge). Falls back to the live value
+  // when the window holds no history yet.
+  const judged = sensor.avgHours
+    ? trailingMean(view[sensor.id], view.timestamps, sensor.avgHours) ?? value
+    : value;
+  const level = judged != null ? sensor.level(judged) : null;
 
   const data = useMemo(
     () => ({
@@ -111,8 +125,11 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
         </span>
       </div>
       <div className="tile-foot">
-        <span className={`badge ${value == null ? 'nodata' : level || ''}`}>
-          {value == null ? t('sensor.tile.waiting') : t(`sensor.${sensor.id}.${sensor.textKey(value)}`)}
+        <span
+          className={`badge ${value == null ? 'nodata' : level || ''}`}
+          title={sensor.avgHours ? t('sensor.tile.avgWindow', { h: sensor.avgHours }) : undefined}
+        >
+          {judged == null ? t('sensor.tile.waiting') : t(`sensor.${sensor.id}.${sensor.textKey(judged)}`)}
         </span>
       </div>
     </div>
@@ -139,6 +156,9 @@ export default function SensorTiles({ latest, histRows, hours, smooth, theme, lo
 
   if (loading) return SENSORS.map((s) => <SkeletonTile key={s.id} />);
 
+  // Every sensor gets a tile, including one the device has never reported: an
+  // empty PM tile reads as "waiting for the dust sensor", which is information.
+  // (The PM *chart* still hides itself — three empty lines say nothing.)
   return (
     <>
       {SENSORS.map((s) => (

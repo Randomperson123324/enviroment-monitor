@@ -3,8 +3,13 @@ import { analyzeReading, readingSummary, healthScore } from '@/lib/analysis';
 import { aiAnalyze, aiEnabled } from '@/lib/ai';
 import { relayTarget, relayFetch } from '@/lib/ai/relay';
 import { jsonOk, aiOverridesFrom, withErrors } from '@/lib/api-helpers';
+import { SENSORS } from '@/config/sensors';
 
 export const dynamic = 'force-dynamic';
+
+/** Every sensor field, missing ones as null — keeps this route sensor-agnostic. */
+const readingFields = (src) =>
+  Object.fromEntries(SENSORS.map((s) => [s.field, src?.[s.field] ?? null]));
 
 /**
  * POST /api/gemini-analyze — re-fetch the latest reading from the DB and
@@ -29,19 +34,10 @@ export const POST = withErrors(async (request) => {
   }
 
   const fresh = await getLatest(normalizeDeviceId(body.device_id)).catch(() => null);
-  const reading = fresh ?? {
-    temperature: body.temperature,
-    humidity: body.humidity,
-    gas_ppm: body.gas_ppm,
-  };
+  const reading = fresh ?? readingFields(body);
 
   const local = analyzeReading(reading);
-  const sensor = {
-    temperature: reading.temperature ?? null,
-    humidity: reading.humidity ?? null,
-    gas_ppm: reading.gas_ppm ?? null,
-    health_score: healthScore(reading),
-  };
+  const sensor = { ...readingFields(reading), health_score: healthScore(reading) };
 
   if (aiEnabled(overrides)) {
     try {

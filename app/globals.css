@@ -1207,6 +1207,13 @@ textarea {
   min-height: 150px;
 }
 
+/* Full-width secondary chart (PM) — taller than the side panels, shorter than
+   the main stage, since it carries three nested series plus a legend. */
+.chart-stage-md {
+  position: relative;
+  min-height: 230px;
+}
+
 /* ═══ AQI METER ═══ */
 .aqi-meter {
   margin-top: 12px;

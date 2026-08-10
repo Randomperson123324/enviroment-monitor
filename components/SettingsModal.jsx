@@ -3,8 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Settings } from 'lucide-react';
 import { AI_ORDER_PRESETS, AI_SUMMARY_STYLES } from '@/config/client';
+import { SENSORS } from '@/config/sensors';
 import { aiHeaders } from '@/lib/ai-client';
 import { useLang } from '@/hooks/useLang';
+
+/** Canonical ingest field names, straight from the sensor definitions. */
+const INGEST_FIELDS = SENSORS.map((s) => s.field).join(', ');
 
 /**
  * Model picker backed by GET /api/ai/models — the list comes from the provider
@@ -142,8 +146,7 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
         </div>
         <p className="field-hint">
           {t('settings.ingestHintPre')} <code>POST /api/ingest</code> {t('settings.ingestHintMid')}{' '}
-          <code>temperature</code>, <code>humidity</code>, <code>gas_ppm</code>{' '}
-          ({t('settings.ingestHintOr')} <code>temp</code>, <code>hum</code>, <code>gas</code>)
+          <code>{INGEST_FIELDS}</code>
         </p>
 
         <h4 className="field-group">{t('settings.aiSection')}</h4>

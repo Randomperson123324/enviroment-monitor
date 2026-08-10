@@ -9,10 +9,33 @@
  * config/sensors.js so nothing is duplicated. Sources are reputable public-health
  * bodies (WHO, CDC, EPA, Thai DDC) — every surfaced risk links to one.
  */
-import { THRESHOLDS } from '@/config/sensors';
+import { THRESHOLDS, risingLevel } from '@/config/sensors';
 
 const num = (v) => Number(v);
 const has = (v) => v != null && Number.isFinite(Number(v));
+
+const LEVEL_RANK = { '': 0, warning: 1, danger: 2 };
+
+/**
+ * Which airborne pollutant drives the respiratory risk, with the reason wording
+ * that matches it. PM2.5 wins a tie: it is a calibrated µg/m³ measurement of the
+ * particles that reach the alveoli, whereas the MQ-2 is an uncalibrated proxy.
+ */
+function airborneRisk(r) {
+  const gas = {
+    level: risingLevel(num(r.gas_ppm), THRESHOLDS.gas),
+    reason: { key: 'disease.respiratory.reason', vars: { g: num(r.gas_ppm).toFixed(0) } },
+  };
+  if (!has(r.pm25)) return gas;
+  const pm = {
+    level: risingLevel(num(r.pm25), THRESHOLDS.pm25),
+    reason: {
+      key: 'disease.respiratory.reasonPm',
+      vars: { p: num(r.pm25).toFixed(0), std: THRESHOLDS.pm25.danger },
+    },
+  };
+  return LEVEL_RANK[pm.level] >= LEVEL_RANK[gas.level] ? pm : gas;
+}
 
 export const SOURCES = {
   whoMould: {
@@ -108,14 +131,8 @@ export const DISEASES = [
   {
     id: 'respiratory',
     nameKey: 'disease.respiratory.name',
-    level: (r) => {
-      const g = num(r.gas_ppm);
-      if (!has(g)) return '';
-      if (g > THRESHOLDS.gas.danger) return 'danger';
-      if (g > THRESHOLDS.gas.warn) return 'warning';
-      return '';
-    },
-    reason: (r) => ({ key: 'disease.respiratory.reason', vars: { g: num(r.gas_ppm).toFixed(0) } }),
+    level: (r) => airborneRisk(r).level,
+    reason: (r) => airborneRisk(r).reason,
     preventionKey: 'disease.respiratory.prevention',
     source: SOURCES.whoAir,
   },

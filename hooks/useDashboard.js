@@ -2,6 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { STORAGE, CHART_VIEW_DEFAULTS } from '@/config/client';
+import { SENSORS } from '@/config/sensors';
+import { translate } from '@/config/i18n';
+
+/** "อุณหภูมิ 27.4 °C · PM2.5 12 µg/m³" — only the values the device reported. */
+function readingLine(row) {
+  return SENSORS.filter((s) => row[s.field] != null)
+    .map((s) => `${translate('th', `sensor.${s.id}.stat`)} ${Number(row[s.field]).toFixed(s.dp)} ${s.unit}`)
+    .join(' · ');
+}
 
 /**
  * Dashboard data loop: polls GET /api/dashboard, tracks devices, view
@@ -69,9 +78,7 @@ export default function useDashboard({ settings, serverCfg, addLog }) {
           lastReadingId.current = pack.latest.id;
           const d = pack.latest;
           addLog(
-            `[${d.device_id ?? '?'}] อุณหภูมิ ${Number(d.temperature ?? 0).toFixed(1)}°C · ` +
-              `ความชื้น ${Number(d.humidity ?? 0).toFixed(1)}% · ก๊าซ ${Number(d.gas_ppm ?? 0).toFixed(0)} ppm · ` +
-              `คะแนน ${d.health_score ?? '--'}`,
+            `[${d.device_id ?? '?'}] ${readingLine(d)} · คะแนน ${d.health_score ?? '--'}`,
             'ok'
           );
         }

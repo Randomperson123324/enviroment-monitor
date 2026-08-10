@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Bot, X, ChartColumn, MessageCircle, Sparkles, ArrowUp } from 'lucide-react';
 import { CHAT_MAX_TURNS } from '@/config/client';
+import { SENSORS } from '@/config/sensors';
 import { aiJsonHeaders } from '@/lib/ai-client';
 import { useLang } from '@/hooks/useLang';
 
@@ -40,9 +41,8 @@ function AnalysisPane({ latest, deviceId, settings, serverAi, addLog, onSource }
         headers: aiJsonHeaders(settings),
         body: JSON.stringify({
           device_id: deviceId,
-          temperature: latest?.temperature,
-          humidity: latest?.humidity,
-          gas_ppm: latest?.gas_ppm,
+          // Cached fallback values, used only if the server can't re-read the DB.
+          ...Object.fromEntries(SENSORS.map((s) => [s.field, latest?.[s.field]])),
         }),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);

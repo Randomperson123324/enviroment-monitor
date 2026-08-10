@@ -5,7 +5,7 @@ import { CircleCheck, TriangleAlert, CircleAlert, Siren, ChartLine } from 'lucid
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import SectionHeader from '@/components/SectionHeader';
-import { SENSORS, AQI_LEVELS, aqiLevel } from '@/config/sensors';
+import { MAIN_SENSORS, PM_SENSORS, PM_AVG_HOURS, AQI_LEVELS, aqiLevel } from '@/config/sensors';
 import {
   CHART_COLORS,
   CHART_RANGES,
@@ -20,6 +20,7 @@ import {
   timeAxis,
   valueAxis,
   tooltipOptions,
+  hasSeriesData,
 } from '@/lib/chart-utils';
 import { useLang } from '@/hooks/useLang';
 
@@ -30,7 +31,7 @@ function HistoryChart({ view, smooth, colors }) {
   const data = useMemo(() => {
     return {
       labels: view.labels,
-      datasets: SENSORS.map((s) => ({
+      datasets: MAIN_SENSORS.map((s) => ({
         label:
           s.id === 'gas'
             ? t('charts.gasDiv', { n: gasDiv })
@@ -50,6 +51,57 @@ function HistoryChart({ view, smooth, colors }) {
       })),
     };
   }, [view, smooth, colors, gasDiv, t]);
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: timeAxis(colors, view.labels.length),
+        y: valueAxis(colors, { scale: { suggestedMin: 0 } }),
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: colors.tick, boxWidth: 10, padding: 8, usePointStyle: true },
+        },
+        tooltip: { ...tooltipOptions(colors, view.timestamps), mode: 'index', intersect: false },
+      },
+    }),
+    [colors, view]
+  );
+
+  return <Line data={data} options={options} />;
+}
+
+/**
+ * PM gets its own chart rather than three more lines on the main one: the three
+ * channels share a µg/m³ axis (no divisor trick needed) and they nest — PM10 ⊇
+ * PM2.5 ⊇ PM1 — which only reads as nested when they sit on the same scale.
+ * Only PM2.5 is filled; filling all three would muddy the overlap.
+ */
+function PmChart({ view, smooth, colors }) {
+  const { t } = useLang();
+
+  const data = useMemo(
+    () => ({
+      labels: view.labels,
+      datasets: PM_SENSORS.map((s) => ({
+        label: t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
+        data: smoothSeries(view[s.id], smooth),
+        borderColor: colors[s.id],
+        backgroundColor: gradientFill(colors[s.id], 0.22),
+        tension: 0.42,
+        pointRadius: 0,
+        borderWidth: 2,
+        spanGaps: true,
+        fill: s.id === 'pm25',
+      })),
+    }),
+    [view, smooth, colors, t]
+  );
 
   const options = useMemo(
     () => ({
@@ -228,6 +280,18 @@ export default function ChartsSection({ dash, theme }) {
           </div>
         </div>
       </div>
+
+      {hasSeriesData(view, PM_SENSORS) && (
+        <div className="panel section-gap">
+          <div className="chart-head">
+            <div className="panel-title">{t('charts.pmTitle')}</div>
+            <div className="panel-meta">{t('charts.pmMeta', { h: PM_AVG_HOURS })}</div>
+          </div>
+          <div className="chart-stage-md">
+            <PmChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
