@@ -192,7 +192,6 @@ textarea {
 .range-pill,
 .mini-btn,
 .btn,
-.analyze-btn,
 .chat-send {
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease,
     color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
@@ -202,7 +201,6 @@ textarea {
 .range-pill:hover,
 .mini-btn:hover,
 .btn:hover,
-.analyze-btn:hover:not(:disabled),
 .chat-send:hover:not(:disabled) {
   transform: scale(1.04);
   box-shadow: var(--glass-shadow-sm);
@@ -212,7 +210,6 @@ textarea {
 .range-pill:active,
 .mini-btn:active,
 .btn:active,
-.analyze-btn:active:not(:disabled),
 .chat-send:active:not(:disabled) {
   transform: scale(0.96);
 }
@@ -547,9 +544,12 @@ textarea {
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--c-focus) 40%, transparent);
-  background: color-mix(in srgb, var(--c-focus) 88%, var(--page));
-  color: #fff;
+  /* The assistant is the page's primary action, so it wears the page's accent.
+     It used to be painted in --c-focus, the colour that identifies the Focus
+     chart's series — an identity colour standing in for "important button". */
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent);
+  color: var(--accent-contrast);
   display: grid;
   place-items: center;
   box-shadow: var(--glass-shadow);
@@ -591,13 +591,6 @@ textarea {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
-}
-
-.ai-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
 }
 
 /* ═══ ALERT BAR ═══ */
@@ -2010,8 +2003,10 @@ textarea {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--c-focus);
-  box-shadow: 0 0 8px var(--c-focus);
+  /* Status, so it matches the top bar's "live" pill rather than the Focus
+     chart's series colour. */
+  background: var(--lv-ok);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--lv-ok) 70%, transparent);
   animation: blink 2.4s ease-in-out infinite;
 }
 
@@ -2179,10 +2174,9 @@ textarea {
 }
 
 .fcard-val {
-  font-size: 28px;
   font-weight: 600;
   line-height: 1.1;
-  color: var(--c-focus);
+  color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2374,42 +2368,7 @@ textarea {
   word-break: break-word;
 }
 
-/* AI panel */
-.ai-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--line);
-  padding: 0 12px;
-  gap: 4px;
-}
-
-.ai-tab {
-  flex: 1;
-  padding: 10px 0;
-  font-size: 13.5px;
-  font-weight: 500;
-  text-align: center;
-  color: var(--muted);
-  border: none;
-  background: none;
-  border-bottom: 2.5px solid transparent;
-  transition: color 0.3s ease, border-color 0.3s ease;
-}
-
-.ai-tab.active {
-  color: var(--c-focus);
-  border-bottom-color: var(--c-focus);
-  font-weight: 600;
-}
-
-.ai-body {
-  height: 220px;
-  overflow-y: auto;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
+/* AI summary blocks (per-tab summaries) */
 .ai-rec {
   padding: 9px 14px;
   border-radius: 14px;
@@ -2439,29 +2398,9 @@ textarea {
   font-weight: 500;
   padding: 3px 12px;
   border-radius: 999px;
-  color: var(--c-focus);
-  background: color-mix(in srgb, var(--c-focus) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--c-focus) 22%, transparent);
-}
-
-.analyze-btn {
-  margin: 10px 16px 12px;
-  padding: 10px 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--c-focus) 26%, transparent);
-  background: color-mix(in srgb, var(--c-focus) 13%, transparent);
-  color: var(--c-focus);
-  font-size: 13.5px;
-  font-weight: 600;
-}
-
-.analyze-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
 }
 
 .analyze-hint {

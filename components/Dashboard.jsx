@@ -222,7 +222,6 @@ function DashboardInner() {
       </div>
 
       <FloatingAi
-        latest={dash.latest}
         deviceId={dash.deviceId}
         settings={settings}
         serverAi={dash.health.aiProviders}

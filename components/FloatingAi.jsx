@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Bot, X, ChartColumn, MessageCircle, Sparkles, ArrowUp } from 'lucide-react';
+import { Bot, X, ArrowUp } from 'lucide-react';
 import { CHAT_MAX_TURNS } from '@/config/client';
-import { SENSORS } from '@/config/sensors';
 import { aiJsonHeaders } from '@/lib/ai-client';
 import { useLang } from '@/hooks/useLang';
 
@@ -13,80 +12,6 @@ function sourceLabel(t, res) {
   // No model ran: the rule engine in lib/analysis.js replied.
   const name = res.provider === 'local-rules' ? t('ai.srcLocal') : res.model || res.provider;
   return res.via === 'relay' ? t('ai.viaRelay', { name }) : name;
-}
-
-function AnalysisPane({ latest, deviceId, settings, serverAi, addLog, onSource }) {
-  const { t } = useLang();
-  const [override, setOverride] = useState(null);
-  const [busy, setBusy] = useState(false);
-
-  const ai = override ?? {
-    recommendations: latest?.ai_analysis?.recommendations ?? null,
-    summary: null,
-  };
-
-  const answered = sourceLabel(t, override);
-  const hint = answered
-    ? t('ai.hintAnswered', { name: answered })
-    : serverAi?.length
-      ? t('ai.hintServer', { providers: serverAi.join(' → ') })
-      : t('ai.hintLocal');
-
-  const forceAnalyze = async () => {
-    setBusy(true);
-    addLog(t('ai.logFetching'), 'info');
-    try {
-      const r = await fetch(`${settings.apiBase}/api/gemini-analyze`, {
-        method: 'POST',
-        headers: aiJsonHeaders(settings),
-        body: JSON.stringify({
-          device_id: deviceId,
-          // Cached fallback values, used only if the server can't re-read the DB.
-          ...Object.fromEntries(SENSORS.map((s) => [s.field, latest?.[s.field]])),
-        }),
-      });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const parsed = await r.json();
-      onSource?.(parsed);
-      setOverride({
-        provider: parsed.provider,
-        model: parsed.model,
-        via: parsed.via,
-        recommendations: parsed.recommendations,
-        summary: parsed.summary,
-      });
-      addLog(t('ai.logDone', { src: sourceLabel(t, parsed) || t('ai.srcLocal') }), 'ok');
-    } catch (e) {
-      addLog(`Analyze error: ${e.message}`, 'err');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-      <div className="ai-body">
-        {busy ? (
-          <div className="ai-rec info">{t('ai.analyzing')}</div>
-        ) : ai.recommendations?.length ? (
-          <>
-            {ai.summary ? <div className="ai-rec info">🤖 {ai.summary}</div> : null}
-            {ai.recommendations.map((r, i) => (
-              <div key={i} className={`ai-rec ${r.level ?? 'info'}`}>
-                {r.text}
-              </div>
-            ))}
-          </>
-        ) : (
-          <div className="ai-rec info">{t('ai.waiting')}</div>
-        )}
-      </div>
-      <button className="analyze-btn" onClick={forceAnalyze} disabled={busy}>
-        <Sparkles size={15} strokeWidth={2.2} aria-hidden /> {t('ai.analyzeNow')}
-      </button>
-      <div className="analyze-hint">{hint}</div>
-    </>
-  );
 }
 
 function ChatPane({ deviceId, settings, addLog, onSource }) {
@@ -184,11 +109,19 @@ function ChatPane({ deviceId, settings, addLog, onSource }) {
   );
 }
 
-/** AI assistant as a floating action button (bottom-right) with a glass popover. */
-export default function FloatingAi({ latest, deviceId, settings, serverAi, addLog }) {
+/**
+ * AI assistant as a floating action button (bottom-right) with a glass popover.
+ *
+ * Chat only. It used to open on an "analysis" tab that re-ran the very analysis
+ * the page already shows: the score card carries the rule engine's
+ * recommendations, and every tab has its own cached AI summary above the
+ * content. Two routes to the same paragraph — one of them spending a model call
+ * on demand — so the assistant now does the one thing nothing else does, which
+ * is answer a question.
+ */
+export default function FloatingAi({ deviceId, settings, serverAi, addLog }) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState('recs');
   const [lastSource, setLastSource] = useState(null);
 
   // The "/" shortcut lives in Dashboard (one global key listener for the app) and
@@ -214,43 +147,18 @@ export default function FloatingAi({ latest, deviceId, settings, serverAi, addLo
             </span>
             <span className="src-tag">{source}</span>
           </div>
-          <div className="ai-tabs">
-            <button
-              className={`ai-tab ${tab === 'recs' ? 'active' : ''}`}
-              onClick={() => setTab('recs')}
-            >
-              <ChartColumn size={14} strokeWidth={2.2} aria-hidden /> {t('ai.analyze')}
-            </button>
-            <button
-              className={`ai-tab ${tab === 'chat' ? 'active' : ''}`}
-              onClick={() => setTab('chat')}
-            >
-              <MessageCircle size={14} strokeWidth={2.2} aria-hidden /> {t('ai.chat')}
-            </button>
-          </div>
-          {tab === 'recs' ? (
-            <AnalysisPane
-              latest={latest}
-              deviceId={deviceId}
-              settings={settings}
-              serverAi={serverAi}
-              addLog={addLog}
-              onSource={setLastSource}
-            />
-          ) : (
-            <ChatPane
-              deviceId={deviceId}
-              settings={settings}
-              addLog={addLog}
-              onSource={setLastSource}
-            />
-          )}
+          <ChatPane
+            deviceId={deviceId}
+            settings={settings}
+            addLog={addLog}
+            onSource={setLastSource}
+          />
         </div>
       )}
       <button
         className={`fab ${open ? 'open' : ''}`}
         onClick={() => setOpen((v) => !v)}
-        title={open ? t('ai.close') : t('ai.openAi')}
+        title={open ? t('ai.close') : `${t('ai.openAi')} (/)`}
         aria-expanded={open}
       >
         {open ? <X size={22} strokeWidth={2.2} /> : <Bot size={24} strokeWidth={2} />}
