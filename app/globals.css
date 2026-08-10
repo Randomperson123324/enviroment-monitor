@@ -1857,8 +1857,10 @@ textarea {
   color: var(--lv-warning);
 }
 
+/* Status family, not a series colour — kept for feeds that really do carry an
+   informational state, never for plain measurements. */
 .gov-marker.info {
-  color: var(--c-hum);
+  color: var(--lv-info);
 }
 
 .gov-datarow-title {
@@ -1892,7 +1894,7 @@ textarea {
 }
 
 .gov-datarow-value.info {
-  color: var(--c-hum);
+  color: var(--lv-info);
 }
 
 .gov-datarow-label {
@@ -3405,4 +3407,83 @@ textarea {
   /* The identity colour marks which channel is showing — the status colours
      stay reserved for the meter below. */
   border-bottom-color: var(--dot-color);
+}
+
+/* ═══ GOV + FOCUS PASS ═══
+   Same two rules as the sensor tiles, applied to the other two data-heavy
+   screens: numbers share one scale with the unit set apart, and colour marks
+   status only. */
+
+/* Count chips: figure first, label beneath, zero muted. */
+.gov-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 12px 5px;
+}
+
+.gov-chip b {
+  font-family: var(--font-mono), monospace;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.gov-chip > span {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* A count of nobody-in-trouble should not shout in red. */
+.gov-chip.zero {
+  color: var(--muted);
+}
+
+.gov-datarow-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: var(--num-sm);
+}
+
+.gov-datarow-value small {
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Focus panel readouts join the shared numeric scale. */
+.fcard-val {
+  font-size: var(--num-md);
+}
+
+/* Empty state that explains itself instead of one grey line in a large box. */
+.focus-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 24px 18px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.focus-empty > svg {
+  color: var(--line-strong);
+  margin-bottom: 2px;
+}
+
+.focus-empty-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.focus-empty-hint {
+  max-width: 46ch;
+  font-size: 12px;
+  line-height: 1.65;
 }

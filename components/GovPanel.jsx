@@ -47,13 +47,19 @@ function placeLine(name, place, prefix = '') {
   return name?.includes(place) ? '' : `${prefix}${place}`;
 }
 
-/** Count chips above a list — the section's headline numbers at a glance. */
+/**
+ * Count chips above a list — the section's headline numbers at a glance.
+ * Number first, label under it: these are read as figures, and "อันตราย: 0"
+ * put the label where the eye lands. A count of zero drops to the muted tone,
+ * so a row of chips shows at a glance whether anything needs attention.
+ */
 function Chips({ items }) {
   return (
     <div className="gov-chips">
       {items.map((c) => (
-        <span key={c.label} className={`gov-chip ${c.tone ?? ''}`}>
-          {c.label}: {c.value}
+        <span key={c.label} className={`gov-chip ${Number(c.value) > 0 ? c.tone ?? '' : 'zero'}`}>
+          <b>{c.value}</b>
+          <span>{c.label}</span>
         </span>
       ))}
     </div>
@@ -68,7 +74,7 @@ function Chips({ items }) {
  * tapping un-truncates the name and reveals the detail, so nothing is lost on
  * a small screen without cramming it.
  */
-function DataRow({ marker, title, subtitle, value, tone, label, labelTone, tooltip }) {
+function DataRow({ marker, title, subtitle, value, unit, tone, label, labelTone, tooltip }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -85,7 +91,12 @@ function DataRow({ marker, title, subtitle, value, tone, label, labelTone, toolt
         </div>
         <div className="gov-datarow-right">
           <div>
-            <p className={`gov-datarow-value ${tone ?? ''}`}>{value}</p>
+            {/* Unit set apart from the figure, as in the sensor tiles: the
+                numbers are what a reader scans down the column. */}
+            <p className={`gov-datarow-value ${tone ?? ''}`}>
+              {value}
+              {unit ? <small>{unit}</small> : null}
+            </p>
             {label ? <p className={`gov-datarow-label ${labelTone ?? ''}`}>{label}</p> : null}
           </div>
           <ChevronDown className="gov-datarow-chev" size={14} strokeWidth={2.2} aria-hidden />
@@ -206,12 +217,13 @@ export default function GovPanel({ feed }) {
                         }
                         title={w.station}
                         subtitle={[
-                          w.amphoe ? `อ.${w.amphoe}` : '',
+                          w.amphoe ? `${t('gov.amphoe')}${w.amphoe}` : '',
                           w.province ? `${t('gov.province')}${w.province}` : '',
                         ]
                           .filter(Boolean)
                           .join(' · ')}
-                        value={`${Number(w.amountMm).toFixed(1)} ${t('gov.mm')}`}
+                        value={Number(w.amountMm).toFixed(1)}
+                        unit={t('gov.mm')}
                         label={w.flashFloodRisk ? t('gov.badgeFlash') : w.periodType}
                         labelTone={w.flashFloodRisk ? 'danger' : ''}
                       />
@@ -279,11 +291,14 @@ export default function GovPanel({ feed }) {
                 renderRow={(r, i) => (
                   <DataRow
                     key={i}
-                    tone="info"
+                    // No tone: 24-hour rainfall is a measurement, not a state.
+                    // It used to be drawn in the humidity series colour, which
+                    // made a plain number look like a status of its own.
                     marker={<CloudRain size={16} strokeWidth={2.2} aria-hidden />}
                     title={r.stationName}
                     subtitle={placeLine(r.stationName, r.province?.th, t('gov.province'))}
-                    value={`${Number(r.rain24h).toFixed(1)} ${t('gov.mm')}`}
+                    value={Number(r.rain24h).toFixed(1)}
+                    unit={t('gov.mm')}
                   />
                 )}
               />
@@ -314,12 +329,13 @@ export default function GovPanel({ feed }) {
                             ? 'danger'
                             : pct >= GOV_LEVELS.reservoirHighPercent
                               ? 'warning'
-                              : 'info'
+                              : undefined
                         }
                         marker={<Droplets size={16} strokeWidth={2.2} aria-hidden />}
                         title={rv.name}
                         subtitle={placeLine(rv.name, rv.region?.th)}
-                        value={`${pct.toFixed(0)}%`}
+                        value={pct.toFixed(0)}
+                        unit="%"
                       />
                     );
                   }}

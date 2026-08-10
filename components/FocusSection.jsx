@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Eye, BookOpen, X } from 'lucide-react';
+import { Eye, BookOpen, X, TriangleAlert, VideoOff } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import useFocus, { movementCount } from '@/hooks/useFocus';
@@ -310,6 +310,7 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
             <input
               type="number"
               className="threshold-input"
+              aria-label={`${t('focus.thresholdPre')} (${t('focus.thresholdPost')})`}
               min={FOCUS_THRESHOLD_INPUT.min}
               max={FOCUS_THRESHOLD_INPUT.max}
               value={threshold}
@@ -322,7 +323,7 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
 
       {overThreshold && (
         <div className="alert-bar" style={{ marginBottom: 10 }} role="alert">
-          <span>⚠</span>
+          <TriangleAlert size={16} strokeWidth={2.4} aria-hidden />
           <span>{t('focus.over', { mv: mvPerMin, th: threshold })}</span>
         </div>
       )}
@@ -350,7 +351,11 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                   t={t}
                 />
               ) : (
-                <div className="focus-empty">{t('focus.empty')}</div>
+                <div className="focus-empty">
+                  <VideoOff size={22} strokeWidth={1.8} aria-hidden />
+                  <p className="focus-empty-title">{t('focus.empty')}</p>
+                  <p className="focus-empty-hint">{t('focus.emptyHint')}</p>
+                </div>
               )}
             </div>
 
@@ -430,17 +435,23 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
             <div className="fcard-label">
               <span>{t('focus.faceCount')}</span>
             </div>
+            {/*
+              Status colours only, and only where they mean something:
+                no data → muted        nobody in frame → muted (they stepped away,
+                one person → ok         nothing is broken)
+                more than one → warning (someone else is in the room)
+              It used to paint "one person" in the humidity series colour and
+              "nobody" in danger red, which read as an alarm over normal events.
+            */}
             <div
               className="fcard-val"
               style={{
                 color:
-                  faceCount == null
+                  faceCount == null || faceCount === 0
                     ? 'var(--muted)'
-                    : faceCount === 0
-                      ? 'var(--lv-danger)'
-                      : faceCount > 1
-                        ? 'var(--lv-warning)'
-                        : 'var(--c-hum)',
+                    : faceCount > 1
+                      ? 'var(--lv-warning)'
+                      : 'var(--lv-ok)',
               }}
             >
               {faceCount ?? '--'}
