@@ -122,16 +122,42 @@ function ChatPane({ deviceId, settings, addLog, onSource }) {
 export default function FloatingAi({ deviceId, settings, serverAi, addLog }) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
+  /** Kept mounted for the collapse animation, then dropped. */
+  const [closing, setClosing] = useState(false);
   const [lastSource, setLastSource] = useState(null);
 
   // The "/" shortcut lives in Dashboard (one global key listener for the app) and
   // reaches the assistant through this event, so the panel keeps owning its own
   // open state instead of having it lifted into the page for one keystroke.
   useEffect(() => {
-    const openPanel = () => setOpen(true);
+    const openPanel = () => {
+      setClosing(false);
+      setOpen(true);
+    };
     window.addEventListener('env-monitor:open-ai', openPanel);
     return () => window.removeEventListener('env-monitor:open-ai', openPanel);
   }, []);
+
+  const finishClose = () => {
+    setOpen(false);
+    setClosing(false);
+  };
+
+  // Safety net: the panel must never be left stuck open if the animation event
+  // does not arrive (an interrupted transition, animations disabled outright).
+  useEffect(() => {
+    if (!closing) return;
+    const timer = setTimeout(finishClose, 400);
+    return () => clearTimeout(timer);
+  }, [closing]);
+
+  const toggle = () => {
+    // Pressing the button mid-collapse re-opens instead of doing nothing: the
+    // panel is still on screen, so a press that appears to hit it must act.
+    if (closing) setClosing(false);
+    else if (open) setClosing(true);
+    else setOpen(true);
+  };
 
   // Until something answers we can only name the chain the server would use.
   const source =
@@ -140,7 +166,15 @@ export default function FloatingAi({ deviceId, settings, serverAi, addLog }) {
   return (
     <>
       {open && (
-        <div className="panel ai-panel ai-float" role="dialog" aria-label={t('ai.dialog')}>
+        <div
+          className={`panel ai-panel ai-float ${closing ? 'closing' : ''}`}
+          role="dialog"
+          aria-label={t('ai.dialog')}
+          // Child animations bubble here too, so only the panel's own counts.
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget && closing) finishClose();
+          }}
+        >
           <div className="subhdr">
             <span className="panel-title ai-float-title">
               <Bot size={17} strokeWidth={2.2} aria-hidden /> {t('ai.title')}
@@ -156,12 +190,12 @@ export default function FloatingAi({ deviceId, settings, serverAi, addLog }) {
         </div>
       )}
       <button
-        className={`fab ${open ? 'open' : ''}`}
-        onClick={() => setOpen((v) => !v)}
-        title={open ? t('ai.close') : `${t('ai.openAi')} (/)`}
-        aria-expanded={open}
+        className={`fab ${open && !closing ? 'open' : ''}`}
+        onClick={toggle}
+        title={open && !closing ? t('ai.close') : `${t('ai.openAi')} (/)`}
+        aria-expanded={open && !closing}
       >
-        {open ? <X size={22} strokeWidth={2.2} /> : <Bot size={24} strokeWidth={2} />}
+        {open && !closing ? <X size={22} strokeWidth={2.2} /> : <Bot size={24} strokeWidth={2} />}
       </button>
     </>
   );

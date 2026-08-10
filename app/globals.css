@@ -536,13 +536,23 @@ textarea {
 }
 
 /* ═══ FLOATING AI ═══ */
+/* One source for the button's geometry: the panel positions itself and picks its
+   transform origin from these, so "grows out of the button" stays true if the
+   button ever moves or changes size. */
+:root {
+  --fab-size: 58px;
+  --fab-inset: 24px;
+  /* Clearance between the button and the panel above it. */
+  --fab-gap: 14px;
+}
+
 .fab {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
+  right: var(--fab-inset);
+  bottom: var(--fab-inset);
   z-index: 350;
-  width: 58px;
-  height: 58px;
+  width: var(--fab-size);
+  height: var(--fab-size);
   border-radius: 50%;
   /* The assistant is the page's primary action, so it wears the page's accent.
      It used to be painted in --c-focus, the colour that identifies the Focus
@@ -566,11 +576,19 @@ textarea {
 
 .ai-float {
   position: fixed;
-  right: 24px;
-  bottom: 96px;
+  right: var(--fab-inset);
+  bottom: calc(var(--fab-inset) + var(--fab-size) + var(--fab-gap));
   z-index: 340;
   width: min(380px, calc(100vw - 32px));
-  animation: float-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /*
+    Origin = the centre of the button, expressed relative to the panel's own
+    bottom-right corner: half a button to the left of its right edge, and half a
+    button plus the gap below its bottom edge. Scaling from there makes the panel
+    unfold out of the button instead of fading in above it.
+  */
+  transform-origin: calc(100% - var(--fab-size) / 2)
+    calc(100% + var(--fab-size) / 2 + var(--fab-gap));
+  animation: ai-expand 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
   /* Floats above busy content — needs the strong glass, not the see-through one. */
   background-color: color-mix(in srgb, var(--surface-2) 100%, transparent);
   backdrop-filter: blur(28px);
@@ -582,14 +600,35 @@ textarea {
   gap: 8px;
 }
 
-@keyframes float-in {
+/* Closing runs the same motion backwards, so the panel folds back into the
+   button it came out of rather than blinking away. */
+.ai-float.closing {
+  animation: ai-collapse 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes ai-collapse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.16);
+  }
+}
+
+@keyframes ai-expand {
   0% {
     opacity: 0;
-    transform: translateY(14px) scale(0.97);
+    /* Starts about the size of the button it comes out of. */
+    transform: scale(0.16);
+  }
+  55% {
+    opacity: 1;
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: scale(1);
   }
 }
 
