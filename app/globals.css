@@ -30,6 +30,8 @@
   --lv-warning: #d97706;
   --lv-danger: #dc2626;
   --glass-shadow: 0 8px 32px rgba(15, 40, 60, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  /* Cast leftward by the docked assistant, so the seam reads as a real edge. */
+  --seam-shadow: -18px 0 38px -16px rgba(15, 40, 60, 0.3);
   --glass-shadow-sm: 0 2px 12px rgba(15, 40, 60, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   --streak: rgba(255, 255, 255, 0.65);
 }
@@ -59,6 +61,7 @@
   --lv-warning: #fbbf24;
   --lv-danger: #f87171;
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --seam-shadow: -18px 0 38px -14px rgba(0, 0, 0, 0.55);
   --glass-shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   --streak: rgba(255, 255, 255, 0.35);
 }
@@ -381,11 +384,12 @@ textarea {
 .sidebar {
   display: none;
   position: fixed;
-  top: 16px;
-  bottom: 16px;
-  left: 16px;
+  top: var(--rail-inset);
+  bottom: var(--rail-inset);
+  left: var(--rail-inset);
   width: 15rem;
   z-index: 90;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sidebar-inner {
@@ -540,6 +544,9 @@ textarea {
    transform origin from these, so "grows out of the button" stays true if the
    button ever moves or changes size. */
 :root {
+  /* Rail geometry, shared by its resting position and its peek transform. */
+  --rail-inset: 16px;
+  --rail-peek: 14px;
   --fab-size: 58px;
   --fab-inset: 24px;
   /* Clearance between the button and the panel above it. */
@@ -901,7 +908,11 @@ textarea {
 /* ═══ SENSOR TILES ═══ */
 .tiles {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* Intrinsic rather than a fixed three, because the content area now changes
+     width without the viewport changing: a docked assistant can leave 690px, and
+     three fixed columns squeezed the value into the label. auto-fit collapses the
+     empty track, so three cards still fill a wide row. */
+  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
   gap: 14px;
 }
 
@@ -3497,7 +3508,11 @@ textarea {
     height: 100vh;
     height: 100dvh;
     border-radius: 0;
+    /* A snapped window needs a real edge against the page it sits beside: a
+       hairline alone disappeared into the glass, so the line carries a shadow
+       cast leftward over the content. */
     border-left: 1px solid var(--line-strong);
+    box-shadow: var(--seam-shadow);
     transform-origin: right center;
     animation: ai-dock-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
@@ -3637,5 +3652,62 @@ textarea {
   to {
     opacity: 0;
     transform: translateX(100%);
+  }
+}
+
+/* ═══ NAV RAIL PEEK ═══
+   Set by useAiWindow when a wide docked assistant leaves too little room for the
+   dashboard: the rail slides out of the way, leaving a strip to hover. */
+@media (min-width: 1024px) {
+  :root[data-rail-peek] .sidebar {
+    /* Its own inset has to come off the travel, or the strip left on screen
+       would be the inset rather than --rail-peek. */
+    transform: translateX(calc(-100% + var(--rail-peek) - var(--rail-inset)));
+  }
+
+  /* Hover or keyboard focus brings it back — focus-within so tabbing into the
+     nav is not a dead end for anyone not using a mouse. */
+  :root[data-rail-peek] .sidebar:hover,
+  :root[data-rail-peek] .sidebar:focus-within {
+    transform: none;
+  }
+
+  /* The freed space goes to the content. */
+  :root[data-rail-peek] .shell {
+    padding-left: calc(var(--rail-peek) + 18px);
+  }
+
+  /* The strip has to look like a handle, not a rendering artefact. */
+  :root[data-rail-peek] .sidebar::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 5px;
+    width: 4px;
+    height: 54px;
+    margin-top: -27px;
+    border-radius: 4px;
+    background: var(--accent);
+    opacity: 0.75;
+    transition: opacity 0.2s ease;
+  }
+
+  :root[data-rail-peek] .sidebar:hover::after,
+  :root[data-rail-peek] .sidebar:focus-within::after {
+    opacity: 0;
+  }
+}
+
+/* Layouts that assume a wide content area, when a docked assistant has taken it.
+   data-rail-peek already means "space is tight" (see useAiWindow), so the same
+   signal switches the two-column sections to one — the viewport media queries
+   below cannot see this, since the window never changed size. */
+@media (min-width: 1024px) {
+  :root[data-rail-peek] .charts,
+  :root[data-rail-peek] .focus-grid,
+  :root[data-rail-peek] .bottom,
+  :root[data-rail-peek] .gov-grid,
+  :root[data-rail-peek] .flood-grid {
+    grid-template-columns: 1fr;
   }
 }

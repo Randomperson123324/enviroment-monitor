@@ -168,6 +168,14 @@ export const AI_WINDOW = {
   minHeight: 320,
   /** How close to the right edge a drop counts as "snap back to docked". */
   snapZone: 72,
+  /** Movement before a press on the title bar counts as a drag, not a click. */
+  dragThreshold: 4,
+  /**
+   * Content width below which the nav rail collapses to a hover strip. A wide
+   * assistant plus a 15rem rail leaves the dashboard too narrow to read, and the
+   * rail is the part you need least while you are talking to the assistant.
+   */
+  railPeekUnder: 1000,
 };
 
 /** Bounds for the focus "movement per minute" threshold input. */

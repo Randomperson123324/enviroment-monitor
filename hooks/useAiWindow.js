@@ -101,16 +101,37 @@ export default function useAiWindow(open) {
    */
   useEffect(() => {
     const root = document.documentElement;
-    if (open && docked) {
+
+    const clear = () => {
+      root.style.removeProperty('--ai-dock-w');
+      delete root.dataset.aiDocked;
+      delete root.dataset.railPeek;
+    };
+
+    if (!open || !docked) {
+      clear();
+      return clear;
+    }
+
+    /*
+      Past a point the dashboard and a wide assistant cannot both be read, and the
+      nav rail is what you need least while typing at the assistant. So it folds
+      away to a strip you hover to bring back — the space goes to the content, and
+      the strip is there so nobody has to guess where the nav went.
+    */
+    const apply = () => {
       root.style.setProperty('--ai-dock-w', `${state.dockWidth}px`);
       root.dataset.aiDocked = 'true';
-    } else {
-      root.style.removeProperty('--ai-dock-w');
-      delete root.dataset.aiDocked;
-    }
+      const contentWidth = window.innerWidth - state.dockWidth;
+      if (contentWidth < AI_WINDOW.railPeekUnder) root.dataset.railPeek = 'true';
+      else delete root.dataset.railPeek;
+    };
+
+    apply();
+    window.addEventListener('resize', apply);
     return () => {
-      root.style.removeProperty('--ai-dock-w');
-      delete root.dataset.aiDocked;
+      window.removeEventListener('resize', apply);
+      clear();
     };
   }, [open, docked, state.dockWidth]);
 
@@ -171,10 +192,20 @@ export default function useAiWindow(open) {
   const startMove = useCallback(
     (e) => {
       if (!desktop) return;
+      /*
+        A press on a control in the title bar is a click, not a drag. Without this
+        the drag claimed pointer capture, and capture retargets the *click* to the
+        capturing element — so the dock and close buttons never received it and
+        looked broken.
+      */
+      if (e.target.closest?.('button, a, input, select, textarea')) return;
+
       const box = panelRef.current?.getBoundingClientRect();
       if (!box) return;
       const offsetX = e.clientX - box.left;
       const offsetY = e.clientY - box.top;
+      const from = { x: e.clientX, y: e.clientY };
+      let dragging = false;
       const size = {
         w: state.mode === 'docked' ? clamp(box.width, AI_WINDOW.minWidth, maxDockWidth()) : state.rect.w,
         h: clamp(
@@ -186,6 +217,12 @@ export default function useAiWindow(open) {
 
       beginDrag(e, {
         move: (ev) => {
+          // A mouse jitters a pixel or two on press; undocking on that would make
+          // the window jump every time someone taps its title bar.
+          if (!dragging) {
+            if (Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < AI_WINDOW.dragThreshold) return;
+            dragging = true;
+          }
           const nearRight = ev.clientX > window.innerWidth - AI_WINDOW.snapZone;
           setSnapping(nearRight);
           setState((s) => ({
@@ -197,6 +234,7 @@ export default function useAiWindow(open) {
           }));
         },
         end: (ev) => {
+          if (!dragging) return;
           if (ev.clientX > window.innerWidth - AI_WINDOW.snapZone) {
             setState((s) => ({ ...s, mode: 'docked', dockWidth: clamp(size.w, AI_WINDOW.minWidth, maxDockWidth()) }));
           }
