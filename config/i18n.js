@@ -30,7 +30,7 @@ const DICT = {
       menuLabel: 'เลือกหมวดข้อมูล',
       environment: 'สภาพแวดล้อม',
       focus: 'การจดจ่อ',
-      hydro: 'ความปลอดภัยและเหตุฉุกเฉิน',
+      hydro: 'ความปลอดภัยและสุขภาพ',
     },
 
     /** Relative ages — see lib/format.js ageParts() */
@@ -379,7 +379,7 @@ const DICT = {
       menuLabel: 'Choose a data section',
       environment: 'Environment',
       focus: 'Focus',
-      hydro: 'Safety & Emergency',
+      hydro: 'Safety & Health',
     },
 
     age: {

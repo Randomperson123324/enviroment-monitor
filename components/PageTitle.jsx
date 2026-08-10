@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The heading for whichever section is open, with a dotted leader running the
+ * The heading for whichever section is open, with a hairline rule running the
  * full width beneath it.
  *
  * The tabs used to be the only thing naming the current section, and on a wide
@@ -16,7 +16,7 @@ export default function PageTitle({ title, children }) {
         <h1 className="page-title">{title}</h1>
         {children}
       </div>
-      <div className="page-dots" aria-hidden />
+      <div className="page-rule" aria-hidden />
     </header>
   );
 }
