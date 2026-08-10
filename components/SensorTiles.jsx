@@ -33,6 +33,12 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
     ? trailingMean(view[sensor.id], view.timestamps, sensor.avgHours) ?? value
     : value;
   const level = judged != null ? sensor.level(judged) : null;
+  const textKey = judged != null ? sensor.textKey(judged) : null;
+
+  // "okish" (past the clean mark, short of a warning) gets a neutral badge:
+  // painting it the same green as "clean" told the user everything was ideal.
+  const badgeClass =
+    value == null ? 'nodata' : level || (textKey === 'okish' ? 'info' : '');
 
   const data = useMemo(
     () => ({
@@ -101,35 +107,49 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
       <div className="tile-chart">
         <Line data={data} options={options} />
       </div>
-      <div className="tile-bar" title={t('sensor.tile.barTitle')}>
+      {/*
+        Three visual roles, three separate encodings:
+          fill  — status (ok / warning / danger), never the sensor's own colour
+          band  — the healthy range, neutral: it is scale furniture, not a state
+          scale — the meter's end points
+        The fill used to inherit --tile-accent when everything was fine, so a
+        sensor whose identity colour happened to be amber (the MQ-2) looked like
+        a warning while it was perfectly normal.
+      */}
+      <div
+        className="tile-bar"
+        role="img"
+        aria-label={`${value != null ? value.toFixed(sensor.dp) : '--'} ${sensor.unit} · ${t(
+          'sensor.tile.comfort',
+          { lo: bar.comfort[0], hi: bar.comfort[1] }
+        )}`}
+        title={t('sensor.tile.barTitle')}
+      >
         <div
-          className={`tile-bar-fill ${level || 'ok'}`}
+          className="tile-bar-band"
+          style={{ left: `${comfortLeft}%`, width: `${comfortWidth}%` }}
+        />
+        <div
+          className={`tile-bar-fill ${value == null ? 'nodata' : level || 'ok'}`}
           style={{ width: `${needlePct ?? 0}%` }}
-        />
-        <div
-          className="tile-bar-mark"
-          style={{ left: `${comfortLeft}%` }}
-          title={t('sensor.tile.comfortStart', { v: bar.comfort[0], unit: sensor.unit })}
-        />
-        <div
-          className="tile-bar-mark"
-          style={{ left: `${comfortLeft + comfortWidth}%` }}
-          title={t('sensor.tile.comfortEnd', { v: bar.comfort[1], unit: sensor.unit })}
         />
       </div>
       <div className="tile-bar-scale">
-        <span>{bar.min}</span>
-        <span>{t('sensor.tile.comfort', { lo: bar.comfort[0], hi: bar.comfort[1] })}</span>
         <span>
-          {bar.max} {sensor.unit}
+          {bar.min}
+          <span className="tile-unit"> {sensor.unit}</span>
         </span>
+        <span className="tile-comfort">
+          {t('sensor.tile.comfort', { lo: bar.comfort[0], hi: bar.comfort[1] })}
+        </span>
+        <span>{bar.max}</span>
       </div>
       <div className="tile-foot">
         <span
-          className={`badge ${value == null ? 'nodata' : level || ''}`}
+          className={`badge ${badgeClass}`}
           title={sensor.avgHours ? t('sensor.tile.avgWindow', { h: sensor.avgHours }) : undefined}
         >
-          {judged == null ? t('sensor.tile.waiting') : t(`sensor.${sensor.id}.${sensor.textKey(judged)}`)}
+          {judged == null ? t('sensor.tile.waiting') : t(`sensor.${sensor.id}.${textKey}`)}
         </span>
       </div>
     </div>

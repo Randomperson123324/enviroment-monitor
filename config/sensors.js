@@ -10,14 +10,13 @@
  *
  *   band   — two-sided comfort range (temp, humidity): okLo/okHi ideal band,
  *            warnLo/warnHi before it counts as dangerous.
- *   rising — one-sided "more is worse" (gas, PM): clean → warn → danger → critical.
+ *   rising — one-sided "more is worse" (PM): clean → warn → danger → critical.
  */
 
 /** Numeric thresholds per sensor (single place to tune). */
 export const THRESHOLDS = {
   temp: { min: -10, max: 50, okLo: 20, okHi: 28, warnLo: 16, warnHi: 32 },
   hum: { min: 0, max: 100, okLo: 40, okHi: 65, warnLo: 25, warnHi: 75 },
-  gas: { min: 0, max: 2000, clean: 80, warn: 150, danger: 300, critical: 600 },
   /**
    * Particulates in µg/m³ (PMS7003, atmospheric values). PM2.5/PM10 marks come
    * from the Thai 24-hour ambient standard in force 1 Jun 2023, with the WHO
@@ -40,8 +39,7 @@ export const THRESHOLDS = {
 export const SCORE_PENALTY = {
   temp: { warn: 12, danger: 30 },
   hum: { warn: 10, danger: 24 },
-  gas: { warn: 15, danger: 35, critical: 55 },
-  pm25: { warn: 12, danger: 30, critical: 55 },
+  pm25: { warn: 15, danger: 35, critical: 60 },
   pm10: { warn: 8, danger: 20, critical: 40 },
 };
 
@@ -90,7 +88,7 @@ function bandAdvice(v, t, keys) {
 }
 
 /**
- * One-sided sensor definition, shared by gas and the three PM channels.
+ * One-sided sensor definition, shared by the three PM channels.
  * `advise: false` keeps a sensor out of the recommendation list (PM1 — same
  * action as PM2.5, so a second line would only repeat it).
  */
@@ -168,13 +166,15 @@ export const SENSORS = [
     issueKey: (v) => bandIssueKey(v, THRESHOLDS.hum, { lo: 'dry', hi: 'humid' }),
     advice: (v) => bandAdvice(v, THRESHOLDS.hum, { lo: 'dry', hi: 'humid' }),
   },
-  risingSensor({ id: 'gas', field: 'gas_ppm', unit: 'ppm', dp: 0, group: 'air' }),
-  risingSensor({ id: 'pm1', field: 'pm1', unit: 'µg/m³', dp: 0, group: 'pm', advise: false, avgHours: PM_AVG_HOURS }),
+  // PM2.5 leads the dust group everywhere (tiles, chart legend, stats rows): it
+  // is the channel with a health standard behind it, so it should not be read
+  // last just because 1 < 2.5 < 10.
   risingSensor({ id: 'pm25', field: 'pm25', unit: 'µg/m³', dp: 0, group: 'pm', avgHours: PM_AVG_HOURS }),
   risingSensor({ id: 'pm10', field: 'pm10', unit: 'µg/m³', dp: 0, group: 'pm', avgHours: PM_AVG_HOURS }),
+  risingSensor({ id: 'pm1', field: 'pm1', unit: 'µg/m³', dp: 0, group: 'pm', advise: false, avgHours: PM_AVG_HOURS }),
 ];
 
-/** Chart split: climate/gas share one axis, the PM channels share another (µg/m³). */
+/** Chart split: climate shares one axis, the PM channels share another (µg/m³). */
 export const MAIN_SENSORS = SENSORS.filter((s) => s.group !== 'pm');
 export const PM_SENSORS = SENSORS.filter((s) => s.group === 'pm');
 
@@ -187,12 +187,21 @@ export const SCORE_BANDS = [
   { id: 'critical', min: 0, emoji: '🤢', msg: 'สภาพแวดล้อมอันตราย รีบแก้ไขทันที!' },
 ];
 
-/** Air-quality index bands derived from gas ppm (order matters: first match wins). */
+/**
+ * Air-quality bands, read from PM2.5 (order matters: first match wins).
+ *
+ * These used to come from the MQ-2's ppm reading — an uncalibrated proxy for
+ * "some gas is present". PM2.5 is a µg/m³ measurement against a published
+ * standard, so the meter now says something checkable. `status` keys the shared
+ * status palette; the same cutoffs drive the PM2.5 tile.
+ */
+export const AQI_SOURCE = 'pm25';
+
 export const AQI_LEVELS = [
-  { max: THRESHOLDS.gas.clean, id: 'clean', label: 'สะอาด', icon: '😊', status: 'good' },
-  { max: THRESHOLDS.gas.warn, id: 'moderate', label: 'ปานกลาง', icon: '🙂', status: 'warning' },
-  { max: THRESHOLDS.gas.danger, id: 'poor', label: 'แย่', icon: '😷', status: 'serious' },
-  { max: Infinity, id: 'danger', label: 'อันตราย', icon: '☣️', status: 'critical' },
+  { max: THRESHOLDS.pm25.clean, id: 'clean', status: 'good' },
+  { max: THRESHOLDS.pm25.warn, id: 'moderate', status: 'warning' },
+  { max: THRESHOLDS.pm25.danger, id: 'poor', status: 'serious' },
+  { max: Infinity, id: 'danger', status: 'critical' },
 ];
 
 /** Webcam (webcam_json) interpretation thresholds. */
@@ -207,6 +216,6 @@ export function scoreBand(score) {
   return SCORE_BANDS.find((b) => score >= b.min) ?? SCORE_BANDS[SCORE_BANDS.length - 1];
 }
 
-export function aqiLevel(gas) {
-  return AQI_LEVELS.find((l) => gas <= l.max) ?? AQI_LEVELS[AQI_LEVELS.length - 1];
+export function aqiLevel(pm25) {
+  return AQI_LEVELS.find((l) => pm25 <= l.max) ?? AQI_LEVELS[AQI_LEVELS.length - 1];
 }

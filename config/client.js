@@ -74,8 +74,6 @@ export const CHART_VIEW_DEFAULTS = {
   hours: 24,
   smooth: 5,
   maxPoints: 200,
-  /** Divisor applied to gas so it shares the main chart's axis (labeled "Gas÷10"). */
-  gasAxisDivisor: 10,
 };
 
 export const LOG_MAX_ROWS = 120;
@@ -181,13 +179,12 @@ export const CLIENT_FALLBACK = {
 /**
  * Validated chart palette (series hexes unchanged; chrome matches the soft surfaces).
  * The three PM series take violet/orange/pink slots from ID_SERIES_PALETTE below,
- * so they stay separable from each other and from temp/hum/gas under CVD.
+ * so they stay separable from each other and from temp/hum under CVD.
  */
 export const CHART_COLORS = {
   light: {
     temp: '#e34948',
     hum: '#2a78d6',
-    gas: '#eda100',
     pm1: '#e87ba4',
     pm25: '#4a3aa7',
     pm10: '#eb6834',
@@ -203,7 +200,6 @@ export const CHART_COLORS = {
   dark: {
     temp: '#e66767',
     hum: '#3987e5',
-    gas: '#c98500',
     pm1: '#d55181',
     pm25: '#9085e9',
     pm10: '#d95926',

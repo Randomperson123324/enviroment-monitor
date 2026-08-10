@@ -82,8 +82,8 @@ const DICT = {
     env: { statusNow: 'สถานะปัจจุบัน', deviceMeta: 'อุปกรณ์ {id}' },
 
     alert: {
-      gasHigh: '⚠️ ก๊าซสูง ({v} ppm) — เปิดหน้าต่างระบายอากาศ',
-      gasCritical: '☣️ ก๊าซวิกฤต ({v} ppm) — ออกจากห้องทันที!',
+      pmHigh: 'PM2.5 {v} µg/m³ เกินมาตรฐาน — เปิดเครื่องฟอกอากาศ ปิดช่องอากาศจากภายนอก',
+      pmCritical: 'PM2.5 {v} µg/m³ สูงมาก — ใส่หน้ากาก N95 และหาต้นตอฝุ่นทันที',
     },
 
     overview: {
@@ -98,8 +98,6 @@ const DICT = {
         cold2: 'เย็นจัด', cold: 'เย็น', hot2: 'ร้อนจัด', hot: 'ค่อนข้างร้อน', ok: 'สมบูรณ์' },
       hum: { label: 'ความชื้น', stat: 'ความชื้น',
         dry2: 'แห้งมาก', dry: 'ค่อนข้างแห้ง', wet2: 'ชื้นเกิน', wet: 'ชื้น', ok: 'เหมาะสม' },
-      gas: { label: 'คุณภาพอากาศ (MQ2)', stat: 'ก๊าซ',
-        crit: '⚠️ อันตราย', bad2: 'แย่มาก', bad: 'ไม่ดี', okish: 'พอใช้', ok: 'บริสุทธิ์' },
       pm1: { label: 'ฝุ่น PM1', stat: 'PM1',
         crit: '⚠️ อันตราย', bad2: 'แย่มาก', bad: 'ไม่ดี', okish: 'พอใช้', ok: 'สะอาด' },
       pm25: { label: 'ฝุ่น PM2.5', stat: 'PM2.5',
@@ -126,14 +124,13 @@ const DICT = {
       airQuality: 'คุณภาพอากาศ',
       pmTitle: 'ฝุ่นละออง PM (µg/m³)',
       pmMeta: 'ค่าที่วัดได้จริง · เกณฑ์เตือนใช้ค่าเฉลี่ย {h} ชม.',
-      gasDiv: 'ก๊าซ ÷{n}',
       hoursShort: '{h} ชม.',
       series: '{label} ({unit})',
     },
 
     ranges: { '1': '1 ชม.', '6': '6 ชม.', '12': '12 ชม.', '24': '24 ชม.', '72': '3 วัน' },
     smooth: { raw: 'ดิบ', light: 'เบา', medium: 'กลาง', smooth: 'ลื่น' },
-    aqi: { clean: 'สะอาด', moderate: 'ปานกลาง', poor: 'แย่', danger: 'อันตราย' },
+    aqi: { clean: 'สะอาด', moderate: 'ปานกลาง', poor: 'เกินมาตรฐาน', danger: 'อันตราย' },
 
     stats: {
       title: 'สรุปสถิติ',
@@ -274,12 +271,12 @@ const DICT = {
 
     disease: {
       section: 'ความเสี่ยงโรคจากสภาพแวดล้อม',
-      meta: 'วิเคราะห์จากอุณหภูมิ · ความชื้น · คุณภาพอากาศ',
+      meta: 'วิเคราะห์จากอุณหภูมิ · ความชื้น · ฝุ่น PM2.5',
       heroDanger: 'มีความเสี่ยงต่อโรคสูง — ควรรีบปรับสภาพแวดล้อม',
       heroWarning: 'มีความเสี่ยงต่อโรคบางชนิด — ควรเฝ้าระวัง',
       heroClear: 'ความเสี่ยงต่อโรคจากสิ่งแวดล้อมต่ำ',
       waiting: 'กำลังรอข้อมูลเซ็นเซอร์...',
-      needData: 'ต้องมีข้อมูลอุณหภูมิ ความชื้น หรือก๊าซ เพื่อประเมินความเสี่ยง',
+      needData: 'ต้องมีข้อมูลอุณหภูมิ ความชื้น หรือฝุ่น PM2.5 เพื่อประเมินความเสี่ยง',
       found: 'พบความเสี่ยง {n} รายการ',
       clearDetail: 'อุณหภูมิ ความชื้น และคุณภาพอากาศอยู่ในเกณฑ์ปลอดภัย ความเสี่ยงต่อโรคจากสิ่งแวดล้อมต่ำ',
       levelDanger: 'เสี่ยงสูง', levelWarning: 'เฝ้าระวัง', source: 'ที่มา: {name}',
@@ -296,9 +293,8 @@ const DICT = {
         reason: 'อุณหภูมิ {t}°C สูงเกินเกณฑ์สบาย เสี่ยงต่อภาวะขาดน้ำ เพลียแดด และโรคลมแดดหากอยู่นาน',
         prevention: 'ดื่มน้ำบ่อยๆ เปิดเครื่องปรับอากาศหรือพัดลม หลีกเลี่ยงการออกแรงหนัก' },
       respiratory: { name: 'การระคายเคืองทางเดินหายใจ / หอบหืด',
-        reason: 'ค่าก๊าซ/ฝุ่น {g} ppm สูง อาจระคายเคืองทางเดินหายใจ กระตุ้นหอบหืดและหลอดลมอักเสบ',
         reasonPm: 'PM2.5 {p} µg/m³ เกินเกณฑ์ {std} µg/m³ ฝุ่นขนาดเล็กเข้าถึงถุงลมปอด กระตุ้นหอบหืดและหลอดลมอักเสบ',
-        prevention: 'เปิดหน้าต่างระบายอากาศ หาแหล่งที่มาของก๊าซ ใช้เครื่องฟอกอากาศ' },
+        prevention: 'เปิดเครื่องฟอกอากาศ ปิดช่องอากาศจากภายนอก หาต้นตอฝุ่น (ธูป ควัน การทำอาหาร)' },
       bacteria: { name: 'การเจริญของแบคทีเรีย / อาหารเป็นพิษ',
         reason: 'อากาศร้อนชื้นเร่งการเจริญเติบโตของแบคทีเรียบนอาหารและพื้นผิว เพิ่มความเสี่ยงอาหารเป็นพิษ',
         prevention: 'เก็บอาหารในตู้เย็น ทำความสะอาดพื้นผิว ไม่วางอาหารทิ้งไว้นาน' },
@@ -426,8 +422,8 @@ const DICT = {
     env: { statusNow: 'Current status', deviceMeta: 'Device {id}' },
 
     alert: {
-      gasHigh: '⚠️ Gas high ({v} ppm) — open a window to ventilate',
-      gasCritical: '☣️ Gas critical ({v} ppm) — leave the room now!',
+      pmHigh: 'PM2.5 {v} µg/m³ over standard — run a purifier and close outside air',
+      pmCritical: 'PM2.5 {v} µg/m³ very high — wear an N95 and find the dust source now',
     },
 
     overview: {
@@ -442,8 +438,6 @@ const DICT = {
         cold2: 'Very cold', cold: 'Cold', hot2: 'Very hot', hot: 'Warm', ok: 'Ideal' },
       hum: { label: 'Humidity', stat: 'Humidity',
         dry2: 'Very dry', dry: 'Dry', wet2: 'Too humid', wet: 'Humid', ok: 'Ideal' },
-      gas: { label: 'Air quality (MQ2)', stat: 'Gas',
-        crit: '⚠️ Dangerous', bad2: 'Very poor', bad: 'Poor', okish: 'Fair', ok: 'Clean' },
       pm1: { label: 'PM1 dust', stat: 'PM1',
         crit: '⚠️ Dangerous', bad2: 'Very poor', bad: 'Poor', okish: 'Fair', ok: 'Clean' },
       pm25: { label: 'PM2.5 dust', stat: 'PM2.5',
@@ -470,14 +464,13 @@ const DICT = {
       airQuality: 'Air quality',
       pmTitle: 'Particulates PM (µg/m³)',
       pmMeta: 'Measured values · levels judged on the {h}h mean',
-      gasDiv: 'Gas ÷{n}',
       hoursShort: '{h}h',
       series: '{label} ({unit})',
     },
 
     ranges: { '1': '1h', '6': '6h', '12': '12h', '24': '24h', '72': '3 days' },
     smooth: { raw: 'Raw', light: 'Light', medium: 'Medium', smooth: 'Smooth' },
-    aqi: { clean: 'Clean', moderate: 'Moderate', poor: 'Poor', danger: 'Dangerous' },
+    aqi: { clean: 'Clean', moderate: 'Moderate', poor: 'Over standard', danger: 'Dangerous' },
 
     stats: {
       title: 'Statistics summary',
@@ -618,12 +611,12 @@ const DICT = {
 
     disease: {
       section: 'Environmental disease risk',
-      meta: 'Based on temperature · humidity · air quality',
+      meta: 'Based on temperature · humidity · PM2.5',
       heroDanger: 'High disease risk — adjust the environment soon',
       heroWarning: 'Some disease risk — keep an eye on it',
       heroClear: 'Low environmental disease risk',
       waiting: 'Waiting for sensor data...',
-      needData: 'Needs temperature, humidity, or gas data to assess risk',
+      needData: 'Needs temperature, humidity, or PM2.5 data to assess risk',
       found: '{n} risks found',
       clearDetail: 'Temperature, humidity, and air quality are within safe ranges; environmental disease risk is low',
       levelDanger: 'High risk', levelWarning: 'Watch', source: 'Source: {name}',
@@ -640,9 +633,8 @@ const DICT = {
         reason: 'Temperature {t}°C is above the comfort range, risking dehydration, exhaustion, and heatstroke if prolonged',
         prevention: 'Drink water often, use AC or a fan, avoid heavy exertion' },
       respiratory: { name: 'Airway irritation / asthma',
-        reason: 'Gas/particulate {g} ppm is high and may irritate airways, triggering asthma and bronchitis',
         reasonPm: 'PM2.5 {p} µg/m³ is above the {std} µg/m³ mark; fine particles reach the alveoli and trigger asthma and bronchitis',
-        prevention: 'Open windows to ventilate, find the gas source, use an air purifier' },
+        prevention: 'Run an air purifier, close outside air, find the dust source (incense, smoke, cooking)' },
       bacteria: { name: 'Bacterial growth / food poisoning',
         reason: 'Hot, humid air speeds bacterial growth on food and surfaces, raising food-poisoning risk',
         prevention: 'Refrigerate food, clean surfaces, don’t leave food out long' },

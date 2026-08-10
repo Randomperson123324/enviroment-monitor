@@ -18,13 +18,11 @@ export const dynamic = 'force-dynamic';
 const FIELD_ALIASES = {
   temperature: ['temperature', 'temp', 't'],
   humidity: ['humidity', 'hum', 'h'],
-  gas_ppm: ['gas_ppm', 'gas', 'g'],
   pm1: ['pm1', 'pm1_0'],
   pm25: ['pm25', 'pm2_5'],
   pm10: ['pm10'],
   sound: ['sound'],
   light: ['light'],
-  gas_digital: ['gas_digital'],
   webcam_json: ['webcam_json', 'webcam'],
 };
 
@@ -37,7 +35,7 @@ function pick(body, aliases) {
 
 /**
  * POST /api/ingest — sensor upload endpoint for the room devices.
- * Body: {device_id, temperature|temp, humidity|hum, gas_ppm|gas, pm1, pm25, pm10, ...}
+ * Body: {device_id, temperature|temp, humidity|hum, pm1, pm25, pm10, ...}
  * A sensor that cannot be read must be omitted or sent as null, never 0.
  */
 export const POST = withErrors(async (request) => {

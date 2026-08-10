@@ -14,27 +14,23 @@ import { THRESHOLDS, risingLevel } from '@/config/sensors';
 const num = (v) => Number(v);
 const has = (v) => v != null && Number.isFinite(Number(v));
 
-const LEVEL_RANK = { '': 0, warning: 1, danger: 2 };
-
 /**
- * Which airborne pollutant drives the respiratory risk, with the reason wording
- * that matches it. PM2.5 wins a tie: it is a calibrated µg/m³ measurement of the
- * particles that reach the alveoli, whereas the MQ-2 is an uncalibrated proxy.
+ * Airway risk from measured particulates.
+ *
+ * This used to read the MQ-2's ppm — an uncalibrated proxy for "some gas is in
+ * the air". PM2.5 is a µg/m³ measurement of the particles that actually reach
+ * the alveoli, judged against a published standard, so the risk it reports can
+ * be checked. No reading means no claim.
  */
 function airborneRisk(r) {
-  const gas = {
-    level: risingLevel(num(r.gas_ppm), THRESHOLDS.gas),
-    reason: { key: 'disease.respiratory.reason', vars: { g: num(r.gas_ppm).toFixed(0) } },
-  };
-  if (!has(r.pm25)) return gas;
-  const pm = {
+  if (!has(r.pm25)) return { level: '', reason: { key: 'disease.respiratory.reasonPm' } };
+  return {
     level: risingLevel(num(r.pm25), THRESHOLDS.pm25),
     reason: {
       key: 'disease.respiratory.reasonPm',
       vars: { p: num(r.pm25).toFixed(0), std: THRESHOLDS.pm25.danger },
     },
   };
-  return LEVEL_RANK[pm.level] >= LEVEL_RANK[gas.level] ? pm : gas;
 }
 
 export const SOURCES = {

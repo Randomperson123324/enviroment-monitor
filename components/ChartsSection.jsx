@@ -5,14 +5,16 @@ import { CircleCheck, TriangleAlert, CircleAlert, Siren, ChartLine } from 'lucid
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import SectionHeader from '@/components/SectionHeader';
-import { MAIN_SENSORS, PM_SENSORS, PM_AVG_HOURS, AQI_LEVELS, aqiLevel } from '@/config/sensors';
 import {
-  CHART_COLORS,
-  CHART_RANGES,
-  SMOOTH_OPTIONS,
-  CHART_VIEW_DEFAULTS,
-  STATUS_COLORS,
-} from '@/config/client';
+  SENSORS,
+  MAIN_SENSORS,
+  PM_SENSORS,
+  PM_AVG_HOURS,
+  AQI_LEVELS,
+  AQI_SOURCE,
+  aqiLevel,
+} from '@/config/sensors';
+import { CHART_COLORS, CHART_RANGES, SMOOTH_OPTIONS, STATUS_COLORS } from '@/config/client';
 import {
   buildHistView,
   smoothSeries,
@@ -26,31 +28,25 @@ import { useLang } from '@/hooks/useLang';
 
 function HistoryChart({ view, smooth, colors }) {
   const { t } = useLang();
-  const gasDiv = CHART_VIEW_DEFAULTS.gasAxisDivisor;
 
+  // Both remaining series share one axis honestly (°C 12–38, % 10–95), so the
+  // divisor trick the MQ-2's ppm needed — a line labelled "ก๊าซ ÷10" — is gone.
   const data = useMemo(() => {
     return {
       labels: view.labels,
       datasets: MAIN_SENSORS.map((s) => ({
-        label:
-          s.id === 'gas'
-            ? t('charts.gasDiv', { n: gasDiv })
-            : t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
-        data:
-          s.id === 'gas'
-            ? smoothSeries(view.gas, smooth).map((v) => (v != null ? v / gasDiv : null))
-            : smoothSeries(view[s.id], smooth),
+        label: t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
+        data: smoothSeries(view[s.id], smooth),
         borderColor: colors[s.id],
         backgroundColor: gradientFill(colors[s.id], 0.22),
         tension: 0.42,
         pointRadius: 0,
         borderWidth: 2,
-        borderDash: s.id === 'gas' ? [5, 4] : [],
         spanGaps: true,
-        fill: s.id !== 'gas',
+        fill: true,
       })),
     };
-  }, [view, smooth, colors, gasDiv, t]);
+  }, [view, smooth, colors, t]);
 
   const options = useMemo(
     () => ({
@@ -168,6 +164,9 @@ function ScoreChart({ view, smooth, colors }) {
   return <Line data={data} options={options} />;
 }
 
+/** Whichever sensor the AQI bands are defined against (config/sensors.js). */
+const AQI_SENSOR = SENSORS.find((s) => s.id === AQI_SOURCE);
+
 const AQI_STATUS_ICON = {
   good: CircleCheck,
   warning: TriangleAlert,
@@ -175,10 +174,13 @@ const AQI_STATUS_ICON = {
   critical: Siren,
 };
 
-/** Linear AQI meter — status segments with icon + label (never color alone). */
-function AqiMeter({ gas }) {
+/**
+ * Air-quality meter, read from PM2.5 against the published bands.
+ * Status segments carry an icon + label so the level never rests on colour.
+ */
+function AqiMeter({ value, unit }) {
   const { t } = useLang();
-  const level = gas != null ? aqiLevel(gas) : null;
+  const level = value != null ? aqiLevel(value) : null;
   const StatusIcon = level ? AQI_STATUS_ICON[level.status] : null;
   return (
     <div className="aqi-meter">
@@ -198,12 +200,12 @@ function AqiMeter({ gas }) {
       </div>
       <div className="aqi-reading">
         <div className="aqi-value">
-          {gas != null ? Number(gas).toFixed(0) : '--'}
-          <small> ppm</small>
+          {value != null ? Number(value).toFixed(0) : '--'}
+          <small> {unit}</small>
         </div>
         <div className="aqi-cat" style={{ color: level ? STATUS_COLORS[level.status] : 'var(--muted)' }}>
           {StatusIcon ? <StatusIcon size={16} strokeWidth={2.2} aria-hidden /> : <span>—</span>}
-          <span>{level ? t(`aqi.${level.id}`) : '--'}</span>
+          <span>{level ? t(`aqi.${level.id}`) : t('sensor.tile.waiting')}</span>
         </div>
       </div>
     </div>
@@ -276,7 +278,10 @@ export default function ChartsSection({ dash, theme }) {
           </div>
           <div className="panel">
             <div className="panel-title">{t('charts.airQuality')}</div>
-            <AqiMeter gas={dash.latest?.gas_ppm != null ? Number(dash.latest.gas_ppm) : null} />
+            <AqiMeter
+              value={dash.latest?.[AQI_SENSOR.field] != null ? Number(dash.latest[AQI_SENSOR.field]) : null}
+              unit={AQI_SENSOR.unit}
+            />
           </div>
         </div>
       </div>
