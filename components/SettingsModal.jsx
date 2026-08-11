@@ -201,14 +201,7 @@ function ProviderTest({ provider, apiBase, headers }) {
   return <TestRow onRun={run} state={state} />;
 }
 
-export default function SettingsModal({
-  settings,
-  serverCfg,
-  browserAi,
-  initialSection,
-  onSave,
-  onClose,
-}) {
+export default function SettingsModal({ settings, serverCfg, browserAi, onSave, onClose }) {
   const { t } = useLang();
   const [apiBase, setApiBase] = useState(settings.apiBase);
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey);
@@ -220,9 +213,7 @@ export default function SettingsModal({
   const [aiRelay, setAiRelay] = useState(settings.aiRelay);
   const [aiSummaryStyle, setAiSummaryStyle] = useState(settings.aiSummaryStyle);
   const [pollSec, setPollSec] = useState(settings.pollMs / 1000);
-  // The composer's chip button opens this dialog straight at the engine pane.
-  const opensAt = SECTIONS.some((s) => s.id === initialSection) ? initialSection : SECTIONS[0].id;
-  const [section, setSection] = useState(opensAt);
+  const [section, setSection] = useState(SECTIONS[0].id);
   // Expanded on open: five of the six panes live in here, so collapsed the dialog
   // presents itself as having one topic. Collapsing is for getting them out of
   // the way, not the resting state.

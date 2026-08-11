@@ -57,8 +57,6 @@ function DashboardInner() {
   // settings dialog configures it, the assistant runs turns with it.
   const browserAi = useBrowserAi({ enabled: serverCfg.ai?.browserEnabled !== false });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  /** Which pane Settings opens on — the assistant links straight to its engine. */
-  const [settingsSection, setSettingsSection] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState(TABS[0].id);
   /** Which half of the safety tab is showing — water/weather or disease risk. */
@@ -120,10 +118,7 @@ function DashboardInner() {
       tab3: () => switchTab(TABS[2].id),
       refresh,
       theme: toggleTheme,
-      settings: () => {
-        setSettingsSection(null);
-        setSettingsOpen(true);
-      },
+      settings: () => setSettingsOpen(true),
       help: () => setHelpOpen((o) => !o),
       ai: () => window.dispatchEvent(new CustomEvent('env-monitor:open-ai')),
       close: () => {
@@ -146,10 +141,7 @@ function DashboardInner() {
         onSelectDevice={dash.setDevice}
         status={status}
         onRefresh={refresh}
-        onOpenSettings={() => {
-          setSettingsSection(null);
-          setSettingsOpen(true);
-        }}
+        onOpenSettings={() => setSettingsOpen(true)}
         onOpenHelp={() => setHelpOpen(true)}
         activeTab={tab}
         onSelectTab={switchTab}
@@ -280,10 +272,6 @@ function DashboardInner() {
         serverAi={dash.health.aiProviders}
         aiCaps={serverCfg.ai}
         browserAi={browserAi}
-        onOpenSettings={(atSection) => {
-          setSettingsSection(atSection ?? null);
-          setSettingsOpen(true);
-        }}
         addLog={addLog}
       />
 
@@ -295,7 +283,6 @@ function DashboardInner() {
           settings={settings}
           serverCfg={serverCfg}
           browserAi={browserAi}
-          initialSection={settingsSection}
           onSave={(patch) => {
             save(patch);
             addLog(`Config saved — poll ${(patch.pollMs ?? settings.pollMs) / 1000}s`, 'info');

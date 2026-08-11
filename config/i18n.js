@@ -268,9 +268,6 @@ const DICT = {
 
     /** โหมด AI ที่รันในเบราว์เซอร์ด้วยการ์ดจอ (WebGPU) — ดู lib/ai/browser/ */
     bai: {
-      title: 'AI ทำงานที่ไหน',
-      onServer: 'AI ทำงานบนเซิร์ฟเวอร์ — แตะเพื่อตั้งค่า',
-      onBrowser: 'AI ทำงานในเครื่องนี้ (การ์ดจอ) — แตะเพื่อตั้งค่า',
       server: 'บนเซิร์ฟเวอร์',
       serverNote: 'ใช้เครื่องมือดึงข้อมูลได้ ค้นเว็บได้ เร็วกว่า',
       browser: 'ในเบราว์เซอร์นี้ (GPU)',
@@ -692,9 +689,6 @@ const DICT = {
     },
 
     bai: {
-      title: 'Where the AI runs',
-      onServer: 'AI runs on the server — tap to change',
-      onBrowser: 'AI runs on this machine (GPU) — tap to change',
       server: 'On the server',
       serverNote: 'Can use tools and web search, and is faster',
       browser: 'In this browser (GPU)',

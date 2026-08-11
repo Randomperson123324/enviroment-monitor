@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Bot, Brain, ChevronDown, Cpu, Globe, Square, Wrench } from 'lucide-react';
+import { ArrowUp, Bot, Brain, ChevronDown, Globe, Square, Wrench } from 'lucide-react';
 import { CHAT_MAX_TURNS } from '@/config/client';
 import { aiJsonHeaders } from '@/lib/ai-client';
 import { chatEvents } from '@/lib/chat-client';
@@ -71,7 +71,7 @@ function Thoughts({ t, msg, onToggle }) {
   );
 }
 
-export default function ChatPane({ deviceId, settings, caps, ai, onOpenSettings, addLog, onSource }) {
+export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSource }) {
   const { t, lang } = useLang();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -351,16 +351,9 @@ export default function ChatPane({ deviceId, settings, caps, ai, onOpenSettings,
 
       <div className="chat-input-row">
         <div className="chat-tgls">
-          {/* A shortcut, not a second home for the setting: it opens the same
-              Settings pane the gear does, already scrolled to the engine. */}
-          <button
-            className={`chat-tgl ${onBrowser ? 'on' : ''}`}
-            onClick={() => onOpenSettings?.('device')}
-            aria-label={t('bai.title')}
-            title={t(onBrowser ? 'bai.onBrowser' : 'bai.onServer')}
-          >
-            <Cpu size={15} strokeWidth={2.2} aria-hidden />
-          </button>
+          {/* Which engine answers is chosen in Settings, not here: the composer's
+              buttons are per-question switches, and where the model runs is not
+              one of those. Which one is answering shows in the title bar. */}
           {/* Web search belongs to the server tool loop; the browser model has
               no tools at all, so the button would promise something untrue. */}
           <button
