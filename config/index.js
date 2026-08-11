@@ -246,8 +246,6 @@ const config = {
      */
     stream: {
       enabled: bool('AI_STREAM_ENABLED', true),
-      /** Gemini's thinking budget in tokens when the user asks to see thinking. */
-      thinkingBudget: num('AI_THINKING_BUDGET', 2048),
       /** Total wall clock for one streamed turn, tool rounds included. */
       budgetMs: num('AI_STREAM_BUDGET_MS', 120000),
     },

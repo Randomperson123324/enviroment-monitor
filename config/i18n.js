@@ -189,10 +189,13 @@ const DICT = {
         relay: 'Relay',
       },
       pollHint: 'ยิ่งถี่ยิ่งเห็นค่าเร็ว แต่กินแบตและเน็ตมากขึ้น · ตั้งได้ {min}–{max} วินาที',
-      browserHint:
-        'อยากให้ AI ทำงานในเครื่องนี้แทนเซิร์ฟเวอร์ (ข้อความไม่ออกจากเครื่อง) ดูหัวข้อ "ในเบราว์เซอร์ (GPU)"',
+      aiWhere: 'AI ทำงานที่ไหน',
+      aiWhereServer: 'ใช้เครื่องมือดึงข้อมูลได้ ค้นเว็บได้ และเร็วกว่า — ลำดับด้านล่างนี้ใช้กับโหมดนี้',
+      aiWhereBrowser:
+        'ใช้ {model} ที่รันในเครื่องนี้ด้วยการ์ดจอ ข้อความไม่ออกจากเครื่อง — ลำดับด้านล่างจึงไม่มีผล · เลือก/โหลดโมเดลได้ที่หัวข้อ "ในเบราว์เซอร์ (GPU)"',
       deviceHint:
         'ส่วนนี้มีผลทันทีเมื่อกด ไม่ต้องกดบันทึก — การโหลด/ลบโมเดลเป็นการลงมือทำ ไม่ใช่ค่าที่รอยืนยัน',
+      deviceWhere: 'การเลือกว่าจะใช้โหมดนี้หรือไม่ อยู่ที่หัวข้อ "ผู้ช่วย AI"',
       aiLocalHint:
         'ปลายทางแบบ OpenAI-compatible ที่คุณรันเอง (llama.cpp / LM Studio / Ollama) — ต้องเปิดให้เซิร์ฟเวอร์ของเว็บนี้เข้าถึงได้ ไม่ใช่แค่เบราว์เซอร์ของคุณ',
       aiSection: 'ผู้ช่วย AI',
@@ -268,10 +271,8 @@ const DICT = {
 
     /** โหมด AI ที่รันในเบราว์เซอร์ด้วยการ์ดจอ (WebGPU) — ดู lib/ai/browser/ */
     bai: {
-      server: 'บนเซิร์ฟเวอร์',
-      serverNote: 'ใช้เครื่องมือดึงข้อมูลได้ ค้นเว็บได้ เร็วกว่า',
-      browser: 'ในเบราว์เซอร์นี้ (GPU)',
-      browserNote: 'ข้อความไม่ออกจากเครื่อง แต่ต้องโหลดโมเดลก่อน',
+      server: 'บนเซิร์ฟเวอร์',
+      browser: 'ในเบราว์เซอร์นี้ (GPU)',
       noWebgpu: 'เบราว์เซอร์นี้ไม่รองรับ WebGPU',
       model: 'โมเดล',
       desc: {
@@ -613,10 +614,14 @@ const DICT = {
         relay: 'Relay',
       },
       pollHint: 'More often means fresher numbers but more battery and bandwidth · {min}–{max} seconds',
-      browserHint:
-        'To run the AI on this machine instead of the server (nothing leaves the device), see "In this browser (GPU)"',
+      aiWhere: 'Where the AI runs',
+      aiWhereServer:
+        'Can use tools and web search, and is faster — the priority below applies to this mode',
+      aiWhereBrowser:
+        '{model} runs on this machine on the GPU and nothing leaves it — so the priority below does not apply · pick and download models under "In this browser (GPU)"',
       deviceHint:
         'This section applies as you press, with no Save — downloading or deleting a model is an action, not a pending edit',
+      deviceWhere: 'Whether to use this mode at all is chosen under "Assistant"',
       aiLocalHint:
         'An OpenAI-compatible endpoint you run yourself (llama.cpp / LM Studio / Ollama) — it must be reachable from this site\'s server, not just from your browser',
       aiSection: 'AI assistant',
@@ -689,10 +694,8 @@ const DICT = {
     },
 
     bai: {
-      server: 'On the server',
-      serverNote: 'Can use tools and web search, and is faster',
-      browser: 'In this browser (GPU)',
-      browserNote: 'Nothing leaves this machine, but the model downloads first',
+      server: 'On the server',
+      browser: 'In this browser (GPU)',
       noWebgpu: 'This browser has no WebGPU',
       model: 'Model',
       desc: {

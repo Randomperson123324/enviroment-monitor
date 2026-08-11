@@ -361,9 +361,40 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
               </div>
               <p className="field-hint">{t('settings.aiSummaryStyleHint')}</p>
 
+              {/* Directly above the provider priority, because the priority list
+                  only means anything while the server answers — separating the
+                  two made it look like it ranked the browser model too. */}
+              {browserAi && (
+                <>
+                  <div className="field">
+                    <label>{t('settings.aiWhere')}</label>
+                    <select
+                      value={browserAi.kind}
+                      onChange={(e) => browserAi.setKind(e.target.value)}
+                    >
+                      <option value="server">{t('bai.server')}</option>
+                      <option value="browser" disabled={browserAi.webgpu === false}>
+                        {browserAi.webgpu === false
+                          ? `${t('bai.browser')} — ${t('bai.noWebgpu')}`
+                          : t('bai.browser')}
+                      </option>
+                    </select>
+                  </div>
+                  <p className="field-hint">
+                    {browserAi.kind === 'browser'
+                      ? t('settings.aiWhereBrowser', { model: browserAi.model.label })
+                      : t('settings.aiWhereServer')}
+                  </p>
+                </>
+              )}
+
               <div className="field">
                 <label>{t('settings.aiOrder')}</label>
-                <select value={aiOrder} onChange={(e) => setAiOrder(e.target.value)}>
+                <select
+                  value={aiOrder}
+                  onChange={(e) => setAiOrder(e.target.value)}
+                  disabled={browserAi?.kind === 'browser'}
+                >
                   {AI_ORDER_PRESETS.map((p) => (
                     <option key={p.key} value={p.value}>
                       {t(`settings.aiOrderOpt.${p.key}`)}
@@ -374,7 +405,6 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
               <p className="field-hint">
                 {t('settings.aiServerOrder', { order: (ai.order ?? []).join(' → ') || '—' })}
               </p>
-              <p className="field-hint">{t('settings.browserHint')}</p>
             </>
           )}
 
@@ -384,6 +414,7 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
                   downloading a model is an action, not a pending edit, and it
                   cannot sit half-applied waiting for a confirmation. */}
               <p className="field-hint">{t('settings.deviceHint')}</p>
+              <p className="field-hint">{t('settings.deviceWhere')}</p>
               {browserAi ? <BrowserAiSettings ai={browserAi} /> : null}
             </>
           )}
