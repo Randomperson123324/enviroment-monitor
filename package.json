@@ -12,6 +12,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.84",
     "chart.js": "^4.4.9",
     "lucide-react": "^1.25.0",
     "next": "^16.2.7",

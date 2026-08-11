@@ -13,6 +13,7 @@ import useAiSummary from '@/hooks/useAiSummary';
 import useDataStatus from '@/hooks/useDataStatus';
 import useToasts from '@/hooks/useToasts';
 import useShortcuts from '@/hooks/useShortcuts';
+import useBrowserAi from '@/hooks/useBrowserAi';
 import AiSummary from '@/components/AiSummary';
 import { StatusNotice } from '@/components/DataStatus';
 import Toasts from '@/components/Toasts';
@@ -52,7 +53,12 @@ function DashboardInner() {
   const dash = useDashboard({ settings, serverCfg, addLog });
   const status = useDataStatus(dash.latest?.created_at);
   const { toasts, notify, dismiss } = useToasts();
+  // Lifted to here because two distant places need the same engine state: the
+  // settings dialog configures it, the assistant runs turns with it.
+  const browserAi = useBrowserAi({ enabled: serverCfg.ai?.browserEnabled !== false });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Which pane Settings opens on — the assistant links straight to its engine. */
+  const [settingsSection, setSettingsSection] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState(TABS[0].id);
   /** Which half of the safety tab is showing — water/weather or disease risk. */
@@ -114,7 +120,10 @@ function DashboardInner() {
       tab3: () => switchTab(TABS[2].id),
       refresh,
       theme: toggleTheme,
-      settings: () => setSettingsOpen(true),
+      settings: () => {
+        setSettingsSection(null);
+        setSettingsOpen(true);
+      },
       help: () => setHelpOpen((o) => !o),
       ai: () => window.dispatchEvent(new CustomEvent('env-monitor:open-ai')),
       close: () => {
@@ -137,7 +146,10 @@ function DashboardInner() {
         onSelectDevice={dash.setDevice}
         status={status}
         onRefresh={refresh}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => {
+          setSettingsSection(null);
+          setSettingsOpen(true);
+        }}
         onOpenHelp={() => setHelpOpen(true)}
         activeTab={tab}
         onSelectTab={switchTab}
@@ -267,6 +279,11 @@ function DashboardInner() {
         settings={settings}
         serverAi={dash.health.aiProviders}
         aiCaps={serverCfg.ai}
+        browserAi={browserAi}
+        onOpenSettings={(atSection) => {
+          setSettingsSection(atSection ?? null);
+          setSettingsOpen(true);
+        }}
         addLog={addLog}
       />
 
@@ -277,6 +294,8 @@ function DashboardInner() {
         <SettingsModal
           settings={settings}
           serverCfg={serverCfg}
+          browserAi={browserAi}
+          initialSection={settingsSection}
           onSave={(patch) => {
             save(patch);
             addLog(`Config saved — poll ${(patch.pollMs ?? settings.pollMs) / 1000}s`, 'info');

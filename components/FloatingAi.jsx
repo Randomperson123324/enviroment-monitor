@@ -24,7 +24,15 @@ function sourceLabel(t, res) {
  * on demand — so the assistant now does the one thing nothing else does, which
  * is answer a question.
  */
-export default function FloatingAi({ deviceId, settings, serverAi, aiCaps, addLog }) {
+export default function FloatingAi({
+  deviceId,
+  settings,
+  serverAi,
+  aiCaps,
+  browserAi,
+  onOpenSettings,
+  addLog,
+}) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   /** Kept mounted for the collapse animation, then dropped. */
@@ -142,6 +150,8 @@ export default function FloatingAi({ deviceId, settings, serverAi, aiCaps, addLo
             deviceId={deviceId}
             settings={settings}
             caps={aiCaps}
+            ai={browserAi}
+            onOpenSettings={onOpenSettings}
             addLog={addLog}
             onSource={setLastSource}
           />

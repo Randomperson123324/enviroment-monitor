@@ -1,14 +1,52 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Settings, Plug } from 'lucide-react';
+import {
+  Bot,
+  ChevronDown,
+  Cloud,
+  Cpu,
+  MonitorSmartphone,
+  Plug,
+  Server,
+  Settings,
+  Share2,
+  Sparkles,
+} from 'lucide-react';
 import { AI_ORDER_PRESETS, AI_SUMMARY_STYLES } from '@/config/client';
 import { SENSORS } from '@/config/sensors';
 import { aiHeaders } from '@/lib/ai-client';
 import { useLang } from '@/hooks/useLang';
+import BrowserAiSettings from '@/components/BrowserAiSettings';
 
 /** Canonical ingest field names, straight from the sensor definitions. */
 const INGEST_FIELDS = SENSORS.map((s) => s.field).join(', ');
+
+/**
+ * The dialog's sections, in the order they appear down the left side.
+ *
+ * Split this way because the old single scroll made unrelated things neighbours:
+ * the polling interval sat below four AI provider fields, and the Save button was
+ * three screens down from the field you had just typed in. Each pane here answers
+ * one question, and Save is now always on screen.
+ *
+ * Five of the six are about AI, so they sit inside one collapsible group rather
+ * than as five siblings of "Server" — otherwise the list reads as though the
+ * dashboard were mostly a settings screen for language models.
+ *
+ * Names live in config/i18n.js under `settings.sections.*`.
+ */
+const AI_SECTIONS = [
+  { id: 'assistant', Icon: Bot },
+  { id: 'device', Icon: MonitorSmartphone },
+  { id: 'local', Icon: Cpu },
+  { id: 'gemini', Icon: Cloud },
+  { id: 'relay', Icon: Share2 },
+];
+
+const SECTIONS = [{ id: 'connection', Icon: Server }, ...AI_SECTIONS];
+
+const isAiSection = (id) => AI_SECTIONS.some((s) => s.id === id);
 
 /**
  * Model picker backed by GET /api/ai/models — the list comes from the provider
@@ -163,7 +201,14 @@ function ProviderTest({ provider, apiBase, headers }) {
   return <TestRow onRun={run} state={state} />;
 }
 
-export default function SettingsModal({ settings, serverCfg, onSave, onClose }) {
+export default function SettingsModal({
+  settings,
+  serverCfg,
+  browserAi,
+  initialSection,
+  onSave,
+  onClose,
+}) {
   const { t } = useLang();
   const [apiBase, setApiBase] = useState(settings.apiBase);
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey);
@@ -175,6 +220,13 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
   const [aiRelay, setAiRelay] = useState(settings.aiRelay);
   const [aiSummaryStyle, setAiSummaryStyle] = useState(settings.aiSummaryStyle);
   const [pollSec, setPollSec] = useState(settings.pollMs / 1000);
+  // The composer's chip button opens this dialog straight at the engine pane.
+  const opensAt = SECTIONS.some((s) => s.id === initialSection) ? initialSection : SECTIONS[0].id;
+  const [section, setSection] = useState(opensAt);
+  // Expanded on open: five of the six panes live in here, so collapsed the dialog
+  // presents itself as having one topic. Collapsing is for getting them out of
+  // the way, not the resting state.
+  const [aiOpen, setAiOpen] = useState(true);
 
   const ai = serverCfg.ai ?? {};
   // What the picker queries: whatever is typed here wins over the server's value.
@@ -210,126 +262,220 @@ export default function SettingsModal({ settings, serverCfg, onSave, onClose }) 
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="modal modal-scroll">
-        <h3 className="ai-float-title">
+      <div className="modal set-modal">
+        <h3 className="ai-float-title set-title">
           <Settings size={18} strokeWidth={2.2} aria-hidden /> {t('settings.title')}
         </h3>
 
-        <div className="field">
-          <label>{t('settings.apiBase')}</label>
-          <input
-            type="text"
-            value={apiBase}
-            onChange={(e) => setApiBase(e.target.value)}
-            placeholder={t('settings.apiBasePlaceholder')}
-          />
-        </div>
-        <ApiBaseTest apiBase={apiBase} />
-        <p className="field-hint">
-          {t('settings.ingestHintPre')} <code>POST /api/ingest</code> {t('settings.ingestHintMid')}{' '}
-          <code>{INGEST_FIELDS}</code>
-        </p>
+        {/* Tabs rather than links: each pane is part of one unsaved form, so
+            moving between them must not be a navigation that could lose it. */}
+        <div className="set-nav" role="tablist" aria-label={t('settings.nav')}>
+          <button
+            role="tab"
+            aria-selected={section === 'connection'}
+            className={`set-navbtn ${section === 'connection' ? 'on' : ''}`}
+            onClick={() => setSection('connection')}
+          >
+            <Server size={15} strokeWidth={2.1} aria-hidden />
+            {t('settings.sections.connection')}
+          </button>
 
-        <h4 className="field-group">{t('settings.aiSection')}</h4>
+          {/* One AI entry that expands. Collapsed, it still shows as active when
+              one of its panes is the one on screen — otherwise the highlight
+              disappears and nothing says where you are. */}
+          <button
+            className={`set-navbtn set-navgroup ${isAiSection(section) ? 'on' : ''}`}
+            aria-expanded={aiOpen}
+            onClick={() => {
+              const next = !aiOpen;
+              setAiOpen(next);
+              // Expanding is also a request to see something: without this the
+              // first click opens a list and leaves the pane on "Server".
+              if (next && !isAiSection(section)) setSection(AI_SECTIONS[0].id);
+            }}
+          >
+            <Sparkles size={15} strokeWidth={2.1} aria-hidden />
+            {t('settings.sections.ai')}
+            <ChevronDown
+              size={14}
+              strokeWidth={2.4}
+              className={`set-caret ${aiOpen ? 'open' : ''}`}
+              aria-hidden
+            />
+          </button>
 
-        <div className="field">
-          <label>{t('settings.aiSummaryStyle')}</label>
-          <select value={aiSummaryStyle} onChange={(e) => setAiSummaryStyle(e.target.value)}>
-            {AI_SUMMARY_STYLES.map((s) => (
-              <option key={s.key} value={s.value}>
-                {t(`settings.aiSummaryStyleOpt.${s.key}`)}
-              </option>
+          {aiOpen &&
+            AI_SECTIONS.map(({ id, Icon }) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={section === id}
+                className={`set-navbtn set-navchild ${section === id ? 'on' : ''}`}
+                onClick={() => setSection(id)}
+              >
+                <Icon size={14} strokeWidth={2.1} aria-hidden />
+                {t(`settings.sections.${id}`)}
+              </button>
             ))}
-          </select>
-        </div>
-        <p className="field-hint">{t('settings.aiSummaryStyleHint')}</p>
-
-        <div className="field">
-          <label>{t('settings.aiOrder')}</label>
-          <select value={aiOrder} onChange={(e) => setAiOrder(e.target.value)}>
-            {AI_ORDER_PRESETS.map((p) => (
-              <option key={p.key} value={p.value}>
-                {t(`settings.aiOrderOpt.${p.key}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <p className="field-hint">
-          {t('settings.aiServerOrder', { order: (ai.order ?? []).join(' → ') || '—' })}
-        </p>
-
-        <div className="field">
-          <label>{t('settings.aiLocalBase')}</label>
-          <input
-            type="text"
-            value={aiLocalBase}
-            onChange={(e) => setAiLocalBase(e.target.value)}
-            placeholder={ai.localBaseUrl || 'http://host:port'}
-          />
-        </div>
-        <ProviderTest provider="local" apiBase={apiBase} headers={probeHeaders} />
-        <ModelField
-          label={t('settings.aiLocalModel')}
-          provider="local"
-          apiBase={apiBase}
-          headers={probeHeaders}
-          value={aiLocalModel}
-          onChange={setAiLocalModel}
-          placeholder={t('settings.modelAuto')}
-        />
-
-        <div className="field">
-          <label>{t('settings.geminiKey')}</label>
-          <input
-            type="password"
-            value={geminiKey}
-            onChange={(e) => setGeminiKey(e.target.value)}
-            placeholder={t('settings.geminiPlaceholder')}
-          />
-        </div>
-        <div className="field">
-          <label>{t('settings.aiGeminiBase')}</label>
-          <input
-            type="text"
-            value={aiGeminiBase}
-            onChange={(e) => setAiGeminiBase(e.target.value)}
-            placeholder={ai.geminiBaseUrl || ''}
-          />
-        </div>
-        <ProviderTest provider="gemini" apiBase={apiBase} headers={probeHeaders} />
-        <ModelField
-          label={t('settings.aiGeminiModel')}
-          provider="gemini"
-          apiBase={apiBase}
-          headers={probeHeaders}
-          value={aiGeminiModel}
-          onChange={setAiGeminiModel}
-          placeholder={ai.geminiModel || t('settings.modelAuto')}
-        />
-
-        <div className="field">
-          <label>{t('settings.aiRelay')}</label>
-          <input
-            type="text"
-            value={aiRelay}
-            onChange={(e) => setAiRelay(e.target.value)}
-            placeholder={ai.relayConfigured ? t('settings.aiRelayServer') : 'https://example.vercel.app'}
-          />
-        </div>
-        <p className="field-hint">{t('settings.aiRelayHint')}</p>
-
-        <div className="field">
-          <label>{t('settings.pollSec')}</label>
-          <input
-            type="number"
-            min={serverCfg.pollMsMin / 1000}
-            max={serverCfg.pollMsMax / 1000}
-            value={pollSec}
-            onChange={(e) => setPollSec(e.target.value)}
-          />
         </div>
 
-        <div className="modal-foot">
+        <div className="set-pane" role="tabpanel">
+          {section === 'connection' && (
+            <>
+              <div className="field">
+                <label>{t('settings.apiBase')}</label>
+                <input
+                  type="text"
+                  value={apiBase}
+                  onChange={(e) => setApiBase(e.target.value)}
+                  placeholder={t('settings.apiBasePlaceholder')}
+                />
+              </div>
+              <ApiBaseTest apiBase={apiBase} />
+              <p className="field-hint">
+                {t('settings.ingestHintPre')} <code>POST /api/ingest</code>{' '}
+                {t('settings.ingestHintMid')} <code>{INGEST_FIELDS}</code>
+              </p>
+
+              <div className="field">
+                <label>{t('settings.pollSec')}</label>
+                <input
+                  type="number"
+                  min={serverCfg.pollMsMin / 1000}
+                  max={serverCfg.pollMsMax / 1000}
+                  value={pollSec}
+                  onChange={(e) => setPollSec(e.target.value)}
+                />
+              </div>
+              <p className="field-hint">
+                {t('settings.pollHint', {
+                  min: serverCfg.pollMsMin / 1000,
+                  max: serverCfg.pollMsMax / 1000,
+                })}
+              </p>
+            </>
+          )}
+
+          {section === 'assistant' && (
+            <>
+              <div className="field">
+                <label>{t('settings.aiSummaryStyle')}</label>
+                <select value={aiSummaryStyle} onChange={(e) => setAiSummaryStyle(e.target.value)}>
+                  {AI_SUMMARY_STYLES.map((s) => (
+                    <option key={s.key} value={s.value}>
+                      {t(`settings.aiSummaryStyleOpt.${s.key}`)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="field-hint">{t('settings.aiSummaryStyleHint')}</p>
+
+              <div className="field">
+                <label>{t('settings.aiOrder')}</label>
+                <select value={aiOrder} onChange={(e) => setAiOrder(e.target.value)}>
+                  {AI_ORDER_PRESETS.map((p) => (
+                    <option key={p.key} value={p.value}>
+                      {t(`settings.aiOrderOpt.${p.key}`)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="field-hint">
+                {t('settings.aiServerOrder', { order: (ai.order ?? []).join(' → ') || '—' })}
+              </p>
+              <p className="field-hint">{t('settings.browserHint')}</p>
+            </>
+          )}
+
+          {section === 'device' && (
+            <>
+              {/* Saved by the hook itself, not by this dialog's Save button:
+                  downloading a model is an action, not a pending edit, and it
+                  cannot sit half-applied waiting for a confirmation. */}
+              <p className="field-hint">{t('settings.deviceHint')}</p>
+              {browserAi ? <BrowserAiSettings ai={browserAi} /> : null}
+            </>
+          )}
+
+          {section === 'local' && (
+            <>
+              <div className="field">
+                <label>{t('settings.aiLocalBase')}</label>
+                <input
+                  type="text"
+                  value={aiLocalBase}
+                  onChange={(e) => setAiLocalBase(e.target.value)}
+                  placeholder={ai.localBaseUrl || 'http://host:port'}
+                />
+              </div>
+              <ProviderTest provider="local" apiBase={apiBase} headers={probeHeaders} />
+              <ModelField
+                label={t('settings.aiLocalModel')}
+                provider="local"
+                apiBase={apiBase}
+                headers={probeHeaders}
+                value={aiLocalModel}
+                onChange={setAiLocalModel}
+                placeholder={t('settings.modelAuto')}
+              />
+              <p className="field-hint">{t('settings.aiLocalHint')}</p>
+            </>
+          )}
+
+          {section === 'gemini' && (
+            <>
+              <div className="field">
+                <label>{t('settings.geminiKey')}</label>
+                <input
+                  type="password"
+                  value={geminiKey}
+                  onChange={(e) => setGeminiKey(e.target.value)}
+                  placeholder={t('settings.geminiPlaceholder')}
+                />
+              </div>
+              <div className="field">
+                <label>{t('settings.aiGeminiBase')}</label>
+                <input
+                  type="text"
+                  value={aiGeminiBase}
+                  onChange={(e) => setAiGeminiBase(e.target.value)}
+                  placeholder={ai.geminiBaseUrl || ''}
+                />
+              </div>
+              <ProviderTest provider="gemini" apiBase={apiBase} headers={probeHeaders} />
+              <ModelField
+                label={t('settings.aiGeminiModel')}
+                provider="gemini"
+                apiBase={apiBase}
+                headers={probeHeaders}
+                value={aiGeminiModel}
+                onChange={setAiGeminiModel}
+                placeholder={ai.geminiModel || t('settings.modelAuto')}
+              />
+            </>
+          )}
+
+          {section === 'relay' && (
+            <>
+              <div className="field">
+                <label>{t('settings.aiRelay')}</label>
+                <input
+                  type="text"
+                  value={aiRelay}
+                  onChange={(e) => setAiRelay(e.target.value)}
+                  placeholder={
+                    ai.relayConfigured ? t('settings.aiRelayServer') : 'https://example.vercel.app'
+                  }
+                />
+              </div>
+              <p className="field-hint">{t('settings.aiRelayHint')}</p>
+            </>
+          )}
+        </div>
+
+        {/* Outside the scrolling pane: Save used to be three screens below the
+            field you had just edited. */}
+        <div className="modal-foot set-foot">
           <button className="btn" onClick={onClose}>
             {t('settings.cancel')}
           </button>

@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, Bot, Brain, ChevronDown, Globe, Square, Wrench } from 'lucide-react';
+import { ArrowUp, Bot, Brain, ChevronDown, Cpu, Globe, Square, Wrench } from 'lucide-react';
 import { CHAT_MAX_TURNS } from '@/config/client';
 import { aiJsonHeaders } from '@/lib/ai-client';
 import { chatEvents } from '@/lib/chat-client';
+import { browserChatEvents, clearContextCache } from '@/lib/ai/browser/chat';
+import { interrupt as interruptBrowser } from '@/lib/ai/browser/engine';
 import { useLang } from '@/hooks/useLang';
 import Markdown from '@/components/Markdown';
 
@@ -69,7 +71,7 @@ function Thoughts({ t, msg, onToggle }) {
   );
 }
 
-export default function ChatPane({ deviceId, settings, caps, addLog, onSource }) {
+export default function ChatPane({ deviceId, settings, caps, ai, onOpenSettings, addLog, onSource }) {
   const { t, lang } = useLang();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -78,6 +80,8 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
   const [thinking, setThinking] = useState(false);
   const bodyRef = useRef(null);
   const abortRef = useRef(null);
+
+  const onBrowser = ai?.kind === 'browser';
 
   // Absent config is treated as capable: /api/config may not have answered yet,
   // and the fallback path below recovers from a wrong guess on its own.
@@ -91,6 +95,12 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
   // A turn left running after the panel closes still costs tokens and still
   // writes into state that no longer has anywhere to go.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // The browser engine's prompt is cached to keep the model's KV cache warm, so
+  // switching device has to drop it or the next answer describes the old room.
+  useEffect(() => {
+    clearContextCache();
+  }, [deviceId]);
 
   /**
    * Patch the assistant message being streamed — always the last one, because
@@ -144,6 +154,7 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
         // pop in and shove the conversation down a second later.
         thinkOpen: thinking,
         tools: [],
+        status: null,
         streaming: true,
         error: null,
         ts: new Date(),
@@ -156,20 +167,41 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
     let produced = false;
 
     try {
-      if (!canStream) throw new Error('streaming disabled');
-      for await (const ev of chatEvents({
-        url: `${settings.apiBase}/api/chat/stream`,
-        headers: aiJsonHeaders(settings),
-        body: {
-          message: msg,
-          history,
-          device_id: deviceId,
-          lang,
-          search: search && canSearch,
-          thinking,
-        },
-        signal: controller.signal,
-      })) {
+      if (!onBrowser && !canStream) throw new Error('streaming disabled');
+      const events = onBrowser
+        ? browserChatEvents({
+            messages: [...history, { role: 'user', content: msg }],
+            apiBase: settings.apiBase,
+            deviceId,
+            lang,
+            modelId: ai.modelId,
+            thinking,
+            sendContext: ai.sendContext,
+            labels: {
+              fetchingContext: t('bai.statusContext'),
+              loadingModel: t('bai.statusLoading'),
+              preparingModel: t('bai.statusPreparing'),
+              analyzingPrompt: t('bai.statusPrefill'),
+              thinking: t('bai.statusWaiting'),
+              thinkingStatus: t('ai.thinkingLive'),
+            },
+            signal: controller.signal,
+          })
+        : chatEvents({
+            url: `${settings.apiBase}/api/chat/stream`,
+            headers: aiJsonHeaders(settings),
+            body: {
+              message: msg,
+              history,
+              device_id: deviceId,
+              lang,
+              search: search && canSearch,
+              thinking,
+            },
+            signal: controller.signal,
+          });
+
+      for await (const ev of events) {
         switch (ev.type) {
           case 'start':
             onSource?.({ provider: ev.provider, model: ev.model });
@@ -189,7 +221,13 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
               // Collapse exactly once — on the first text — so a user who
               // re-opens the thoughts mid-answer keeps them open.
               thinkOpen: m.content ? m.thinkOpen : false,
+              status: null,
             }));
+            break;
+          // The browser engine has no tool calls to show; this is what it
+          // reports instead — downloading, prefilling, waiting for a token.
+          case 'status':
+            patchLast((m) => ({ ...m, status: ev.text }));
             break;
           case 'tool-start':
             patchLast((m) => ({
@@ -219,10 +257,14 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
     } catch (e) {
       if (controller.signal.aborted) {
         patchLast((m) => ({ ...m, error: m.content ? null : t('ai.stopped') }));
-      } else if (produced) {
+      } else if (produced || onBrowser) {
         // Half an answer is already on screen; say what broke and keep it.
-        patchLast((m) => ({ ...m, error: e.message }));
-        addLog(`Chat stream: ${e.message}`, 'err');
+        //
+        // The browser engine never falls back either, even having produced
+        // nothing: someone who chose to keep the conversation on this machine
+        // did not ask for it to be quietly sent to a provider instead.
+        patchLast((m) => ({ ...m, error: e.message, status: null }));
+        addLog(`Chat ${onBrowser ? 'browser' : 'stream'}: ${e.message}`, 'err');
       } else {
         // Nothing shipped yet, so the plain endpoint can still answer this turn.
         addLog(`Chat stream failed, using /api/chat: ${e.message}`, 'warn');
@@ -236,7 +278,7 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
         }
       }
     } finally {
-      patchLast((m) => ({ ...m, streaming: false }));
+      patchLast((m) => ({ ...m, streaming: false, status: null }));
       setMessages((prev) =>
         prev.length > CHAT_MAX_TURNS ? prev.slice(prev.length - CHAT_MAX_TURNS) : prev
       );
@@ -257,7 +299,7 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
             <p className="chat-empty-hint">
               {t('ai.chatEmpty1')}
               <br />
-              {t('ai.chatEmpty2')}
+              {onBrowser ? t('bai.emptyHint', { model: ai.model.label }) : t('ai.chatEmpty2')}
             </p>
           </div>
         )}
@@ -274,10 +316,18 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
                 ))}
               </div>
             )}
+            {m.role === 'assistant' && m.status && (
+              <div className="chat-status">
+                <span className="chat-tool-dots" aria-hidden />
+                {m.status}
+              </div>
+            )}
             {m.role === 'user' ? (
               <div className="chat-bubble">{m.content}</div>
             ) : (
-              (m.content || m.streaming || m.error) && (
+              // While a status line is showing there is nothing to put in a
+              // bubble, and an empty one reads as a failed reply.
+              (m.content || m.error || (m.streaming && !m.status)) && (
                 <div className="chat-bubble">
                   {m.content ? (
                     <Markdown text={m.content} className="markdown chat-md" />
@@ -301,12 +351,31 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
 
       <div className="chat-input-row">
         <div className="chat-tgls">
+          {/* A shortcut, not a second home for the setting: it opens the same
+              Settings pane the gear does, already scrolled to the engine. */}
           <button
-            className={`chat-tgl ${search && canSearch ? 'on' : ''}`}
+            className={`chat-tgl ${onBrowser ? 'on' : ''}`}
+            onClick={() => onOpenSettings?.('device')}
+            aria-label={t('bai.title')}
+            title={t(onBrowser ? 'bai.onBrowser' : 'bai.onServer')}
+          >
+            <Cpu size={15} strokeWidth={2.2} aria-hidden />
+          </button>
+          {/* Web search belongs to the server tool loop; the browser model has
+              no tools at all, so the button would promise something untrue. */}
+          <button
+            className={`chat-tgl ${search && canSearch && !onBrowser ? 'on' : ''}`}
             onClick={() => setSearch((v) => !v)}
-            disabled={!canSearch}
-            aria-pressed={search && canSearch}
-            title={canSearch ? t(search ? 'ai.searchOn' : 'ai.searchOff') : t('ai.searchUnset')}
+            disabled={!canSearch || onBrowser}
+            aria-pressed={search && canSearch && !onBrowser}
+            aria-label={t('ai.search')}
+            title={
+              onBrowser
+                ? t('bai.noSearch')
+                : canSearch
+                  ? t(search ? 'ai.searchOn' : 'ai.searchOff')
+                  : t('ai.searchUnset')
+            }
           >
             <Globe size={15} strokeWidth={2.2} aria-hidden />
           </button>
@@ -314,6 +383,7 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
             className={`chat-tgl ${thinking ? 'on' : ''}`}
             onClick={() => setThinking((v) => !v)}
             aria-pressed={thinking}
+            aria-label={t('ai.thinkLabel')}
             title={t(thinking ? 'ai.thinkOn' : 'ai.thinkOff')}
           >
             <Brain size={15} strokeWidth={2.2} aria-hidden />
@@ -338,7 +408,12 @@ export default function ChatPane({ deviceId, settings, caps, addLog, onSource })
         {busy ? (
           <button
             className="chat-send stop"
-            onClick={() => abortRef.current?.abort()}
+            onClick={() => {
+              abortRef.current?.abort();
+              // The abort signal stops the loop reading chunks; WebLLM also has
+              // to be told, or it keeps generating into nothing.
+              if (onBrowser) void interruptBrowser();
+            }}
             title={t('ai.stop')}
             aria-label={t('ai.stop')}
           >

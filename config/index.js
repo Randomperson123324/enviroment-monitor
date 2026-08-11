@@ -30,8 +30,14 @@ const list = (key, fallback) => {
  *
  * The old name is still honoured: this rule started life as a summary-only
  * setting, and an existing deployment must not silently widen when it upgrades.
+ *
+ * `browser` is the WebGPU engine running inside the user's own browser. It is on
+ * the list because the rule is about data leaving the device, and that engine
+ * sends nothing anywhere — the focus rows are already fetched into that same
+ * browser by the Focus tab, straight from Supabase. Remove it if the policy you
+ * actually want is "camera data stays on the Pi and the server".
  */
-const FOCUS_PROVIDERS = list('AI_FOCUS_PROVIDERS', list('AI_SUMMARY_FOCUS_PROVIDERS', ['local']));
+const FOCUS_PROVIDERS = list('AI_FOCUS_PROVIDERS', list('AI_SUMMARY_FOCUS_PROVIDERS', ['local', 'browser']));
 
 const config = {
   supabase: {
@@ -216,6 +222,21 @@ const config = {
       maxResults: num('TAVILY_MAX_RESULTS', 5),
       depth: str('TAVILY_DEPTH', 'basic'),
       timeoutMs: num('TAVILY_TIMEOUT_MS', 15000),
+    },
+
+    /**
+     * The model that runs in the user's browser on the GPU (WebGPU/WebLLM).
+     *
+     * Nothing here is a secret or an endpoint: the weights come from the MLC CDN
+     * to the browser directly, and the server's only part is assembling the
+     * snapshot prompt (`lib/ai/context.js`) that the model is given, because a
+     * 4-bit model of this size cannot be trusted to call tools.
+     */
+    browser: {
+      enabled: bool('AI_BROWSER_ENABLED', true),
+      /** Rows of camera history folded into the browser engine's prompt. Far
+       *  fewer than the summary's: its whole context window is 4096 tokens. */
+      focusRows: num('AI_BROWSER_FOCUS_ROWS', 60),
     },
 
     /**

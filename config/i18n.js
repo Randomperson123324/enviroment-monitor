@@ -177,6 +177,24 @@ const DICT = {
       apiTestNoDb: 'เซิร์ฟเวอร์ตอบ แต่ต่อฐานข้อมูลไม่ได้',
       apiTestNotThisApp: 'ที่อยู่นี้ตอบกลับ แต่ไม่ใช่เซิร์ฟเวอร์ของแดชบอร์ดนี้',
 
+      /** หัวข้อด้านซ้ายของหน้าตั้งค่า — ดู SECTIONS ใน SettingsModal.jsx */
+      nav: 'หัวข้อการตั้งค่า',
+      sections: {
+        connection: 'เซิร์ฟเวอร์',
+        ai: 'AI',
+        assistant: 'ผู้ช่วย AI',
+        device: 'ในเบราว์เซอร์ (GPU)',
+        local: 'เครื่อง Local',
+        gemini: 'Gemini',
+        relay: 'Relay',
+      },
+      pollHint: 'ยิ่งถี่ยิ่งเห็นค่าเร็ว แต่กินแบตและเน็ตมากขึ้น · ตั้งได้ {min}–{max} วินาที',
+      browserHint:
+        'อยากให้ AI ทำงานในเครื่องนี้แทนเซิร์ฟเวอร์ (ข้อความไม่ออกจากเครื่อง) ดูหัวข้อ "ในเบราว์เซอร์ (GPU)"',
+      deviceHint:
+        'ส่วนนี้มีผลทันทีเมื่อกด ไม่ต้องกดบันทึก — การโหลด/ลบโมเดลเป็นการลงมือทำ ไม่ใช่ค่าที่รอยืนยัน',
+      aiLocalHint:
+        'ปลายทางแบบ OpenAI-compatible ที่คุณรันเอง (llama.cpp / LM Studio / Ollama) — ต้องเปิดให้เซิร์ฟเวอร์ของเว็บนี้เข้าถึงได้ ไม่ใช่แค่เบราว์เซอร์ของคุณ',
       aiSection: 'ผู้ช่วย AI',
       aiSummaryStyle: 'รูปแบบการแสดงสรุปของ AI',
       aiSummaryStyleOpt: {
@@ -224,6 +242,8 @@ const DICT = {
       chatError: '⚠️ ขออภัย เกิดข้อผิดพลาด: {msg}',
 
       /* ปุ่มค้นเว็บ / ปุ่มคิด และการแสดงความคิดระหว่างทำงาน */
+      search: 'ค้นเว็บ',
+      thinkLabel: 'แสดงความคิด',
       searchOn: 'ค้นเว็บ: เปิด — แตะเพื่อปิด',
       searchOff: 'ค้นเว็บ: ปิด — แตะเพื่อให้ AI ค้นอินเทอร์เน็ตได้',
       searchUnset: 'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่าการค้นเว็บ (ไม่มี TAVILY_API_KEY)',
@@ -244,6 +264,45 @@ const DICT = {
         get_focus_activity: 'ข้อมูลการจดจ่อ (ในเครื่อง)',
         web_search: 'ค้นเว็บ',
       },
+    },
+
+    /** โหมด AI ที่รันในเบราว์เซอร์ด้วยการ์ดจอ (WebGPU) — ดู lib/ai/browser/ */
+    bai: {
+      title: 'AI ทำงานที่ไหน',
+      onServer: 'AI ทำงานบนเซิร์ฟเวอร์ — แตะเพื่อตั้งค่า',
+      onBrowser: 'AI ทำงานในเครื่องนี้ (การ์ดจอ) — แตะเพื่อตั้งค่า',
+      server: 'บนเซิร์ฟเวอร์',
+      serverNote: 'ใช้เครื่องมือดึงข้อมูลได้ ค้นเว็บได้ เร็วกว่า',
+      browser: 'ในเบราว์เซอร์นี้ (GPU)',
+      browserNote: 'ข้อความไม่ออกจากเครื่อง แต่ต้องโหลดโมเดลก่อน',
+      noWebgpu: 'เบราว์เซอร์นี้ไม่รองรับ WebGPU',
+      model: 'โมเดล',
+      desc: {
+        quality: 'ตอบดีกว่า ใช้ VRAM มากกว่า',
+        light: 'เล็กและเร็ว เหมาะกับการ์ดจอ VRAM น้อย',
+      },
+      noF16: 'การ์ดจอนี้ไม่รองรับ shader-f16 — จะใช้รุ่น q4f32 ที่ไฟล์ใหญ่และกิน VRAM มากกว่า',
+      sendContext: 'ส่งข้อมูลของเว็บให้ AI',
+      sendContextNote: 'ปิดแล้วตอบเร็วขึ้นมาก แต่ AI จะไม่รู้ค่าเซ็นเซอร์เลย',
+      download: 'ดาวน์โหลดโมเดล ({size})',
+      load: 'โหลดเข้าการ์ดจอ',
+      downloading: 'กำลังดาวน์โหลด {pct}%',
+      delete: 'ลบโมเดลออกจากเครื่อง',
+      deleteSure: 'กดอีกครั้งเพื่อลบจริง',
+      ready: 'โมเดลพร้อมใช้แล้ว',
+      failed: 'โหลดโมเดลไม่สำเร็จ: {msg}',
+      checkingGpu: 'กำลังตรวจการ์ดจอ...',
+      noAdapter: 'ไม่พบการ์ดจอที่ WebGPU ใช้ได้',
+      gpu: 'GPU: {vendor} {arch} · {f16}',
+      storage: 'พื้นที่ที่เบราว์เซอร์ใช้: {used} / {quota}',
+      noSearch: 'โหมดในเครื่องค้นเว็บไม่ได้ (ไม่มีเครื่องมือ)',
+      emptyHint: '{model} ทำงานในเครื่องนี้ — ข้อความไม่ถูกส่งออกไปไหน',
+      /* สถานะระหว่างรอ — โมเดลในเครื่องช้ากว่า จึงต้องบอกว่ากำลังทำอะไรอยู่ */
+      statusContext: 'กำลังรวบรวมข้อมูลของห้อง...',
+      statusLoading: 'กำลังโหลดโมเดล',
+      statusPreparing: 'กำลังเตรียมโมเดลเข้าการ์ดจอ...',
+      statusPrefill: 'กำลังอ่านข้อมูล',
+      statusWaiting: 'กำลังพิมพ์...',
     },
 
     aiSummary: {
@@ -546,6 +605,23 @@ const DICT = {
       apiTestNoDb: 'Server answers, but cannot reach the database',
       apiTestNotThisApp: 'Something answers at this address, but it is not this dashboard',
 
+      nav: 'Settings sections',
+      sections: {
+        connection: 'Server',
+        ai: 'AI',
+        assistant: 'Assistant',
+        device: 'In this browser (GPU)',
+        local: 'Local endpoint',
+        gemini: 'Gemini',
+        relay: 'Relay',
+      },
+      pollHint: 'More often means fresher numbers but more battery and bandwidth · {min}–{max} seconds',
+      browserHint:
+        'To run the AI on this machine instead of the server (nothing leaves the device), see "In this browser (GPU)"',
+      deviceHint:
+        'This section applies as you press, with no Save — downloading or deleting a model is an action, not a pending edit',
+      aiLocalHint:
+        'An OpenAI-compatible endpoint you run yourself (llama.cpp / LM Studio / Ollama) — it must be reachable from this site\'s server, not just from your browser',
       aiSection: 'AI assistant',
       aiSummaryStyle: 'AI summary style',
       aiSummaryStyleOpt: {
@@ -592,6 +668,8 @@ const DICT = {
       resize: 'Drag to resize',
       chatError: '⚠️ Sorry, an error occurred: {msg}',
 
+      search: 'Web search',
+      thinkLabel: 'Show thinking',
       searchOn: 'Web search: on — tap to turn off',
       searchOff: 'Web search: off — tap to let the AI search the internet',
       searchUnset: 'Web search is not configured on the server (no TAVILY_API_KEY)',
@@ -611,6 +689,43 @@ const DICT = {
         get_focus_activity: 'Focus data (on-device)',
         web_search: 'Web search',
       },
+    },
+
+    bai: {
+      title: 'Where the AI runs',
+      onServer: 'AI runs on the server — tap to change',
+      onBrowser: 'AI runs on this machine (GPU) — tap to change',
+      server: 'On the server',
+      serverNote: 'Can use tools and web search, and is faster',
+      browser: 'In this browser (GPU)',
+      browserNote: 'Nothing leaves this machine, but the model downloads first',
+      noWebgpu: 'This browser has no WebGPU',
+      model: 'Model',
+      desc: {
+        quality: 'Better answers, more VRAM',
+        light: 'Small and quick, for cards with little VRAM',
+      },
+      noF16: 'This GPU has no shader-f16 — the larger q4f32 build will be used instead',
+      sendContext: "Give the AI the site's data",
+      sendContextNote: 'Off is much faster, but the AI then knows no sensor values',
+      download: 'Download model ({size})',
+      load: 'Load onto the GPU',
+      downloading: 'Downloading {pct}%',
+      delete: 'Delete model from this machine',
+      deleteSure: 'Press again to delete',
+      ready: 'Model ready',
+      failed: 'Could not load the model: {msg}',
+      checkingGpu: 'Checking the GPU...',
+      noAdapter: 'No WebGPU adapter available',
+      gpu: 'GPU: {vendor} {arch} · {f16}',
+      storage: 'Browser storage used: {used} / {quota}',
+      noSearch: 'On-device mode cannot search the web (it has no tools)',
+      emptyHint: '{model} runs on this machine — nothing is sent anywhere',
+      statusContext: 'Gathering the room data...',
+      statusLoading: 'Loading model',
+      statusPreparing: 'Preparing the model on the GPU...',
+      statusPrefill: 'Reading the data',
+      statusWaiting: 'Typing...',
     },
 
     aiSummary: {

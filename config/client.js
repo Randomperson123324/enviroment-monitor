@@ -18,6 +18,11 @@ export const STORAGE = {
   aiRelay: 'em_ai_relay',
   /** How AI summaries are rendered — see AI_SUMMARY_STYLES */
   aiSummaryStyle: 'em_ai_summary_style',
+  /** Assistant engine: 'server' (provider chain) or 'browser' (WebGPU, on-device) */
+  aiEngine: 'em_ai_engine',
+  aiBrowserModel: 'em_ai_browser_model',
+  /** Whether the browser engine is given the dashboard's data at all */
+  aiSendContext: 'em_ai_send_context',
   pollMs: 'em_poll_ms',
   deviceId: 'em_device_id',
   chartHours: 'em_chart_hours',
@@ -105,6 +110,28 @@ export const GOV_LEVELS = {
 };
 
 export const CHAT_MAX_TURNS = 20;
+
+/**
+ * The browser (WebGPU) chat engine. Client-side because every one of these is a
+ * decision about how the model runs in this tab, not a server setting.
+ */
+export const BROWSER_AI = {
+  /**
+   * How long one built snapshot prompt is reused.
+   *
+   * Not about saving a request — it is about keeping the conversation's prefix
+   * byte-identical between turns. The prompt carries a timestamp and live
+   * readings; change one character and the model's KV cache is void and the
+   * whole prompt must be prefilled again. Holding it steady means the next turn
+   * prefills only the new message. The cost is data up to this old, which
+   * matches the dashboard's own summary cadence.
+   */
+  contextTtlMs: 120000,
+  /** Thinking needs its own headroom or reasoning eats the whole answer. */
+  maxTokens: 1024,
+  thinkingMaxTokens: 2048,
+  temperature: 0.6,
+};
 
 /**
  * Freshness thresholds for the newest reading, in minutes.

@@ -207,12 +207,55 @@ Two buttons in the composer:
 automatically if the stream cannot be started, but not once text has arrived —
 restarting mid-answer would rewrite what someone is already reading.
 
+## The browser engine (WebGPU)
+
+The chip button in the composer moves the assistant off the server entirely: the
+model downloads to the browser once and runs there on the GPU, through
+[@mlc-ai/web-llm](https://github.com/mlc-ai/web-llm). Ported from StreeFlood's
+on-device mode — its GPU path only, since the CPU (wllama/WASM) path needs
+cross-origin isolation and a second engine to maintain.
+
+Two models, both Qwen3, both q4f16 by default (`lib/ai/browser/models.js`). The
+VRAM and size figures come out of the installed web-llm's own `prebuiltAppConfig`
+rather than being estimated, because a wrong figure surfaces as a 2.5 GB download
+that completes and then refuses to start.
+
+Details that are not decoration:
+
+- **q4f16 → q4f32 fallback.** A GPU without the WebGPU feature `shader-f16` fails
+  to compile the f16 shaders — *after* the whole model has downloaded. So the
+  adapter is asked first, and every id, size and cache check follows the answer.
+- **Main thread, not a worker.** A worker that fetches its script needs that
+  script's response to carry COEP, and on a cross-origin-isolated page it
+  otherwise fails to construct — at which point web-llm waits forever for a
+  message that never arrives: no error, a bar frozen at 0%. The trade is a less
+  smooth page while generating.
+- **Prefill progress is an estimate.** web-llm reports nothing between "prompt
+  accepted" and "first token", which on a long prompt is tens of seconds of
+  apparent hang. `lib/ai/browser/prefill.js` predicts it from prompt length and
+  the token rate this machine measured on its last run (kept in localStorage), and
+  eases toward 99% rather than arriving early and stopping.
+- **A snapshot prompt, not tools.** `POST /api/ai/context` runs the same tool
+  handlers server-side and returns one prompt (`lib/ai/context.js`). Given real
+  tools, a 4-bit model of this size announces a call it never makes. The prompt is
+  reused for two minutes so the model's KV cache survives between turns —
+  changing one character of it forces a full re-prefill.
+- **No fallback to the server.** If the browser engine fails, the turn reports the
+  failure. Someone who moved the conversation onto their own machine did not ask
+  for it to be quietly sent to a provider instead.
+
+Camera data: `browser` is in the default `AI_FOCUS_PROVIDERS` because the rule is
+about data leaving the device, and this engine sends nothing anywhere — the focus
+rows are already in that browser, fetched by the Focus tab. Drop it from the list
+if the policy you want is "camera data stays on the Pi and the server".
+
 ## Routes
 
 | Route | Purpose |
 |---|---|
 | `POST /api/chat` | Q&A, non-streaming fallback |
 | `POST /api/chat/stream` | streamed Q&A with tools (SSE) |
+| `POST /api/ai/context` | snapshot prompt for the browser (WebGPU) engine |
 | `POST /api/gemini-analyze` | analyze a reading → `{summary, recommendations[]}` |
 | `GET /api/ai/models?provider=` | live model list for the settings picker |
 | `GET /api/config` | `ai.{order, available, localBaseUrl, …}` — endpoints and model preferences only, never keys |

@@ -39,6 +39,9 @@ export const GET = withErrors(async () => {
       streaming: config.ai.stream.enabled,
       toolsEnabled: config.ai.tools.enabled,
       searchConfigured: searchConfigured(),
+      /** Whether the WebGPU on-device engine may be offered at all. Whether it
+       *  actually *works* is a question only the browser can answer. */
+      browserEnabled: config.ai.browser.enabled,
     },
     focus: {
       ...client.focus,
