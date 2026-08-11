@@ -2624,8 +2624,14 @@ textarea {
   border: none;
   background: var(--accent);
   color: var(--accent-contrast);
-  font-size: 16px;
   flex-shrink: 0;
+  /* The icon is the only child, so it must be placed rather than laid out as
+     text: on the baseline it sat high and slightly left of the circle's centre,
+     which the small square of the stop state made obvious. */
+  display: grid;
+  place-items: center;
+  padding: 0;
+  line-height: 0;
 }
 
 .chat-send:disabled {
