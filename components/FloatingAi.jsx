@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Bot, X, ArrowUp, PanelRight, PictureInPicture2 } from 'lucide-react';
-import { CHAT_MAX_TURNS } from '@/config/client';
-import { aiJsonHeaders } from '@/lib/ai-client';
+import { useEffect, useState } from 'react';
+import { Bot, X, PanelRight, PictureInPicture2 } from 'lucide-react';
 import { useLang } from '@/hooks/useLang';
 import useAiWindow from '@/hooks/useAiWindow';
+import ChatPane from '@/components/ChatPane';
 
 /** "gemma4-e4b (via relay)" — what actually answered, not what's configured. */
 function sourceLabel(t, res) {
@@ -13,107 +12,6 @@ function sourceLabel(t, res) {
   // No model ran: the rule engine in lib/analysis.js replied.
   const name = res.provider === 'local-rules' ? t('ai.srcLocal') : res.model || res.provider;
   return res.via === 'relay' ? t('ai.viaRelay', { name }) : name;
-}
-
-function ChatPane({ deviceId, settings, addLog, onSource }) {
-  const { t } = useLang();
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
-  const bodyRef = useRef(null);
-
-  useEffect(() => {
-    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [messages, busy]);
-
-  const send = async () => {
-    const msg = input.trim();
-    if (!msg || busy) return;
-    setInput('');
-    const nextMsgs = [...messages, { role: 'user', content: msg, ts: new Date() }];
-    setMessages(nextMsgs);
-    setBusy(true);
-    try {
-      const r = await fetch(`${settings.apiBase}/api/chat`, {
-        method: 'POST',
-        headers: aiJsonHeaders(settings),
-        body: JSON.stringify({
-          message: msg,
-          history: nextMsgs.slice(0, -1).slice(-CHAT_MAX_TURNS / 2).map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          device_id: deviceId,
-        }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error ?? `HTTP ${r.status}`);
-      onSource?.(data);
-      setMessages((prev) => {
-        const next = [...prev, { role: 'assistant', content: data.reply ?? '—', ts: new Date() }];
-        return next.length > CHAT_MAX_TURNS ? next.slice(next.length - CHAT_MAX_TURNS) : next;
-      });
-    } catch (e) {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: t('ai.chatError', { msg: e.message }), ts: new Date() },
-      ]);
-      addLog(`Chat error: ${e.message}`, 'err');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-      <div className="chat-msgs" ref={bodyRef}>
-        {messages.length === 0 && (
-          <div className="chat-empty">
-            <span className="chat-empty-mark">
-              <Bot size={22} strokeWidth={1.9} aria-hidden />
-            </span>
-            <p className="chat-empty-title">{t('ai.greeting')}</p>
-            <p className="chat-empty-hint">
-              {t('ai.chatEmpty1')}
-              <br />
-              {t('ai.chatEmpty2')}
-            </p>
-          </div>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={`chat-msg ${m.role === 'user' ? 'user' : 'bot'}`}>
-            <div className="chat-bubble">{m.content}</div>
-            <div className="chat-time">
-              {m.ts.toLocaleTimeString('th-TH', { hour12: false, hour: '2-digit', minute: '2-digit' })}
-            </div>
-          </div>
-        ))}
-        {busy && (
-          <div className="chat-msg bot">
-            <div className="chat-bubble">…</div>
-          </div>
-        )}
-      </div>
-      <div className="chat-input-row">
-        <textarea
-          className="chat-input"
-          rows={1}
-          placeholder={t('ai.chatPlaceholder')}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              send();
-            }
-          }}
-        />
-        <button className="chat-send" onClick={send} disabled={busy} title={t('ai.send')}>
-          <ArrowUp size={17} strokeWidth={2.4} aria-hidden />
-        </button>
-      </div>
-    </>
-  );
 }
 
 /**
@@ -126,7 +24,7 @@ function ChatPane({ deviceId, settings, addLog, onSource }) {
  * on demand — so the assistant now does the one thing nothing else does, which
  * is answer a question.
  */
-export default function FloatingAi({ deviceId, settings, serverAi, addLog }) {
+export default function FloatingAi({ deviceId, settings, serverAi, aiCaps, addLog }) {
   const { t } = useLang();
   const [open, setOpen] = useState(false);
   /** Kept mounted for the collapse animation, then dropped. */
@@ -243,6 +141,7 @@ export default function FloatingAi({ deviceId, settings, serverAi, addLog }) {
           <ChatPane
             deviceId={deviceId}
             settings={settings}
+            caps={aiCaps}
             addLog={addLog}
             onSource={setLastSource}
           />

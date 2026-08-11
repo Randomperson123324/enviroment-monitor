@@ -266,6 +266,7 @@ function DashboardInner() {
         deviceId={dash.deviceId}
         settings={settings}
         serverAi={dash.health.aiProviders}
+        aiCaps={serverCfg.ai}
         addLog={addLog}
       />
 

@@ -1,6 +1,7 @@
 import config from '@/config';
 import { aiStatus } from '@/lib/ai';
 import { providerSettings } from '@/lib/ai/discovery';
+import { searchConfigured } from '@/lib/ai/search';
 import { jsonOk, withErrors } from '@/lib/api-helpers';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,14 @@ export const GET = withErrors(async () => {
       geminiModel: gemini.model,
       relayConfigured: Boolean(config.ai.relay.url),
       allowClientOverrides: config.ai.allowClientOverrides,
+      /**
+       * What the assistant's buttons may offer. `searchConfigured` is the honest
+       * answer to "can this deployment search?" — without it the toggle would
+       * promise a tool the server never hands to the model.
+       */
+      streaming: config.ai.stream.enabled,
+      toolsEnabled: config.ai.tools.enabled,
+      searchConfigured: searchConfigured(),
     },
     focus: {
       ...client.focus,

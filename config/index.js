@@ -23,6 +23,16 @@ const list = (key, fallback) => {
   return parts.length ? parts : fallback;
 };
 
+/**
+ * Which providers may see camera/focus data at all — the app's one hard data
+ * boundary. Read by both the per-tab summaries and the chat tools, so there is a
+ * single list to change and no way for the two to disagree.
+ *
+ * The old name is still honoured: this rule started life as a summary-only
+ * setting, and an existing deployment must not silently widen when it upgrades.
+ */
+const FOCUS_PROVIDERS = list('AI_FOCUS_PROVIDERS', list('AI_SUMMARY_FOCUS_PROVIDERS', ['local']));
+
 const config = {
   supabase: {
     url: str('SUPABASE_URL'),
@@ -154,7 +164,7 @@ const config = {
        * Focus is pinned to the on-device endpoint: camera data never leaves the
        * network, so a failure is reported rather than retried against Gemini.
        */
-      focusProviders: list('AI_SUMMARY_FOCUS_PROVIDERS', ['local']),
+      focusProviders: FOCUS_PROVIDERS,
     },
 
     /**
@@ -176,6 +186,50 @@ const config = {
      * rather than hammering down the whole list.
      */
     modelRetryMax: num('AI_MODEL_RETRY_MAX', 3),
+
+    /** Providers allowed to hold camera data — see FOCUS_PROVIDERS above. */
+    focusProviders: FOCUS_PROVIDERS,
+
+    /**
+     * Tool calling. The assistant is given tools instead of a prompt with data
+     * pasted into it, so it can ask for what a question actually needs.
+     *
+     * `maxRounds` bounds the model→tool→model loop. Two is not enough for a
+     * question that needs the room *and* the forecast; unbounded lets a confused
+     * model spend a whole request calling the same tool forever.
+     */
+    tools: {
+      enabled: bool('AI_TOOLS_ENABLED', true),
+      maxRounds: num('AI_TOOLS_MAX_ROUNDS', 4),
+      /** Per-turn ceiling on tool calls, across all rounds. */
+      maxCalls: num('AI_TOOLS_MAX_CALLS', 8),
+    },
+
+    /**
+     * Web search (Tavily), reachable only through the assistant's search toggle.
+     * Without a key the tool is never offered, so the model cannot promise a
+     * search it has no way to run.
+     */
+    search: {
+      apiKey: str('TAVILY_API_KEY'),
+      baseUrl: str('TAVILY_BASE_URL', 'https://api.tavily.com'),
+      maxResults: num('TAVILY_MAX_RESULTS', 5),
+      depth: str('TAVILY_DEPTH', 'basic'),
+      timeoutMs: num('TAVILY_TIMEOUT_MS', 15000),
+    },
+
+    /**
+     * Streaming chat. The reply is written as it is generated, and a reasoning
+     * model's thoughts can be shown while it works — a 20-second wait with a
+     * blinking dot is indistinguishable from a hang.
+     */
+    stream: {
+      enabled: bool('AI_STREAM_ENABLED', true),
+      /** Gemini's thinking budget in tokens when the user asks to see thinking. */
+      thinkingBudget: num('AI_THINKING_BUDGET', 2048),
+      /** Total wall clock for one streamed turn, tool rounds included. */
+      budgetMs: num('AI_STREAM_BUDGET_MS', 120000),
+    },
 
     /** Max chat-history turns forwarded to the model */
     maxHistoryTurns: num('AI_MAX_HISTORY_TURNS', num('GEMINI_MAX_HISTORY_TURNS', 10)),

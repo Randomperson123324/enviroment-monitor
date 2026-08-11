@@ -154,11 +154,65 @@ Only `http:`/`https:` URLs are accepted. Because a caller-supplied base URL is a
 URL this server will then fetch, set `AI_ALLOW_CLIENT_OVERRIDES=false` on any
 deployment that isn't a controlled demo — the headers are then ignored entirely.
 
+## Tools, and the focus boundary
+
+The assistant is no longer handed a pre-rendered sentence of the latest reading.
+It is given tools and asks for what a question needs — `get_sensor_latest`,
+`get_sensor_history`, `get_government_water`, `get_flood_points`,
+`get_health_risks`, `get_focus_activity`, `web_search` (see `lib/ai/tools.js`).
+
+The old shape could only answer questions about the sentence it was given. Asked
+about last night's humidity or the rainfall upstream, it had to guess or decline
+— the data was one call away and nothing could ask for it.
+
+**Camera data is the exception, and it is enforced three times.** Only providers
+in `AI_FOCUS_PROVIDERS` (default `local`) may read it:
+
+1. `toolsFor(provider)` never offers `get_focus_activity` to anyone else, so the
+   model cannot call what it cannot see.
+2. That model's system instruction says outright that it has no camera access —
+   so it says so instead of reaching for the sensor data and answering as though
+   it had looked.
+3. `runTool()` re-checks the provider before touching the database, so a
+   hallucinated call to a tool that was never offered is refused.
+
+(3) is what makes the guarantee real; (1) and (2) shape what the model is likely
+to do, and only (3) decides what happens. Adding a cloud provider to
+`AI_FOCUS_PROVIDERS` sends camera-derived data off the network.
+
+Bounds: `AI_TOOLS_MAX_ROUNDS` caps the model→tool→model loop (a model that
+misreads a result will otherwise ask forever) and `AI_TOOLS_MAX_CALLS` caps calls
+per turn, since one round can contain many.
+
+## Streaming, thinking and search
+
+`POST /api/chat/stream` writes Server-Sent Events: `start`, `thinking`, `delta`,
+`tool-start`, `tool`, `error`, then `[DONE]`. Deltas are text fragments, not
+lines — the client concatenates. The assistant shows a chip per tool call as it
+runs: fetching that nobody can see is indistinguishable from invention, and it
+also answers "why is this taking eight seconds".
+
+Two buttons in the composer:
+
+- **Globe** — lets the model call `web_search`. Off by default and disabled
+  entirely without `TAVILY_API_KEY`: a question about this room's own sensors has
+  no business leaving the building, and on a metered key a surprise search costs
+  money. The server checks the key too, so the toggle cannot promise a tool that
+  will not run.
+- **Brain** — asks for the model's reasoning (`thinkingConfig.includeThoughts`
+  on Gemini, `reasoning_content` on OpenAI-compatible endpoints) and shows it
+  while it works. The block collapses the moment real text arrives.
+
+`/api/chat` stays as the non-streaming fallback; the browser falls back to it
+automatically if the stream cannot be started, but not once text has arrived —
+restarting mid-answer would rewrite what someone is already reading.
+
 ## Routes
 
 | Route | Purpose |
 |---|---|
-| `POST /api/chat` | Q&A with the latest reading attached |
+| `POST /api/chat` | Q&A, non-streaming fallback |
+| `POST /api/chat/stream` | streamed Q&A with tools (SSE) |
 | `POST /api/gemini-analyze` | analyze a reading → `{summary, recommendations[]}` |
 | `GET /api/ai/models?provider=` | live model list for the settings picker |
 | `GET /api/config` | `ai.{order, available, localBaseUrl, …}` — endpoints and model preferences only, never keys |

@@ -2633,6 +2633,185 @@ textarea {
   cursor: not-allowed;
 }
 
+/* Stopping a running answer is a different act from sending one, so it does not
+   wear the accent colour that means "go". */
+.chat-send.stop {
+  background: var(--lv-danger);
+}
+
+/* ── Search / thinking toggles ─────────────────────────────────────────────── */
+.chat-input-row {
+  align-items: flex-end;
+}
+
+.chat-tgls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.chat-tgl {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 3px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  backdrop-filter: blur(8px);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.chat-tgl:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.chat-tgl.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chat-tgl:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Tool-call chips ───────────────────────────────────────────────────────── */
+.chat-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.chat-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.7;
+}
+
+.chat-tool.running {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.chat-tool.done {
+  color: var(--lv-ok);
+  border-color: color-mix(in srgb, var(--lv-ok) 40%, transparent);
+}
+
+.chat-tool.failed {
+  color: var(--lv-danger);
+  border-color: color-mix(in srgb, var(--lv-danger) 40%, transparent);
+}
+
+.chat-tool-dots {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: chat-pulse 1s ease-in-out infinite;
+}
+
+@keyframes chat-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+/* ── Thinking block ────────────────────────────────────────────────────────── */
+.chat-think {
+  margin-bottom: 5px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.chat-think-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: left;
+}
+
+.chat-think-head:hover {
+  color: var(--ink);
+}
+
+.chat-think-caret {
+  margin-left: auto;
+  transition: transform 0.18s;
+}
+
+.chat-think.open .chat-think-caret {
+  transform: rotate(180deg);
+}
+
+/* Capped and scrollable: a reasoning model can produce more thinking than
+   answer, and it must not push the answer off the screen. */
+.chat-think-body {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 0 10px 8px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+
+/* ── Streaming states ──────────────────────────────────────────────────────── */
+/* Shown only before the first token: a caret, so an empty bubble still reads as
+   "about to speak" rather than "broken". */
+.chat-typing {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  vertical-align: -2px;
+  background: var(--accent);
+  animation: chat-caret 1s step-end infinite;
+}
+
+@keyframes chat-caret {
+  50% { opacity: 0; }
+}
+
+.chat-err {
+  display: block;
+  margin-top: 5px;
+  font-size: 11.5px;
+  color: var(--lv-danger);
+}
+
+/* The bubble is already tight; markdown inside it must not add outer margins. */
+.chat-md {
+  font-size: 13.5px;
+}
+
+.chat-md > :first-child {
+  margin-top: 0;
+}
+
+.chat-md > :last-child {
+  margin-bottom: 0;
+}
+
 /* ═══ MODAL ═══ */
 .modal-ov {
   position: fixed;

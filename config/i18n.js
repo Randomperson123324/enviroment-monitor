@@ -215,13 +215,35 @@ const DICT = {
       srcLocal: 'ในเครื่อง',
       greeting: 'สวัสดี — ถามเรื่องห้องนี้ได้เลย',
       chatEmpty1: 'ถามเกี่ยวกับสภาพแวดล้อมในห้อง',
-      chatEmpty2: 'ข้อมูลเซ็นเซอร์จะถูกแนบไปอัตโนมัติ',
+      chatEmpty2: 'AI จะเรียกดูข้อมูลเซ็นเซอร์ ข้อมูลรัฐ และสุขภาพเองเมื่อจำเป็น',
       chatPlaceholder: 'ถามเกี่ยวกับสภาพแวดล้อม...',
       send: 'ส่ง', close: 'ปิดผู้ช่วย AI', openAi: 'เปิดผู้ช่วย AI', dialog: 'ผู้ช่วย AI',
       dock: 'เข้าเทียบขอบขวา',
       undock: 'ดึงออกเป็นหน้าต่างลอย',
       resize: 'ลากเพื่อปรับขนาด',
       chatError: '⚠️ ขออภัย เกิดข้อผิดพลาด: {msg}',
+
+      /* ปุ่มค้นเว็บ / ปุ่มคิด และการแสดงความคิดระหว่างทำงาน */
+      searchOn: 'ค้นเว็บ: เปิด — แตะเพื่อปิด',
+      searchOff: 'ค้นเว็บ: ปิด — แตะเพื่อให้ AI ค้นอินเทอร์เน็ตได้',
+      searchUnset: 'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่าการค้นเว็บ (ไม่มี TAVILY_API_KEY)',
+      thinkOn: 'แสดงความคิด: เปิด — แตะเพื่อปิด',
+      thinkOff: 'แสดงความคิด: ปิด — แตะเพื่อดูว่า AI คิดอะไร',
+      thinkingLive: 'กำลังคิด...',
+      thoughtTitle: 'ความคิดของ AI',
+      stop: 'หยุดตอบ',
+      stopped: 'หยุดโดยผู้ใช้',
+
+      /* ชื่อเครื่องมือที่ AI เรียก — แสดงเป็นชิปเหนือคำตอบ */
+      tools: {
+        get_sensor_latest: 'อ่านค่าเซ็นเซอร์ล่าสุด',
+        get_sensor_history: 'อ่านค่าย้อนหลัง',
+        get_government_water: 'ข้อมูลน้ำ/ฝนจากหน่วยงานรัฐ',
+        get_flood_points: 'จุดวัดระดับน้ำ',
+        get_health_risks: 'ประเมินความเสี่ยงสุขภาพ',
+        get_focus_activity: 'ข้อมูลการจดจ่อ (ในเครื่อง)',
+        web_search: 'ค้นเว็บ',
+      },
     },
 
     aiSummary: {
@@ -562,13 +584,33 @@ const DICT = {
       srcLocal: 'local',
       greeting: 'Hi — ask me about this room',
       chatEmpty1: 'Ask about the room environment',
-      chatEmpty2: 'Sensor data is attached automatically',
+      chatEmpty2: 'The AI fetches sensor, government and health data as it needs them',
       chatPlaceholder: 'Ask about the environment...',
       send: 'Send', close: 'Close AI assistant', openAi: 'Open AI assistant', dialog: 'AI assistant',
       dock: 'Snap to the right edge',
       undock: 'Pull out into a floating window',
       resize: 'Drag to resize',
       chatError: '⚠️ Sorry, an error occurred: {msg}',
+
+      searchOn: 'Web search: on — tap to turn off',
+      searchOff: 'Web search: off — tap to let the AI search the internet',
+      searchUnset: 'Web search is not configured on the server (no TAVILY_API_KEY)',
+      thinkOn: 'Show thinking: on — tap to turn off',
+      thinkOff: 'Show thinking: off — tap to watch the AI reason',
+      thinkingLive: 'Thinking...',
+      thoughtTitle: 'AI reasoning',
+      stop: 'Stop generating',
+      stopped: 'Stopped by user',
+
+      tools: {
+        get_sensor_latest: 'Reading latest sensors',
+        get_sensor_history: 'Reading history',
+        get_government_water: 'Government water/rain data',
+        get_flood_points: 'Flood gauges',
+        get_health_risks: 'Assessing health risks',
+        get_focus_activity: 'Focus data (on-device)',
+        web_search: 'Web search',
+      },
     },
 
     aiSummary: {
