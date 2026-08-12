@@ -54,6 +54,25 @@ function Thoughts({ t, msg, onToggle }) {
     if (msg.thinkOpen && bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [msg.thinking, msg.thinkOpen]);
 
+  /**
+   * Asked for thoughts, finished, and none came: say so rather than showing
+   * nothing. Gemini 3 leaves the thought text empty on most turns where it calls
+   * a tool — the reasoning goes back as an encrypted thoughtSignature instead —
+   * and every question about this room calls one, so the honest failure mode of
+   * the brain button is "silence that looks like a broken button".
+   * Docs: https://ai.google.dev/gemini-api/docs/generate-content/thinking
+   */
+  if (!msg.thinking) {
+    return (
+      <div className="chat-think empty">
+        <span className="chat-think-head">
+          <Brain size={12} strokeWidth={2.2} aria-hidden />
+          <span>{t('ai.noThoughts')}</span>
+        </span>
+      </div>
+    );
+  }
+
   const live = msg.streaming && !msg.content;
   return (
     <div className={`chat-think ${msg.thinkOpen ? 'open' : ''}`}>
@@ -153,6 +172,9 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
         // Open from the start when thinking was asked for, so the block does not
         // pop in and shove the conversation down a second later.
         thinkOpen: thinking,
+        // Remembered per message, because the toggle can be flipped mid-turn and
+        // a finished answer has to be judged by what *it* was asked for.
+        thinkAsked: thinking,
         tools: [],
         status: null,
         streaming: true,
@@ -306,9 +328,13 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
 
         {messages.map((m, i) => (
           <div key={i} className={`chat-msg ${m.role === 'user' ? 'user' : 'bot'}`}>
-            {m.role === 'assistant' && m.thinking && (
-              <Thoughts t={t} msg={m} onToggle={() => toggleThoughts(i)} />
-            )}
+            {/* The empty-handed note waits for the turn to end — thoughts that
+                arrive late are still thoughts — and stays out of the way when the
+                turn failed, since the error already says what happened. */}
+            {m.role === 'assistant' &&
+              (m.thinking || (m.thinkAsked && !m.streaming && !m.error)) && (
+                <Thoughts t={t} msg={m} onToggle={() => toggleThoughts(i)} />
+              )}
             {m.role === 'assistant' && m.tools?.length > 0 && (
               <div className="chat-tools">
                 {m.tools.map((c, j) => (

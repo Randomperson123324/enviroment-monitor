@@ -2761,6 +2761,15 @@ textarea {
   color: var(--ink);
 }
 
+/* Nothing to expand, so nothing to click: the note is the whole block. */
+.chat-think.empty {
+  opacity: 0.75;
+}
+
+.chat-think.empty .chat-think-head:hover {
+  color: var(--muted);
+}
+
 .chat-think-caret {
   margin-left: auto;
   transition: transform 0.18s;

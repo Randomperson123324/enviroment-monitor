@@ -254,6 +254,9 @@ const DICT = {
       thinkOff: 'แสดงความคิด: ปิด — แตะเพื่อดูว่า AI คิดอะไร',
       thinkingLive: 'กำลังคิด...',
       thoughtTitle: 'ความคิดของ AI',
+      /* Gemini 3 มักไม่ส่งสรุปความคิดกลับมาในเทิร์นที่เรียกเครื่องมือ — บอกไปตรง ๆ
+         ดีกว่าปล่อยให้ปุ่มดูเหมือนเสีย */
+      noThoughts: 'รอบนี้โมเดลไม่ได้ส่งความคิดกลับมา',
       stop: 'หยุดตอบ',
       stopped: 'หยุดโดยผู้ใช้',
 
@@ -271,8 +274,8 @@ const DICT = {
 
     /** โหมด AI ที่รันในเบราว์เซอร์ด้วยการ์ดจอ (WebGPU) — ดู lib/ai/browser/ */
     bai: {
-      server: 'บนเซิร์ฟเวอร์',
-      browser: 'ในเบราว์เซอร์นี้ (GPU)',
+      server: 'บนเซิร์ฟเวอร์',
+      browser: 'ในเบราว์เซอร์นี้ (GPU)',
       noWebgpu: 'เบราว์เซอร์นี้ไม่รองรับ WebGPU',
       model: 'โมเดล',
       desc: {
@@ -679,6 +682,7 @@ const DICT = {
       thinkOff: 'Show thinking: off — tap to watch the AI reason',
       thinkingLive: 'Thinking...',
       thoughtTitle: 'AI reasoning',
+      noThoughts: 'The model returned no reasoning for this turn',
       stop: 'Stop generating',
       stopped: 'Stopped by user',
 
@@ -694,8 +698,8 @@ const DICT = {
     },
 
     bai: {
-      server: 'On the server',
-      browser: 'In this browser (GPU)',
+      server: 'On the server',
+      browser: 'In this browser (GPU)',
       noWebgpu: 'This browser has no WebGPU',
       model: 'Model',
       desc: {
