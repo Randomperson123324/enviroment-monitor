@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Gauge, Waves, HeartPulse } from 'lucide-react';
 import { STORAGE, TABS, HYDRO_VIEWS } from '@/config/client';
 import { LanguageProvider, useLang } from '@/hooks/useLang';
@@ -36,17 +35,22 @@ import HydroSection from '@/components/HydroSection';
 import LogPanel from '@/components/LogPanel';
 import FloatingAi from '@/components/FloatingAi';
 
-export default function Dashboard() {
+/**
+ * `initialPanel` is how /setting differs from /: same dashboard, with the
+ * assistant open on its settings face. The panel is where those settings belong
+ * — they are about which AI answers and on what model — so the route opens it
+ * rather than replacing the page.
+ */
+export default function Dashboard({ initialPanel = 'chat' }) {
   return (
     <LanguageProvider>
-      <DashboardInner />
+      <DashboardInner initialPanel={initialPanel} />
     </LanguageProvider>
   );
 }
 
-function DashboardInner() {
+function DashboardInner({ initialPanel }) {
   const { t } = useLang();
-  const router = useRouter();
   const [theme, toggleTheme] = useTheme();
   const { settings, save } = useSettings();
   const { logs, addLog, clearLogs } = useLogs();
@@ -100,6 +104,10 @@ function DashboardInner() {
     localStorage.setItem(STORAGE.activeTab, id);
   }, []);
 
+  /** Opens the assistant on one of its two faces (see FloatingAi). */
+  const openAi = (view) =>
+    window.dispatchEvent(new CustomEvent('env-monitor:open-ai', { detail: { view } }));
+
   /** Confirms only what happened: a 403 from a wrong API base is not a refresh. */
   const refresh = useCallback(async () => {
     const res = await dash.refresh();
@@ -118,14 +126,14 @@ function DashboardInner() {
       tab3: () => switchTab(TABS[2].id),
       refresh,
       theme: toggleTheme,
-      settings: () => router.push('/setting'),
+      settings: () => openAi('settings'),
       help: () => setHelpOpen((o) => !o),
-      ai: () => window.dispatchEvent(new CustomEvent('env-monitor:open-ai')),
+      ai: () => openAi('chat'),
       close: () => {
         if (helpOpen) setHelpOpen(false);
       },
     }),
-    [switchTab, refresh, toggleTheme, helpOpen, router]
+    [switchTab, refresh, toggleTheme, helpOpen]
   );
   useShortcuts(shortcutHandlers);
 
@@ -140,7 +148,7 @@ function DashboardInner() {
         onSelectDevice={dash.setDevice}
         status={status}
         onRefresh={refresh}
-        onOpenSettings={() => router.push('/setting')}
+        onOpenSettings={() => openAi('settings')}
         onOpenHelp={() => setHelpOpen(true)}
         activeTab={tab}
         onSelectTab={switchTab}
@@ -268,10 +276,17 @@ function DashboardInner() {
       <FloatingAi
         deviceId={dash.deviceId}
         settings={settings}
+        serverCfg={serverCfg}
         serverAi={dash.health.aiProviders}
         aiCaps={serverCfg.ai}
         browserAi={browserAi}
         addLog={addLog}
+        initialView={initialPanel}
+        onSaveSettings={(patch) => {
+          save(patch);
+          addLog(`Config saved — poll ${(patch.pollMs ?? settings.pollMs) / 1000}s`, 'info');
+          notify(t('toast.saved'));
+        }}
       />
 
       <Toasts toasts={toasts} onDismiss={dismiss} />

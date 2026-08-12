@@ -3395,6 +3395,68 @@ textarea {
   overflow-y: auto;
 }
 
+/* ── The assistant's two faces ─────────────────────────────────────────────── */
+/* Chat and settings share one panel, one at a time. Tabs rather than a stack:
+   the dock is ~400px wide, and splitting that between a conversation and a form
+   would leave neither usable. */
+.ai-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ai-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  /* The bar drags the window; the tabs are the exception. */
+  cursor: pointer;
+}
+
+.ai-tab:hover {
+  color: var(--ink);
+}
+
+.ai-tab.on {
+  color: var(--ink);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* The label goes when the dock is too narrow for two of them; the icons still
+   say which is which, and the selected one keeps its word. */
+@media (max-width: 420px) {
+  .ai-tab:not(.on) span {
+    display: none;
+  }
+}
+
+/* Inside the panel the form has no page chrome of its own: no card, no page
+   background, and the dock supplies the padding. */
+.ai-panel .set-shell {
+  flex: 1;
+  min-height: 0;
+}
+
+.ai-panel .set-modal {
+  padding: 12px 14px 14px;
+  max-height: none;
+  width: auto;
+}
+
+.ai-panel .set-title {
+  display: none;
+}
+
 /* ── The settings routes (/setting, /dev-setting) ──────────────────────────── */
 /* Settings are a place now, not a dialog over the dashboard: a page can be
    linked to, bookmarked and reloaded, and a model download that takes minutes no
@@ -3440,13 +3502,18 @@ textarea {
   border-color: var(--accent);
 }
 
-/* Pushed to the far end: it is a way *out* of the ordinary settings, not a
-   sibling of the way back. */
+/* Kept to the far side of whatever holds it: a way *out* of the ordinary
+   settings, not a sibling of Save. */
 .set-devlink {
-  margin-left: auto;
+  margin-right: auto;
   font-size: 12px;
   color: var(--muted);
   border-style: dashed;
+}
+
+.set-page-bar .set-devlink {
+  margin-right: 0;
+  margin-left: auto;
 }
 
 .set-saved {
@@ -3457,11 +3524,14 @@ textarea {
   color: var(--ok, var(--accent));
 }
 
+/* Whatever holds the form — a full-screen page or the assistant's dock — is what
+   the layout above measures itself against. */
 .set-shell {
   width: 100%;
   flex: 1;
   min-height: 0;
   display: flex;
+  container: settings / inline-size;
 }
 
 /* No card: the frame the form inherited from .modal was the dialog's, and a
@@ -3589,43 +3659,32 @@ textarea {
   margin-bottom: 0;
 }
 
+/*
+  `align-self: end` because the row this lands in is not fixed: the form renders
+  with three children or four (the panel hides the title, a single-pane page has
+  no section list), and every child dropped shifts the rest up a row — the
+  stretchy `1fr` then lands on the footer and inflates Save into a pill the
+  height of the panel. Pinning the footer to the bottom of whatever row it gets
+  is true in all of them; `align-items: center` keeps the buttons their own size.
+*/
 .set-foot {
   grid-column: 1 / 3;
+  align-self: end;
+  align-items: center;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 
 /* Narrow: the same panes, with the section list as a scrolling strip on top —
-   a 190px column plus a form field does not fit on a phone. */
-@media (max-width: 720px) {
-  .modal-ov {
-    /* Every px of width counts here, and the phone's own rounded corners and
-       home indicator are not places to put a dialog edge. */
-    padding: 10px max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-bottom));
-  }
-
-  .modal,
-  .set-modal {
-    width: 100%;
-    padding: 16px;
-    border-radius: 1.25rem;
-  }
-
+   a 190px column plus a form field does not fit on a phone, and does not fit in
+   the assistant dock either. Keyed to the *container*, because the form now lives
+   in three places of very different widths inside the same viewport. */
+@container settings (max-width: 720px) {
   .set-modal {
     grid-template-columns: 1fr;
-    /* Stacked, the nav and the pane are separate rows, so the `1fr` that the
-       two-column layout gives to the row they share would land on the nav and
-       stretch a strip of chips down the card. Name all four. */
     grid-template-rows: auto auto 1fr auto;
     gap: 0;
-    /* dvh, not vh: mobile browsers measure vh against the *expanded* viewport,
-       so a dialog capped in vh keeps its footer under the address bar until the
-       toolbar happens to collapse. */
-    max-height: min(90dvh, 760px);
-  }
-
-  .modal-scroll {
-    max-height: min(80dvh, 780px);
+    padding: 16px;
   }
 
   .set-title,
@@ -3636,8 +3695,6 @@ textarea {
   .set-nav {
     flex-direction: row;
     overflow-x: auto;
-    /* The strip is a horizontal scroller on a touch screen, so it must not also
-       start a vertical drag, and it must not paint a scrollbar over the chips. */
     overscroll-behavior-x: contain;
     scrollbar-width: none;
     padding-bottom: 10px;
@@ -3658,6 +3715,33 @@ textarea {
      a row, where it just reads as a gap in the strip. */
   .set-navchild {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .modal-ov {
+    /* Every px of width counts here, and the phone's own rounded corners and
+       home indicator are not places to put a dialog edge. */
+    padding: 10px max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-bottom));
+  }
+
+  .modal,
+  .set-modal {
+    width: 100%;
+    padding: 16px;
+    border-radius: 1.25rem;
+  }
+
+  .set-modal {
+    /* dvh, not vh: mobile browsers measure vh against the *expanded* viewport,
+       so a dialog capped in vh keeps its footer under the address bar until the
+       toolbar happens to collapse. The single-column layout itself comes from
+       the container query above, which the dock needs too. */
+    max-height: min(90dvh, 760px);
+  }
+
+  .modal-scroll {
+    max-height: min(80dvh, 780px);
   }
 }
 
@@ -4589,7 +4673,8 @@ textarea {
      width — the provider tag ended up floating in the middle with the two
      buttons far apart. The title absorbs the slack instead, so the tag and the
      buttons group at the right where window controls belong. */
-  .ai-winbar .ai-float-title {
+  .ai-winbar .ai-float-title,
+  .ai-winbar .ai-tabs {
     flex: 1;
     min-width: 0;
   }

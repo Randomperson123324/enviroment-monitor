@@ -11,7 +11,9 @@ import {
   Settings,
   Share2,
   Sparkles,
+  Wrench,
 } from 'lucide-react';
+import Link from 'next/link';
 import { AI_SUMMARY_STYLES, aiChainFrom } from '@/config/client';
 import { SENSORS } from '@/config/sensors';
 import { aiHeaders } from '@/lib/ai-client';
@@ -522,6 +524,14 @@ export default function SettingsForm({
         {/* Outside the scrolling pane: Save used to be three screens below the
             field you had just edited. */}
         <div className="modal-foot set-foot">
+          {/* The one way to the developer page now that the user settings live in
+              a panel with no page bar of their own. */}
+          {scope === 'user' && (
+            <Link className="set-devlink" href="/dev-setting">
+              <Wrench size={13} strokeWidth={2.2} aria-hidden />
+              {t('settings.devTitle')}
+            </Link>
+          )}
           <button className="btn" onClick={onClose}>
             {t('settings.cancel')}
           </button>

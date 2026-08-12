@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Bot, X, PanelRight, PictureInPicture2 } from 'lucide-react';
+import { Bot, Settings, X, PanelRight, PictureInPicture2 } from 'lucide-react';
 import { aiChainFrom } from '@/config/client';
 import { useLang } from '@/hooks/useLang';
 import useAiWindow from '@/hooks/useAiWindow';
 import ChatPane from '@/components/ChatPane';
+import SettingsForm from '@/components/SettingsForm';
 
 /** "gemma4-e4b (via relay)" — what actually answered, not what's configured. */
 function sourceLabel(t, res) {
@@ -25,20 +26,38 @@ function sourceLabel(t, res) {
  * on demand — so the assistant now does the one thing nothing else does, which
  * is answer a question.
  */
-export default function FloatingAi({ deviceId, settings, serverAi, aiCaps, browserAi, addLog }) {
+export default function FloatingAi({
+  deviceId,
+  settings,
+  serverCfg,
+  serverAi,
+  aiCaps,
+  browserAi,
+  addLog,
+  onSaveSettings,
+  initialView = 'chat',
+}) {
   const { t } = useLang();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialView === 'settings');
   /** Kept mounted for the collapse animation, then dropped. */
   const [closing, setClosing] = useState(false);
   const [lastSource, setLastSource] = useState(null);
+  /**
+   * 'chat' | 'settings' — one at a time, swapped by the tabs in the title bar.
+   * Settings live here rather than on their own screen because they are about
+   * the thing in this panel: which AI answers, on what model. Showing both at
+   * once would halve a dock that is already narrow.
+   */
+  const [view, setView] = useState(initialView);
 
   // The "/" shortcut lives in Dashboard (one global key listener for the app) and
   // reaches the assistant through this event, so the panel keeps owning its own
   // open state instead of having it lifted into the page for one keystroke.
   useEffect(() => {
-    const openPanel = () => {
+    const openPanel = (e) => {
       setClosing(false);
       setOpen(true);
+      if (e.detail?.view) setView(e.detail.view);
     };
     window.addEventListener('env-monitor:open-ai', openPanel);
     return () => window.removeEventListener('env-monitor:open-ai', openPanel);
@@ -131,10 +150,33 @@ export default function FloatingAi({ deviceId, settings, serverAi, aiCaps, brows
             onPointerDown={win.startMove}
             onDoubleClick={win.desktop ? win.toggleDock : undefined}
           >
-            <span className="panel-title ai-float-title">
-              <Bot size={17} strokeWidth={2.2} aria-hidden /> {t('ai.title')}
-            </span>
-            <span className="src-tag">{source}</span>
+            {/* Two faces of one panel. The tabs replace the old fixed title: it
+                said "AI assistant" over a settings form otherwise. */}
+            <div className="ai-tabs" role="tablist" aria-label={t('ai.title')}>
+              <button
+                role="tab"
+                aria-selected={view === 'chat'}
+                className={`ai-tab ${view === 'chat' ? 'on' : ''}`}
+                onClick={() => setView('chat')}
+                // The bar is the window's drag handle, and a drag that starts on
+                // a tab must move the window, not select text in the label.
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <Bot size={15} strokeWidth={2.2} aria-hidden />
+                <span>{t('ai.title')}</span>
+              </button>
+              <button
+                role="tab"
+                aria-selected={view === 'settings'}
+                className={`ai-tab ${view === 'settings' ? 'on' : ''}`}
+                onClick={() => setView('settings')}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <Settings size={15} strokeWidth={2.2} aria-hidden />
+                <span>{t('settings.title')}</span>
+              </button>
+            </div>
+            {view === 'chat' && <span className="src-tag">{source}</span>}
             {win.desktop && (
               <button
                 className="icon-btn ai-winbtn"
@@ -161,14 +203,30 @@ export default function FloatingAi({ deviceId, settings, serverAi, aiCaps, brows
             )}
           </div>
 
-          <ChatPane
-            deviceId={deviceId}
-            settings={settings}
-            caps={aiCaps}
-            ai={browserAi}
-            addLog={addLog}
-            onSource={setLastSource}
-          />
+          {view === 'chat' ? (
+            <ChatPane
+              deviceId={deviceId}
+              settings={settings}
+              caps={aiCaps}
+              ai={browserAi}
+              addLog={addLog}
+              onSource={setLastSource}
+            />
+          ) : (
+            <SettingsForm
+              scope="user"
+              settings={settings}
+              serverCfg={serverCfg}
+              browserAi={browserAi}
+              onSave={(patch) => {
+                onSaveSettings?.(patch);
+                // Back to the conversation: the settings were opened to change
+                // something about it, and saving is the end of that errand.
+                setView('chat');
+              }}
+              onClose={() => setView('chat')}
+            />
+          )}
 
           {/* Resize handles. The docked panel only owns its left edge — the other
               three sides are the screen. */}
