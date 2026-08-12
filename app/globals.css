@@ -3100,6 +3100,100 @@ textarea {
   font-weight: 600;
 }
 
+/* The "search Hugging Face" opener sits alone on its row, unlike the download /
+   delete pair that share one. */
+.bai-btn.wide {
+  width: 100%;
+  border-color: var(--line-strong);
+  background: none;
+  color: var(--ink-2);
+}
+
+.bai-btn.wide:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+
+/* ── Hugging Face model search ─────────────────────────────────────────────── */
+.bai-search {
+  display: grid;
+  gap: 7px;
+}
+
+.bai-search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.bai-search-box input {
+  flex: 1;
+  padding: 7px 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.bai-search-box input:focus {
+  outline: none;
+}
+
+/* Capped and scrolled: the catalogue is 150-odd builds and the pane still has a
+   download button under it that must stay reachable. */
+.bai-results {
+  display: grid;
+  gap: 5px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.bai-result {
+  display: grid;
+  gap: 2px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.bai-result:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.bai-result.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* Listed but not selectable — the fact line says why, so it must stay readable
+   rather than fading into the background. */
+.bai-result.off {
+  opacity: 0.75;
+  cursor: not-allowed;
+}
+
+.bai-result-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bai-result-facts {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
 .bai-btn.danger {
   background: none;
   border-color: var(--line-strong);

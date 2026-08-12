@@ -21,6 +21,8 @@ export const STORAGE = {
   /** Assistant engine: 'server' (provider chain) or 'browser' (WebGPU, on-device) */
   aiEngine: 'em_ai_engine',
   aiBrowserModel: 'em_ai_browser_model',
+  /** Label and measured size of a model picked from the Hugging Face search. */
+  aiBrowserModelMeta: 'em_ai_browser_model_meta',
   /** Whether the browser engine is given the dashboard's data at all */
   aiSendContext: 'em_ai_send_context',
   pollMs: 'em_poll_ms',

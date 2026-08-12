@@ -254,16 +254,31 @@ model downloads to the browser once and runs there on the GPU, through
 on-device mode — its GPU path only, since the CPU (wllama/WASM) path needs
 cross-origin isolation and a second engine to maintain.
 
-Two models, both Qwen3, both q4f16 by default (`lib/ai/browser/models.js`). The
-VRAM and size figures come out of the installed web-llm's own `prebuiltAppConfig`
-rather than being estimated, because a wrong figure surfaces as a 2.5 GB download
-that completes and then refuses to start.
+Two Qwen3 builds are recommended up front (`lib/ai/browser/models.js`), and the
+rest of the catalogue is a search: **Settings → In this browser → search Hugging
+Face**. `lib/ai/browser/catalog.js` lists the MLC conversions from the `mlc-ai`
+account with their download counts, and joins each one against the installed
+web-llm's `prebuiltAppConfig`.
+
+That join is the point. Weights alone do not run in a browser — a model also
+needs a WebGPU shader library compiled for its architecture and quantisation and
+pinned to this exact web-llm version, which is what `prebuiltAppConfig` lists (163
+builds in 0.2.84). A repo without one is shown and marked rather than hidden,
+since "why is Gemma 3 greyed out" deserves an answer on screen. Picking a model
+costs one more request to the repo's file tree: web-llm's config states VRAM,
+which is not the download size, and the size is the number someone about to spend
+their data needs. The VRAM and context figures still come from web-llm itself
+rather than being estimated, because a wrong figure surfaces as a multi-gigabyte
+download that completes and then refuses to start.
 
 Details that are not decoration:
 
 - **q4f16 → q4f32 fallback.** A GPU without the WebGPU feature `shader-f16` fails
   to compile the f16 shaders — *after* the whole model has downloaded. So the
   adapter is asked first, and every id, size and cache check follows the answer.
+  For a model picked from the search there is no curated twin, so `resolveModelId`
+  swaps the quantisation in the id and takes the result only if web-llm actually
+  ships a library for it.
 - **Main thread, not a worker.** A worker that fetches its script needs that
   script's response to carry COEP, and on a cross-origin-isolated page it
   otherwise fails to construct — at which point web-llm waits forever for a
@@ -279,9 +294,11 @@ Details that are not decoration:
   tools, a 4-bit model of this size announces a call it never makes. The prompt is
   reused for two minutes so the model's KV cache survives between turns —
   changing one character of it forces a full re-prefill.
-- **No fallback to the server.** If the browser engine fails, the turn reports the
-  failure. Someone who moved the conversation onto their own machine did not ask
-  for it to be quietly sent to a provider instead.
+- **Fallback is arranged, never assumed.** The browser engine only hands a failed
+  turn to the server when the chain says so — a lane holding it alone reports the
+  failure instead, because someone who moved the conversation onto their own
+  machine did not ask for it to be quietly sent to a provider. In the other
+  direction, reaching it as a fallback asks before downloading anything.
 
 Camera data: `browser` is in the default `AI_FOCUS_PROVIDERS` because the rule is
 about data leaving the device, and this engine sends nothing anywhere — the focus

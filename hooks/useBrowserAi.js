@@ -33,6 +33,8 @@ export default function useBrowserAi({ enabled = true } = {}) {
   const [kind, setKindState] = useState('server');
   /** Stored canonically as the f16 id; the variant to actually run is derived. */
   const [selectedId, setSelectedId] = useState(DEFAULT_BROWSER_MODEL_ID);
+  /** Label and measured size of a model chosen from the search, for the UI to show. */
+  const [meta, setMeta] = useState(null);
   const [f16Ok, setF16Ok] = useState(null);
   const [status, setStatus] = useState({ phase: 'idle' });
   const [webgpu, setWebgpu] = useState(null);
@@ -45,7 +47,7 @@ export default function useBrowserAi({ enabled = true } = {}) {
   // getEngine resolves: the size shown and the cache check have to agree with
   // what will really be downloaded.
   const modelId = f16Ok === false ? (F32_FALLBACKS[selectedId]?.id ?? selectedId) : selectedId;
-  const model = getBrowserModelInfo(modelId);
+  const model = getBrowserModelInfo(modelId, meta);
   const models = useMemo(
     () => (f16Ok === false ? BROWSER_MODELS.map((m) => F32_FALLBACKS[m.id] ?? m) : BROWSER_MODELS),
     [f16Ok]
@@ -62,10 +64,16 @@ export default function useBrowserAi({ enabled = true } = {}) {
     }
     if (window.localStorage.getItem(STORAGE.aiSendContext) === 'false') setSendContextState(false);
 
+    // Any id from web-llm's prebuilt list is allowed here, not just the curated
+    // pair: the Hugging Face search can put anything runnable in this slot, and
+    // an unknown id is only unknown to *this file*.
     const stored = window.localStorage.getItem(STORAGE.aiBrowserModel);
-    if (stored) {
-      const canonical = canonicalModelId(stored);
-      if (BROWSER_MODELS.some((m) => m.id === canonical)) setSelectedId(canonical);
+    if (stored) setSelectedId(canonicalModelId(stored));
+    try {
+      const savedMeta = JSON.parse(window.localStorage.getItem(STORAGE.aiBrowserModelMeta) ?? 'null');
+      if (savedMeta?.id) setMeta(savedMeta);
+    } catch {
+      // A half-written or hand-edited entry is not worth failing the pane over.
     }
     if (supported) {
       void getWebGpuInfo().then((info) => {
@@ -106,14 +114,26 @@ export default function useBrowserAi({ enabled = true } = {}) {
     window.localStorage.setItem(STORAGE.aiSendContext, String(next));
   }, []);
 
-  const setModel = useCallback((id) => {
+  /**
+   * `info` carries what the picker learned from Hugging Face (label, measured
+   * size) for models this file has no curated entry for. The curated pair pass
+   * nothing and keep their own description.
+   */
+  const setModel = useCallback((id, info = null) => {
     // Never mid-download: the percentage on screen would start meaning a
     // different model than the one it is counting.
     if (loadRef.current) return;
+    if (!id) return;
     const canonical = canonicalModelId(id);
-    if (!BROWSER_MODELS.some((m) => m.id === canonical)) return;
     setSelectedId(canonical);
     window.localStorage.setItem(STORAGE.aiBrowserModel, canonical);
+
+    const curated = BROWSER_MODELS.some((m) => m.id === canonical);
+    const next = curated || !info ? null : { id: canonical, ...info };
+    setMeta(next);
+    if (next) window.localStorage.setItem(STORAGE.aiBrowserModelMeta, JSON.stringify(next));
+    else window.localStorage.removeItem(STORAGE.aiBrowserModelMeta);
+
     setStatus({ phase: 'idle' });
   }, []);
 
