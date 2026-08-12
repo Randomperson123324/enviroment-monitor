@@ -302,10 +302,29 @@ export default function useAiWindow(open) {
         height: box.height,
       };
 
+      /**
+       * Kept out of setState because the drop needs it after the last move, and
+       * a state updater is not the place to read the pointer from.
+       */
+      let wantFull = false;
+
       beginDrag(e, {
         move: (ev) => {
           const dx = ev.clientX - start.px;
           const dy = ev.clientY - start.py;
+
+          /*
+            Where the edge is being asked to go, before the width cap has its say.
+            The cap (maxWidthRatio) exists so a docked panel cannot squeeze the
+            dashboard into a column — but pulling *well* past it is not a request
+            for a slightly wider panel that the cap should quietly refuse. It is a
+            request for the whole screen, and that is what a release now does.
+          */
+          const asked =
+            edge.includes('right') && !docked ? start.width + dx : start.width - dx;
+          wantFull = asked > window.innerWidth * AI_WINDOW.fullDragRatio;
+          setSnapping(wantFull ? 'full' : null);
+
           setState((s) => {
             if (s.mode === 'docked') {
               // Pulling the left edge left widens the panel.
@@ -326,9 +345,14 @@ export default function useAiWindow(open) {
             return { ...s, rect };
           });
         },
+        end: () => {
+          // The width it had before this pull is left alone, so leaving the full
+          // screen returns it to the size it was, not to the cap.
+          if (wantFull) setState((s) => ({ ...s, mode: 'full' }));
+        },
       });
     },
-    [beginDrag, desktop]
+    [beginDrag, desktop, docked]
   );
 
   const toggleDock = useCallback(() => {
