@@ -44,6 +44,24 @@ export default function FloatingAi({ deviceId, settings, serverAi, aiCaps, brows
     return () => window.removeEventListener('env-monitor:open-ai', openPanel);
   }, []);
 
+  // The rail's button is the only one on screen at desktop widths, so it has to
+  // do both jobs the floating button did. "/" keeps opening rather than toggling:
+  // a shortcut that closes the panel you just asked for is a trap.
+  useEffect(() => {
+    const onToggle = () => toggle();
+    window.addEventListener('env-monitor:toggle-ai', onToggle);
+    return () => window.removeEventListener('env-monitor:toggle-ai', onToggle);
+  });
+
+  // The sidebar's assistant button mirrors this, and it cannot read state it does
+  // not own. Announcing it keeps the rail in step without lifting `open` into the
+  // page for one highlight.
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('env-monitor:ai-state', { detail: { open: open && !closing } })
+    );
+  }, [open, closing]);
+
   const finishClose = () => {
     setOpen(false);
     setClosing(false);

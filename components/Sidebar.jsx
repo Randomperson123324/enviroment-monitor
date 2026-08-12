@@ -1,6 +1,7 @@
 'use client';
 
-import { House } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Bot, House } from 'lucide-react';
 import TabMenu from '@/components/TabMenu';
 import { useLang } from '@/hooks/useLang';
 
@@ -17,6 +18,19 @@ import { useLang } from '@/hooks/useLang';
  */
 export default function Sidebar({ activeTab, onSelectTab }) {
   const { t } = useLang();
+  /**
+   * The panel owns whether it is open; the rail only mirrors it, the same way a
+   * tab row mirrors the section on screen. Both directions travel as events, so
+   * neither component has to hold the other's state — the "/" shortcut already
+   * opens the assistant this way.
+   */
+  const [aiOpen, setAiOpen] = useState(false);
+
+  useEffect(() => {
+    const onState = (e) => setAiOpen(Boolean(e.detail?.open));
+    window.addEventListener('env-monitor:ai-state', onState);
+    return () => window.removeEventListener('env-monitor:ai-state', onState);
+  }, []);
 
   return (
     <>
@@ -42,6 +56,22 @@ export default function Sidebar({ activeTab, onSelectTab }) {
           <div className="sidebar-div" />
 
           <TabMenu active={activeTab} onSelect={onSelectTab} className="in-side" />
+
+          {/* The assistant sits at the foot of the rail rather than floating over
+              the page. It is not a section, so it is below the nav and separated
+              from it — pressing it opens a panel, it does not navigate. The
+              floating button stays for narrower screens, where there is no rail
+              to put it in. */}
+          <div className="sidebar-div" />
+          <button
+            className={`tab-item sidebar-ai ${aiOpen ? 'active' : ''}`}
+            onClick={() => window.dispatchEvent(new CustomEvent('env-monitor:toggle-ai'))}
+            title={aiOpen ? t('ai.close') : `${t('ai.openAi')} (/)`}
+            aria-expanded={aiOpen}
+          >
+            <Bot size={17} strokeWidth={2.2} aria-hidden />
+            <span>{t('ai.title')}</span>
+          </button>
 
           <div className="sidebar-hint">
             <kbd>?</kbd> {t('shortcuts.hintKey')}

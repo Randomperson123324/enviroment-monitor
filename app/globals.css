@@ -505,6 +505,27 @@ textarea {
   }
 }
 
+/* The assistant row borrows the nav's shape so the rail reads as one column,
+   but keeps the accent outline the floating button had: it opens a panel rather
+   than moving between sections, and it is the page's primary action. */
+.sidebar-ai {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 10px 12px;
+  border-radius: 1.125rem;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  backdrop-filter: none;
+  flex-shrink: 0;
+}
+
+.sidebar-ai.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: transparent;
+}
+
 .tab-item {
   display: inline-flex;
   align-items: center;
@@ -571,6 +592,15 @@ textarea {
   place-items: center;
   box-shadow: var(--glass-shadow);
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s ease;
+}
+
+/* From the rail's breakpoint up, the assistant is a row at the foot of the
+   sidebar, so the floating copy would be a second button for one action. Below
+   it there is no rail, and this is the only way in. */
+@media (min-width: 1024px) {
+  .fab {
+    display: none;
+  }
 }
 
 .fab:hover {
