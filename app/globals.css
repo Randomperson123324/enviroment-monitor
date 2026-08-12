@@ -3422,6 +3422,40 @@ textarea {
   cursor: pointer;
 }
 
+/* The settings tab is a wrapper holding its label and its ×, so the padding
+   moves inward to the label and the × gets its own hit area. */
+span.ai-tab {
+  padding: 0 4px 0 0;
+}
+
+.ai-tab-face {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 6px 5px 9px;
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.ai-tab-close {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+}
+
+.ai-tab-close:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+
 .ai-tab:hover {
   color: var(--ink);
 }
@@ -3435,7 +3469,8 @@ textarea {
 /* The label goes when the dock is too narrow for two of them; the icons still
    say which is which, and the selected one keeps its word. */
 @media (max-width: 420px) {
-  .ai-tab:not(.on) span {
+  .ai-tab:not(.on) > span,
+  .ai-tab:not(.on) .ai-tab-face span {
     display: none;
   }
 }

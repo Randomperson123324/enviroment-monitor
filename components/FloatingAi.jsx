@@ -43,12 +43,24 @@ export default function FloatingAi({
   const [closing, setClosing] = useState(false);
   const [lastSource, setLastSource] = useState(null);
   /**
-   * 'chat' | 'settings' — one at a time, swapped by the tabs in the title bar.
-   * Settings live here rather than on their own screen because they are about
-   * the thing in this panel: which AI answers, on what model. Showing both at
-   * once would halve a dock that is already narrow.
+   * The panel's tabs, behaving like a browser's.
+   *
+   * The conversation is always there; settings are a tab that gets *opened* — by
+   * the gear in the header — and closed with the × on the tab itself. There is
+   * no permanent settings tab taking up half the bar for something looked at
+   * once a week, and no separate window for it either: what it configures is in
+   * this panel. `view` is which tab has focus, and only the focused one renders,
+   * because a ~400px dock split between a conversation and a form leaves neither
+   * usable.
    */
+  const [settingsTab, setSettingsTab] = useState(initialView === 'settings');
   const [view, setView] = useState(initialView);
+
+  /** Closing the tab always lands back on the conversation, as a browser does. */
+  const closeSettingsTab = () => {
+    setSettingsTab(false);
+    setView('chat');
+  };
 
   // The "/" shortcut lives in Dashboard (one global key listener for the app) and
   // reaches the assistant through this event, so the panel keeps owning its own
@@ -57,6 +69,10 @@ export default function FloatingAi({
     const openPanel = (e) => {
       setClosing(false);
       setOpen(true);
+      // The gear asks for the settings tab: open it if it is not there, focus it
+      // if it is — the same press does both, like clicking a link that is
+      // already open in a tab.
+      if (e.detail?.view === 'settings') setSettingsTab(true);
       if (e.detail?.view) setView(e.detail.view);
     };
     window.addEventListener('env-monitor:open-ai', openPanel);
@@ -150,8 +166,9 @@ export default function FloatingAi({
             onPointerDown={win.startMove}
             onDoubleClick={win.desktop ? win.toggleDock : undefined}
           >
-            {/* Two faces of one panel. The tabs replace the old fixed title: it
-                said "AI assistant" over a settings form otherwise. */}
+            {/* A tab strip, not a fixed title: the title said "AI assistant"
+                over a settings form otherwise. With settings closed there is one
+                tab, which reads as the title it replaced. */}
             <div className="ai-tabs" role="tablist" aria-label={t('ai.title')}>
               <button
                 role="tab"
@@ -165,16 +182,33 @@ export default function FloatingAi({
                 <Bot size={15} strokeWidth={2.2} aria-hidden />
                 <span>{t('ai.title')}</span>
               </button>
-              <button
-                role="tab"
-                aria-selected={view === 'settings'}
-                className={`ai-tab ${view === 'settings' ? 'on' : ''}`}
-                onClick={() => setView('settings')}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                <Settings size={15} strokeWidth={2.2} aria-hidden />
-                <span>{t('settings.title')}</span>
-              </button>
+
+              {settingsTab && (
+                <span className={`ai-tab ${view === 'settings' ? 'on' : ''}`}>
+                  {/* The tab and its close button are siblings rather than nested:
+                      a button inside a button is invalid, and the × must not also
+                      select the tab it is closing. */}
+                  <button
+                    role="tab"
+                    aria-selected={view === 'settings'}
+                    className="ai-tab-face"
+                    onClick={() => setView('settings')}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <Settings size={15} strokeWidth={2.2} aria-hidden />
+                    <span>{t('settings.title')}</span>
+                  </button>
+                  <button
+                    className="ai-tab-close"
+                    onClick={closeSettingsTab}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    title={t('settings.closeTab')}
+                    aria-label={t('settings.closeTab')}
+                  >
+                    <X size={12} strokeWidth={2.6} aria-hidden />
+                  </button>
+                </span>
+              )}
             </div>
             {view === 'chat' && <span className="src-tag">{source}</span>}
             {win.desktop && (
@@ -220,11 +254,11 @@ export default function FloatingAi({
               browserAi={browserAi}
               onSave={(patch) => {
                 onSaveSettings?.(patch);
-                // Back to the conversation: the settings were opened to change
-                // something about it, and saving is the end of that errand.
-                setView('chat');
+                // Saving is the end of the errand the gear started, so the tab
+                // goes with it — the same as closing it by hand.
+                closeSettingsTab();
               }}
-              onClose={() => setView('chat')}
+              onClose={closeSettingsTab}
             />
           )}
 
