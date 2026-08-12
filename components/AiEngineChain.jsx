@@ -16,11 +16,12 @@
  */
 
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Cloud, Cpu, MonitorSmartphone, Plus, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Cloud, Cpu, Plus, Server, X } from 'lucide-react';
 import { AI_ENGINES } from '@/config/client';
 import { useLang } from '@/hooks/useLang';
 
-const ICONS = { gemini: Cloud, local: Cpu, browser: MonitorSmartphone };
+/** Where each one runs: someone else's cloud, our server, this machine's chip. */
+const ICONS = { gemini: Cloud, local: Server, browser: Cpu };
 
 export default function AiEngineChain({ chain, onChange, browserAi }) {
   const { t } = useLang();

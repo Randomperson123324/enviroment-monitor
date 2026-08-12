@@ -6,7 +6,6 @@ import {
   ChevronDown,
   Cloud,
   Cpu,
-  MonitorSmartphone,
   Plug,
   Server,
   Settings,
@@ -39,8 +38,8 @@ const INGEST_FIELDS = SENSORS.map((s) => s.field).join(', ');
  */
 const AI_SECTIONS = [
   { id: 'assistant', Icon: Bot },
-  { id: 'device', Icon: MonitorSmartphone },
-  { id: 'local', Icon: Cpu },
+  { id: 'device', Icon: Cpu },
+  { id: 'local', Icon: Server },
   { id: 'gemini', Icon: Cloud },
   { id: 'relay', Icon: Share2 },
 ];
