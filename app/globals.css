@@ -3399,20 +3399,26 @@ textarea {
 /* Settings are a place now, not a dialog over the dashboard: a page can be
    linked to, bookmarked and reloaded, and a model download that takes minutes no
    longer lives in something a stray click on the backdrop dismisses. */
+/* Full-bleed: the settings own the window rather than floating in the middle of
+   it. `height` and not `min-height`, so the pane below is the only thing that
+   scrolls and the footer stays where the eye last left it. */
 .set-page {
-  min-height: 100dvh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 20px 16px max(20px, env(safe-area-inset-bottom));
+  gap: 0;
+  padding: 0;
+  background: var(--bg);
 }
 
 .set-page-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  width: min(760px, 100%);
+  width: 100%;
+  flex-shrink: 0;
+  padding: 12px max(14px, env(safe-area-inset-left)) 12px max(14px, env(safe-area-inset-right));
+  border-bottom: 1px solid var(--line);
 }
 
 .set-back,
@@ -3451,26 +3457,41 @@ textarea {
   color: var(--ok, var(--accent));
 }
 
-/* The form carried the dialog's own frame; on a page it needs the panel look it
-   used to inherit from .modal. */
 .set-shell {
-  width: min(760px, 100%);
+  width: 100%;
   flex: 1;
   min-height: 0;
   display: flex;
 }
 
+/* No card: the frame the form inherited from .modal was the dialog's, and a
+   rounded panel floating inside a full window is a dialog wearing a page's
+   clothes. The shell owns the height, so the form's own cap comes off. */
 .set-shell .set-modal {
   flex: 1;
   min-width: 0;
-  /* The dialog capped itself against the viewport; on a page the shell above
-     already owns the height, and a second cap would leave dead space under a
-     short pane. */
   width: auto;
   max-height: none;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: 1.75rem;
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 20px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+}
+
+/*
+  Fields stop at a readable width instead of stretching to the window. A text
+  input 1200px wide is not more usable than one at 640 — it is just harder to
+  pair a label with the box it belongs to — so the pane goes full-bleed and its
+  *contents* are capped.
+*/
+.set-shell .set-pane > * {
+  max-width: 680px;
+}
+
+.set-shell .set-title,
+.set-shell .set-foot {
+  max-width: none;
 }
 
 /* One pane and no section list: the grid's left column has nothing to hold. */
