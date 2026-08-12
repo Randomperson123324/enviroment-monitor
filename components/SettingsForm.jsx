@@ -36,7 +36,7 @@ const INGEST_FIELDS = SENSORS.map((s) => s.field).join(', ');
  *
  * Names live in config/i18n.js under `settings.sections.*`.
  */
-const AI_SECTIONS = [
+const ALL_AI_SECTIONS = [
   { id: 'assistant', Icon: Bot },
   { id: 'device', Icon: Cpu },
   { id: 'local', Icon: Server },
@@ -44,9 +44,23 @@ const AI_SECTIONS = [
   { id: 'relay', Icon: Share2 },
 ];
 
-const SECTIONS = [{ id: 'connection', Icon: Server }, ...AI_SECTIONS];
-
-const isAiSection = (id) => AI_SECTIONS.some((s) => s.id === id);
+/**
+ * Which panes each page owns.
+ *
+ * `user` is the settings someone using the dashboard has a reason to touch:
+ * which AI answers, the on-device model, the endpoint we host, how often the
+ * page polls. `dev` holds the cloud account — a key, a base URL and a model id
+ * that belong to whoever runs the deployment, not to whoever reads it. Sending
+ * the room's data to Google is a deployment decision, so it lives behind a URL
+ * you have to know.
+ *
+ * Ids are shared with the panes below, so a section moves between pages by
+ * moving one string.
+ */
+export const SETTINGS_SCOPES = {
+  user: ['connection', 'assistant', 'device', 'local', 'relay'],
+  dev: ['gemini'],
+};
 
 /**
  * Model picker backed by GET /api/ai/models — the list comes from the provider
@@ -201,8 +215,19 @@ function ProviderTest({ provider, apiBase, headers }) {
   return <TestRow onRun={run} state={state} />;
 }
 
-export default function SettingsModal({ settings, serverCfg, browserAi, onSave, onClose }) {
+export default function SettingsForm({
+  settings,
+  serverCfg,
+  browserAi,
+  onSave,
+  onClose,
+  scope = 'user',
+}) {
   const { t } = useLang();
+  const shown = SETTINGS_SCOPES[scope] ?? SETTINGS_SCOPES.user;
+  const aiSections = ALL_AI_SECTIONS.filter((s) => shown.includes(s.id));
+  const hasConnection = shown.includes('connection');
+  const isAiSection = (id) => aiSections.some((s) => s.id === id);
   const [apiBase, setApiBase] = useState(settings.apiBase);
   const [geminiKey, setGeminiKey] = useState(settings.geminiKey);
   const [aiOrder, setAiOrder] = useState(settings.aiOrder);
@@ -213,7 +238,7 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
   const [aiRelay, setAiRelay] = useState(settings.aiRelay);
   const [aiSummaryStyle, setAiSummaryStyle] = useState(settings.aiSummaryStyle);
   const [pollSec, setPollSec] = useState(settings.pollMs / 1000);
-  const [section, setSection] = useState(SECTIONS[0].id);
+  const [section, setSection] = useState(shown[0]);
   // Expanded on open: five of the six panes live in here, so collapsed the dialog
   // presents itself as having one topic. Collapsing is for getting them out of
   // the way, not the resting state.
@@ -271,69 +296,73 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
     });
   };
 
+  // A single-pane page needs no list of one, and a group header that expands to
+  // reveal the pane already on screen is furniture, not navigation.
+  const showNav = shown.length > 1;
+
   return (
-    <div
-      className="modal-ov"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="modal set-modal">
+    <div className="set-shell">
+      <div className="set-modal">
         <h3 className="ai-float-title set-title">
-          <Settings size={18} strokeWidth={2.2} aria-hidden /> {t('settings.title')}
+          <Settings size={18} strokeWidth={2.2} aria-hidden />{' '}
+          {t(scope === 'dev' ? 'settings.devTitle' : 'settings.title')}
         </h3>
 
         {/* Tabs rather than links: each pane is part of one unsaved form, so
             moving between them must not be a navigation that could lose it. */}
-        <div className="set-nav" ref={navRef} role="tablist" aria-label={t('settings.nav')}>
-          <button
-            role="tab"
-            aria-selected={section === 'connection'}
-            className={`set-navbtn ${section === 'connection' ? 'on' : ''}`}
-            onClick={() => setSection('connection')}
-          >
-            <Server size={15} strokeWidth={2.1} aria-hidden />
-            {t('settings.sections.connection')}
-          </button>
-
-          {/* One AI entry that expands. Collapsed, it still shows as active when
-              one of its panes is the one on screen — otherwise the highlight
-              disappears and nothing says where you are. */}
-          <button
-            className={`set-navbtn set-navgroup ${isAiSection(section) ? 'on' : ''}`}
-            aria-expanded={aiOpen}
-            onClick={() => {
-              const next = !aiOpen;
-              setAiOpen(next);
-              // Expanding is also a request to see something: without this the
-              // first click opens a list and leaves the pane on "Server".
-              if (next && !isAiSection(section)) setSection(AI_SECTIONS[0].id);
-            }}
-          >
-            <Sparkles size={15} strokeWidth={2.1} aria-hidden />
-            {t('settings.sections.ai')}
-            <ChevronDown
-              size={14}
-              strokeWidth={2.4}
-              className={`set-caret ${aiOpen ? 'open' : ''}`}
-              aria-hidden
-            />
-          </button>
-
-          {aiOpen &&
-            AI_SECTIONS.map(({ id, Icon }) => (
+        {showNav && (
+          <div className="set-nav" ref={navRef} role="tablist" aria-label={t('settings.nav')}>
+            {hasConnection && (
               <button
-                key={id}
                 role="tab"
-                aria-selected={section === id}
-                className={`set-navbtn set-navchild ${section === id ? 'on' : ''}`}
-                onClick={() => setSection(id)}
+                aria-selected={section === 'connection'}
+                className={`set-navbtn ${section === 'connection' ? 'on' : ''}`}
+                onClick={() => setSection('connection')}
               >
-                <Icon size={14} strokeWidth={2.1} aria-hidden />
-                {t(`settings.sections.${id}`)}
+                <Server size={15} strokeWidth={2.1} aria-hidden />
+                {t('settings.sections.connection')}
               </button>
-            ))}
-        </div>
+            )}
+
+            {/* One AI entry that expands. Collapsed, it still shows as active when
+                one of its panes is the one on screen — otherwise the highlight
+                disappears and nothing says where you are. */}
+            <button
+              className={`set-navbtn set-navgroup ${isAiSection(section) ? 'on' : ''}`}
+              aria-expanded={aiOpen}
+              onClick={() => {
+                const next = !aiOpen;
+                setAiOpen(next);
+                // Expanding is also a request to see something: without this the
+                // first click opens a list and leaves the pane on "Server".
+                if (next && !isAiSection(section)) setSection(aiSections[0].id);
+              }}
+            >
+              <Sparkles size={15} strokeWidth={2.1} aria-hidden />
+              {t('settings.sections.ai')}
+              <ChevronDown
+                size={14}
+                strokeWidth={2.4}
+                className={`set-caret ${aiOpen ? 'open' : ''}`}
+                aria-hidden
+              />
+            </button>
+
+            {aiOpen &&
+              aiSections.map(({ id, Icon }) => (
+                <button
+                  key={id}
+                  role="tab"
+                  aria-selected={section === id}
+                  className={`set-navbtn set-navchild ${section === id ? 'on' : ''}`}
+                  onClick={() => setSection(id)}
+                >
+                  <Icon size={14} strokeWidth={2.1} aria-hidden />
+                  {t(`settings.sections.${id}`)}
+                </button>
+              ))}
+          </div>
+        )}
 
         <div className="set-pane" role="tabpanel">
           {section === 'connection' && (
@@ -504,3 +533,6 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
     </div>
   );
 }
+
+/** The pane ids each page shows, for anything that needs to know without rendering. */
+export { ALL_AI_SECTIONS };

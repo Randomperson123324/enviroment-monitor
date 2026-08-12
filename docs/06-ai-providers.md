@@ -143,9 +143,17 @@ exposes the model to everything on the LAN; the rewrite keeps it on loopback.
 4. Check the assistant's source tag — it names the model that actually answered
    and marks `via relay` when the hop was used.
 
-## Dev Settings overrides
+## Settings pages, and the overrides they send
 
-Every AI field in the Settings dialog is sent as an `x-ai-*` header, so the demo
+Settings are two routes, not a dialog: **`/setting`** for the things someone
+using the dashboard adjusts (which AI answers, the on-device model, the endpoint
+we host, the poll interval) and **`/dev-setting`** for the cloud account — key,
+base URL, model. Sending the room's data to Google is a deployment decision
+rather than a reader's, so it sits behind a URL you have to know, linked once
+from the top of `/setting` and nowhere else. `SETTINGS_SCOPES` in `components/SettingsForm.jsx`
+is the whole split; a pane changes page by moving one string.
+
+Every AI field on either page is sent as an `x-ai-*` header, so the demo
 can be re-pointed from the browser with no redeploy. Blank fields are omitted
 entirely, leaving the server on its env configuration.
 

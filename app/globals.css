@@ -3395,6 +3395,94 @@ textarea {
   overflow-y: auto;
 }
 
+/* ── The settings routes (/setting, /dev-setting) ──────────────────────────── */
+/* Settings are a place now, not a dialog over the dashboard: a page can be
+   linked to, bookmarked and reloaded, and a model download that takes minutes no
+   longer lives in something a stray click on the backdrop dismisses. */
+.set-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px max(20px, env(safe-area-inset-bottom));
+}
+
+.set-page-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(760px, 100%);
+}
+
+.set-back,
+.set-devlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+
+.set-back:hover,
+.set-devlink:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+/* Pushed to the far end: it is a way *out* of the ordinary settings, not a
+   sibling of the way back. */
+.set-devlink {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.set-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ok, var(--accent));
+}
+
+/* The form carried the dialog's own frame; on a page it needs the panel look it
+   used to inherit from .modal. */
+.set-shell {
+  width: min(760px, 100%);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.set-shell .set-modal {
+  flex: 1;
+  min-width: 0;
+  /* The dialog capped itself against the viewport; on a page the shell above
+     already owns the height, and a second cap would leave dead space under a
+     short pane. */
+  width: auto;
+  max-height: none;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 1.75rem;
+}
+
+/* One pane and no section list: the grid's left column has nothing to hold. */
+.set-shell .set-modal:not(:has(.set-nav)) {
+  grid-template-columns: 1fr;
+}
+
+.set-shell .set-modal:not(:has(.set-nav)) .set-title,
+.set-shell .set-modal:not(:has(.set-nav)) .set-foot {
+  grid-column: 1;
+}
+
 /* ── Settings: sections on the left, fields on the right ───────────────────── */
 .set-modal {
   width: 760px;
@@ -3504,6 +3592,10 @@ textarea {
 
   .set-modal {
     grid-template-columns: 1fr;
+    /* Stacked, the nav and the pane are separate rows, so the `1fr` that the
+       two-column layout gives to the row they share would land on the nav and
+       stretch a strip of chips down the card. Name all four. */
+    grid-template-rows: auto auto 1fr auto;
     gap: 0;
     /* dvh, not vh: mobile browsers measure vh against the *expanded* viewport,
        so a dialog capped in vh keeps its footer under the address bar until the

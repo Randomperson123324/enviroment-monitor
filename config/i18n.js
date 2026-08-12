@@ -160,6 +160,9 @@ const DICT = {
 
     settings: {
       title: 'ตั้งค่า',
+      /* หน้า /dev-setting — ของคนที่ดูแลระบบ ไม่ใช่คนที่ใช้แดชบอร์ด */
+      devTitle: 'ตั้งค่านักพัฒนา',
+      back: 'กลับไปแดชบอร์ด',
       apiBase: 'ที่อยู่เซิร์ฟเวอร์ API (เว้นว่าง = เซิร์ฟเวอร์เดียวกัน)',
       apiBasePlaceholder: 'เช่น http://192.168.1.50:3000 (ใส่ IP ดิบได้)',
       geminiKey: 'API Key ของ Cloud AI (ไม่บังคับ — ใช้แทนของเซิร์ฟเวอร์)',
@@ -177,7 +180,7 @@ const DICT = {
       apiTestNoDb: 'เซิร์ฟเวอร์ตอบ แต่ต่อฐานข้อมูลไม่ได้',
       apiTestNotThisApp: 'ที่อยู่นี้ตอบกลับ แต่ไม่ใช่เซิร์ฟเวอร์ของแดชบอร์ดนี้',
 
-      /** หัวข้อด้านซ้ายของหน้าตั้งค่า — ดู SECTIONS ใน SettingsModal.jsx */
+      /** หัวข้อด้านซ้ายของหน้าตั้งค่า — ดู SETTINGS_SCOPES ใน SettingsForm.jsx */
       nav: 'หัวข้อการตั้งค่า',
       sections: {
         connection: 'เซิร์ฟเวอร์',
@@ -618,6 +621,8 @@ const DICT = {
 
     settings: {
       title: 'Settings',
+      devTitle: 'Developer settings',
+      back: 'Back to dashboard',
       apiBase: 'API server URL (blank = same server)',
       apiBasePlaceholder: 'e.g. http://192.168.1.50:3000 (raw IP is fine)',
       geminiKey: 'Cloud AI API key (optional — overrides the server key)',

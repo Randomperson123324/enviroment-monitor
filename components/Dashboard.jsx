@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Gauge, Waves, HeartPulse } from 'lucide-react';
 import { STORAGE, TABS, HYDRO_VIEWS } from '@/config/client';
 import { LanguageProvider, useLang } from '@/hooks/useLang';
@@ -34,7 +35,6 @@ import FocusSection from '@/components/FocusSection';
 import HydroSection from '@/components/HydroSection';
 import LogPanel from '@/components/LogPanel';
 import FloatingAi from '@/components/FloatingAi';
-import SettingsModal from '@/components/SettingsModal';
 
 export default function Dashboard() {
   return (
@@ -46,6 +46,7 @@ export default function Dashboard() {
 
 function DashboardInner() {
   const { t } = useLang();
+  const router = useRouter();
   const [theme, toggleTheme] = useTheme();
   const { settings, save } = useSettings();
   const { logs, addLog, clearLogs } = useLogs();
@@ -56,7 +57,6 @@ function DashboardInner() {
   // Lifted to here because two distant places need the same engine state: the
   // settings dialog configures it, the assistant runs turns with it.
   const browserAi = useBrowserAi({ enabled: serverCfg.ai?.browserEnabled !== false });
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState(TABS[0].id);
   /** Which half of the safety tab is showing — water/weather or disease risk. */
@@ -118,15 +118,14 @@ function DashboardInner() {
       tab3: () => switchTab(TABS[2].id),
       refresh,
       theme: toggleTheme,
-      settings: () => setSettingsOpen(true),
+      settings: () => router.push('/setting'),
       help: () => setHelpOpen((o) => !o),
       ai: () => window.dispatchEvent(new CustomEvent('env-monitor:open-ai')),
       close: () => {
         if (helpOpen) setHelpOpen(false);
-        else if (settingsOpen) setSettingsOpen(false);
       },
     }),
-    [switchTab, refresh, toggleTheme, helpOpen, settingsOpen]
+    [switchTab, refresh, toggleTheme, helpOpen, router]
   );
   useShortcuts(shortcutHandlers);
 
@@ -141,7 +140,7 @@ function DashboardInner() {
         onSelectDevice={dash.setDevice}
         status={status}
         onRefresh={refresh}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => router.push('/setting')}
         onOpenHelp={() => setHelpOpen(true)}
         activeTab={tab}
         onSelectTab={switchTab}
@@ -277,21 +276,6 @@ function DashboardInner() {
 
       <Toasts toasts={toasts} onDismiss={dismiss} />
       {helpOpen && <ShortcutHelp onClose={() => setHelpOpen(false)} />}
-
-      {settingsOpen && (
-        <SettingsModal
-          settings={settings}
-          serverCfg={serverCfg}
-          browserAi={browserAi}
-          onSave={(patch) => {
-            save(patch);
-            addLog(`Config saved — poll ${(patch.pollMs ?? settings.pollMs) / 1000}s`, 'info');
-            notify(t('toast.saved'));
-            setSettingsOpen(false);
-          }}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
     </div>
   );
 }
