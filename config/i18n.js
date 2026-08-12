@@ -183,8 +183,8 @@ const DICT = {
         connection: 'เซิร์ฟเวอร์',
         ai: 'AI',
         assistant: 'ผู้ช่วย AI',
-        device: 'ในเบราว์เซอร์ (GPU)',
-        local: 'เครื่อง Local',
+        device: 'AI ในอุปกรณ์ (GPU)',
+        local: 'AI ที่โฮสต์เอง',
         gemini: 'Gemini',
         relay: 'Relay',
       },
@@ -206,8 +206,8 @@ const DICT = {
       enginePick: 'เลือก AI ที่จะใช้',
       engine: {
         gemini: 'AI บนคลาวด์',
-        local: 'เครื่อง Local',
-        browser: 'ในเบราว์เซอร์นี้',
+        local: 'AI ที่โฮสต์เอง',
+        browser: 'AI ในอุปกรณ์',
       },
       engineHint: {
         gemini: 'Gemini ของ Google — ตอบดีที่สุด แต่คำถามและข้อมูลห้องจะถูกส่งออกไปนอกเครือข่าย',
@@ -225,8 +225,8 @@ const DICT = {
       engineBrowserNote:
         'ถ้ายังไม่ได้ดาวน์โหลดโมเดลลงเครื่อง ระบบจะถามก่อนดาวน์โหลดเสมอ ไม่ดาวน์โหลดเองเงียบ ๆ',
       aiServerOrder: 'ลำดับปัจจุบันของเซิร์ฟเวอร์: {order}',
-      aiLocalBase: 'ที่อยู่ AI ในเครื่อง (OpenAI-compatible)',
-      aiLocalModel: 'โมเดลของเครื่อง Local',
+      aiLocalBase: 'ที่อยู่ AI ที่โฮสต์เอง (OpenAI-compatible)',
+      aiLocalModel: 'โมเดลของ AI ที่โฮสต์เอง',
       aiGeminiBase: 'Gemini Base URL',
       aiGeminiModel: 'โมเดล Gemini',
       modelAuto: 'อัตโนมัติ (ตามที่เซิร์ฟเวอร์เลือก)',
@@ -240,10 +240,10 @@ const DICT = {
 
     ai: {
       title: 'ผู้ช่วย AI',
-      local: 'ในเครื่อง',
+      local: 'กฎในตัวเครื่อง',
       summaryTitle: 'สรุปโดย AI',
       viaRelay: '{name} (ผ่าน relay)',
-      srcLocal: 'ในเครื่อง',
+      srcLocal: 'กฎในตัวเครื่อง',
       greeting: 'สวัสดี — ถามเรื่องห้องนี้ได้เลย',
       chatEmpty1: 'ถามเกี่ยวกับสภาพแวดล้อมในห้อง',
       chatEmpty2: 'AI จะเรียกดูข้อมูลเซ็นเซอร์ ข้อมูลรัฐ และสุขภาพเองเมื่อจำเป็น',
@@ -269,7 +269,7 @@ const DICT = {
       noThoughts: 'รอบนี้โมเดลไม่ได้ส่งความคิดกลับมา',
       /* การส่งต่อให้ AI ตัวถัดไปในลำดับ และการขออนุญาตก่อนดาวน์โหลดโมเดล */
       tryingNext: 'ตัวนี้ตอบไม่ได้ กำลังส่งต่อให้ AI ตัวถัดไป...',
-      askDownload: 'ลำดับถัดไปคือ AI ในเบราว์เซอร์ แต่ยังไม่มีโมเดล {model} ({size}) ในเครื่องนี้',
+      askDownload: 'ลำดับถัดไปคือ AI ในอุปกรณ์ แต่ยังไม่มีโมเดล {model} ({size}) ในเครื่องนี้',
       askDownloadGo: 'ดาวน์โหลดแล้วตอบต่อ',
       askDownloadSkip: 'ข้ามไปตัวถัดไป',
       stop: 'หยุดตอบ',
@@ -289,8 +289,7 @@ const DICT = {
 
     /** โหมด AI ที่รันในเบราว์เซอร์ด้วยการ์ดจอ (WebGPU) — ดู lib/ai/browser/ */
     bai: {
-      server: 'บนเซิร์ฟเวอร์',
-      browser: 'ในเบราว์เซอร์นี้ (GPU)',
+      browser: 'AI ในอุปกรณ์ (GPU)',
       noWebgpu: 'เบราว์เซอร์นี้ไม่รองรับ WebGPU',
       notDownloaded: 'ยังไม่ได้ดาวน์โหลดโมเดลลงเครื่องนี้',
       /* ค้นหาโมเดลจาก Hugging Face (บัญชี mlc-ai) */
@@ -310,7 +309,7 @@ const DICT = {
       model: 'โมเดล',
       noModel: 'ยังไม่ได้เลือกโมเดล — ค้นหาและเลือกจาก Hugging Face ด้านล่างก่อน',
       /* เวอร์ชันสำหรับหน้าจอที่ไม่มีตัวค้นหาอยู่ตรงนั้น จึงต้องบอกทางไป */
-      noModelWhere: 'ยังไม่ได้เลือกโมเดลในเครื่องนี้ — เลือกได้ที่ ตั้งค่า → ในเบราว์เซอร์ (GPU)',
+      noModelWhere: 'ยังไม่ได้เลือกโมเดลในเครื่องนี้ — เลือกได้ที่ ตั้งค่า → AI ในอุปกรณ์ (GPU)',
       noF16: 'การ์ดจอนี้ไม่รองรับ shader-f16 — จะใช้รุ่น q4f32 ที่ไฟล์ใหญ่และกิน VRAM มากกว่า',
       sendContext: 'ส่งข้อมูลของเว็บให้ AI',
       sendContextNote: 'ปิดแล้วตอบเร็วขึ้นมาก แต่ AI จะไม่รู้ค่าเซ็นเซอร์เลย',
@@ -641,8 +640,8 @@ const DICT = {
         connection: 'Server',
         ai: 'AI',
         assistant: 'Assistant',
-        device: 'In this browser (GPU)',
-        local: 'Local endpoint',
+        device: 'On-device AI (GPU)',
+        local: 'Self-hosted AI',
         gemini: 'Gemini',
         relay: 'Relay',
       },
@@ -663,8 +662,8 @@ const DICT = {
       enginePick: 'Which AI answers',
       engine: {
         gemini: 'Cloud AI',
-        local: 'Local',
-        browser: 'In this browser',
+        local: 'Self-hosted AI',
+        browser: 'On-device AI',
       },
       engineHint: {
         gemini: "Google's Gemini — the best answers, but the question and the room's data leave your network",
@@ -682,8 +681,8 @@ const DICT = {
       engineBrowserNote:
         'If the on-device model is not downloaded yet, you are asked first — it is never fetched silently.',
       aiServerOrder: "Server's current order: {order}",
-      aiLocalBase: 'Local AI endpoint (OpenAI-compatible)',
-      aiLocalModel: 'Local model',
+      aiLocalBase: 'Self-hosted AI endpoint (OpenAI-compatible)',
+      aiLocalModel: 'Self-hosted model',
       aiGeminiBase: 'Gemini base URL',
       aiGeminiModel: 'Gemini model',
       modelAuto: 'Automatic (server picks)',
@@ -697,10 +696,10 @@ const DICT = {
 
     ai: {
       title: 'AI assistant',
-      local: 'Local',
+      local: 'Built-in rules',
       summaryTitle: 'AI summary',
       viaRelay: '{name} (via relay)',
-      srcLocal: 'local',
+      srcLocal: 'built-in rules',
       greeting: 'Hi — ask me about this room',
       chatEmpty1: 'Ask about the room environment',
       chatEmpty2: 'The AI fetches sensor, government and health data as it needs them',
@@ -722,7 +721,7 @@ const DICT = {
       thoughtTitle: 'AI reasoning',
       noThoughts: 'The model returned no reasoning for this turn',
       tryingNext: 'That one could not answer — handing the question to the next AI...',
-      askDownload: 'Next in line is the in-browser AI, but {model} ({size}) is not on this machine yet',
+      askDownload: 'Next in line is the on-device AI, but {model} ({size}) is not on this machine yet',
       askDownloadGo: 'Download and continue',
       askDownloadSkip: 'Skip to the next one',
       stop: 'Stop generating',
@@ -740,8 +739,7 @@ const DICT = {
     },
 
     bai: {
-      server: 'On the server',
-      browser: 'In this browser (GPU)',
+      browser: 'On-device AI (GPU)',
       noWebgpu: 'This browser has no WebGPU',
       notDownloaded: 'The on-device model is not downloaded on this machine',
       searchOpen: 'Search Hugging Face for other models',
@@ -759,7 +757,7 @@ const DICT = {
       downloadsCount: '{n} downloads',
       model: 'Model',
       noModel: 'No model chosen yet — search Hugging Face below and pick one',
-      noModelWhere: 'No on-device model chosen — pick one under Settings → In this browser (GPU)',
+      noModelWhere: 'No on-device model chosen — pick one under Settings → On-device AI (GPU)',
       noF16: 'This GPU has no shader-f16 — the larger q4f32 build will be used instead',
       sendContext: "Give the AI the site's data",
       sendContextNote: 'Off is much faster, but the AI then knows no sensor values',

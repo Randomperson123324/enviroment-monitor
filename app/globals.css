@@ -3033,7 +3033,7 @@ textarea {
   color: var(--muted);
 }
 
-/* ── On-device model (Settings → "ในเบราว์เซอร์ (GPU)") ────────────────────── */
+/* ── On-device model (Settings → "AI ในอุปกรณ์ (GPU)") ─────────────────────── */
 .bai-body {
   margin-top: 9px;
   padding-top: 9px;

@@ -156,8 +156,9 @@ deployment that isn't a controlled demo — the headers are then ignored entirel
 
 ## The engine chain
 
-Settings → Assistant offers three engines — **Cloud AI** (Gemini), **Local** (the
-endpoint we run ourselves), and **In this browser** (WebGPU) — as three buttons
+Settings → Assistant offers three engines — **Cloud AI** (Gemini), **Self-hosted
+AI** (the OpenAI-compatible endpoint we run ourselves, `local` in the code), and
+**On-device AI** (WebGPU in this browser, `browser` in the code) — as three buttons
 for the simple choice, and as a lane of boxes underneath for arranging a
 fallback. Left to right is the order they are tried; an engine dragged out of the
 lane is not used at all, and the lane can hold one box or all three but never
@@ -254,7 +255,7 @@ model downloads to the browser once and runs there on the GPU, through
 on-device mode — its GPU path only, since the CPU (wllama/WASM) path needs
 cross-origin isolation and a second engine to maintain.
 
-No model ships with the app. **Settings → In this browser** opens a search of
+No model ships with the app. **Settings → On-device AI** opens a search of
 Hugging Face, and nothing runs until something is picked from it — the pane, the
 chat's empty state and a browser run in the chain all say so rather than falling
 back to a name in the source. `lib/ai/browser/catalog.js` lists the MLC
