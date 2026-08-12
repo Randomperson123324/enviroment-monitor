@@ -199,9 +199,25 @@ Two buttons in the composer:
   no business leaving the building, and on a metered key a surprise search costs
   money. The server checks the key too, so the toggle cannot promise a tool that
   will not run.
-- **Brain** — asks for the model's reasoning (`thinkingConfig.includeThoughts`
-  on Gemini, `reasoning_content` on OpenAI-compatible endpoints) and shows it
-  while it works. The block collapses the moment real text arrives.
+- **Brain** — asks for the model's reasoning (`thinkingConfig` on Gemini,
+  `reasoning_content` on OpenAI-compatible endpoints) and shows it while it
+  works. The block collapses the moment real text arrives.
+
+On Gemini, `includeThoughts: true` alone is not enough: it asks for a summary of
+whatever thinking happened, and Flash-Lite models — the default
+`gemini-3.5-flash-lite` among them — think at `minimal` unless told otherwise, so
+the request succeeded and simply carried no thoughts back. The level is a
+separate dial whose name changed with the model family: 3.x takes
+`thinkingLevel: 'medium'` (`GEMINI_THINKING_LEVEL`), 2.5 takes a token count
+(`thinkingBudget: -1`, dynamic), and sending both in one request is a 400. The
+provider picks by the version in the model id and falls back through the other
+shapes — then to no thinking at all — if Google refuses one, since an answer
+without thoughts beats no answer.
+
+Thoughts are billed and counted as output, so a thinking turn gets its own
+ceiling (`GEMINI_THINKING_MAX_OUTPUT_TOKENS`, 4096): on the plain 1024 the model
+can spend the whole budget reasoning and finish on `MAX_TOKENS` having said
+nothing.
 
 `/api/chat` stays as the non-streaming fallback; the browser falls back to it
 automatically if the stream cannot be started, but not once text has arrived —

@@ -137,6 +137,19 @@ const config = {
       baseUrl: str('GEMINI_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta'),
       timeoutMs: num('GEMINI_TIMEOUT_MS', 25000),
       maxTokens: num('GEMINI_MAX_OUTPUT_TOKENS', 1024),
+      /**
+       * How hard the model thinks when the brain button is on: minimal · low ·
+       * medium · high. Flash-Lite's own default is `minimal`, which produces no
+       * thoughts worth showing, so the toggle has to name a level of its own.
+       * 2.5-era models take a token budget instead; the provider translates.
+       */
+      thinkingLevel: str('GEMINI_THINKING_LEVEL', 'medium'),
+      /**
+       * Thoughts are billed and counted as output, so they eat maxOutputTokens
+       * before the answer gets any. At 1024 the model can spend the lot thinking
+       * and finish on MAX_TOKENS with nothing said.
+       */
+      thinkingMaxTokens: num('GEMINI_THINKING_MAX_OUTPUT_TOKENS', 4096),
     },
 
     /**
