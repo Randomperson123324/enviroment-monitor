@@ -9,16 +9,9 @@
  * actually used.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { STORAGE } from '@/config/client';
-import {
-  BROWSER_MODELS,
-  DEFAULT_BROWSER_MODEL_ID,
-  F32_FALLBACKS,
-  canonicalModelId,
-  getBrowserModelInfo,
-  variantIds,
-} from '@/lib/ai/browser/models';
+import { f32SiblingId, getBrowserModelInfo, variantIds } from '@/lib/ai/browser/models';
 import {
   deleteModel,
   getEngine,
@@ -31,8 +24,12 @@ import {
 
 export default function useBrowserAi({ enabled = true } = {}) {
   const [kind, setKindState] = useState('server');
-  /** Stored canonically as the f16 id; the variant to actually run is derived. */
-  const [selectedId, setSelectedId] = useState(DEFAULT_BROWSER_MODEL_ID);
+  /**
+   * Exactly what was picked from the search, stored verbatim. Empty until
+   * someone picks: there is no built-in model to fall back on, and inventing a
+   * default here would be the hardcoded list coming back through the side door.
+   */
+  const [selectedId, setSelectedId] = useState('');
   /** Label and measured size of a model chosen from the search, for the UI to show. */
   const [meta, setMeta] = useState(null);
   const [f16Ok, setF16Ok] = useState(null);
@@ -43,15 +40,12 @@ export default function useBrowserAi({ enabled = true } = {}) {
   /** Guards against two loads at once (panel button + first message). */
   const loadRef = useRef(null);
 
-  // No shader-f16 → every id must point at the q4f32 build, not just the one
-  // getEngine resolves: the size shown and the cache check have to agree with
-  // what will really be downloaded.
-  const modelId = f16Ok === false ? (F32_FALLBACKS[selectedId]?.id ?? selectedId) : selectedId;
+  // No shader-f16 → point at the q4f32 build here too, not only inside
+  // getEngine: the cache check and the size on screen have to agree with what
+  // will really be downloaded. Whether web-llm has that build is settled at load
+  // time, where the catalogue is already in hand.
+  const modelId = f16Ok === false ? (f32SiblingId(selectedId) ?? selectedId) : selectedId;
   const model = getBrowserModelInfo(modelId, meta);
-  const models = useMemo(
-    () => (f16Ok === false ? BROWSER_MODELS.map((m) => F32_FALLBACKS[m.id] ?? m) : BROWSER_MODELS),
-    [f16Ok]
-  );
 
   useEffect(() => {
     const supported = isWebGpuAvailable();
@@ -64,11 +58,10 @@ export default function useBrowserAi({ enabled = true } = {}) {
     }
     if (window.localStorage.getItem(STORAGE.aiSendContext) === 'false') setSendContextState(false);
 
-    // Any id from web-llm's prebuilt list is allowed here, not just the curated
-    // pair: the Hugging Face search can put anything runnable in this slot, and
-    // an unknown id is only unknown to *this file*.
+    // Any id web-llm ships a build for is allowed here — the search is what
+    // validates, and an unknown-looking id is only unknown to *this file*.
     const stored = window.localStorage.getItem(STORAGE.aiBrowserModel);
-    if (stored) setSelectedId(canonicalModelId(stored));
+    if (stored) setSelectedId(stored);
     try {
       const savedMeta = JSON.parse(window.localStorage.getItem(STORAGE.aiBrowserModelMeta) ?? 'null');
       if (savedMeta?.id) setMeta(savedMeta);
@@ -85,6 +78,7 @@ export default function useBrowserAi({ enabled = true } = {}) {
 
   /** Is this model already on disk? Re-checked whenever the id changes. */
   const checkCache = useCallback(async () => {
+    if (!modelId) return;
     try {
       const cached = await hasModelCached(modelId);
       setStatus((prev) => {
@@ -115,21 +109,19 @@ export default function useBrowserAi({ enabled = true } = {}) {
   }, []);
 
   /**
-   * `info` carries what the picker learned from Hugging Face (label, measured
-   * size) for models this file has no curated entry for. The curated pair pass
-   * nothing and keep their own description.
+   * `info` is what the picker learned from Hugging Face — the label it showed
+   * and the size it measured — kept beside the id so the pane can describe the
+   * choice without going back to the network.
    */
   const setModel = useCallback((id, info = null) => {
     // Never mid-download: the percentage on screen would start meaning a
     // different model than the one it is counting.
     if (loadRef.current) return;
     if (!id) return;
-    const canonical = canonicalModelId(id);
-    setSelectedId(canonical);
-    window.localStorage.setItem(STORAGE.aiBrowserModel, canonical);
+    setSelectedId(id);
+    window.localStorage.setItem(STORAGE.aiBrowserModel, id);
 
-    const curated = BROWSER_MODELS.some((m) => m.id === canonical);
-    const next = curated || !info ? null : { id: canonical, ...info };
+    const next = info ? { id, ...info } : null;
     setMeta(next);
     if (next) window.localStorage.setItem(STORAGE.aiBrowserModelMeta, JSON.stringify(next));
     else window.localStorage.removeItem(STORAGE.aiBrowserModelMeta);
@@ -142,6 +134,12 @@ export default function useBrowserAi({ enabled = true } = {}) {
       if (loadRef.current) return loadRef.current;
 
       const run = (async () => {
+        // Nothing picked yet: say so rather than asking web-llm to load ''.
+        if (!modelId) {
+          const err = new Error('no on-device model chosen');
+          setStatus({ phase: 'error', message: err.message });
+          throw err;
+        }
         setStatus((prev) => (prev.phase === 'ready' ? prev : { phase: 'downloading', progress: 0 }));
         try {
           await getEngine(modelId, (progress) => {
@@ -180,7 +178,6 @@ export default function useBrowserAi({ enabled = true } = {}) {
     setKind,
     modelId,
     model,
-    models,
     status,
     webgpu,
     gpuInfo,

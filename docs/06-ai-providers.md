@@ -254,11 +254,17 @@ model downloads to the browser once and runs there on the GPU, through
 on-device mode — its GPU path only, since the CPU (wllama/WASM) path needs
 cross-origin isolation and a second engine to maintain.
 
-Two Qwen3 builds are recommended up front (`lib/ai/browser/models.js`), and the
-rest of the catalogue is a search: **Settings → In this browser → search Hugging
-Face**. `lib/ai/browser/catalog.js` lists the MLC conversions from the `mlc-ai`
-account with their download counts, and joins each one against the installed
-web-llm's `prebuiltAppConfig`.
+No model ships with the app. **Settings → In this browser** opens a search of
+Hugging Face, and nothing runs until something is picked from it — the pane, the
+chat's empty state and a browser run in the chain all say so rather than falling
+back to a name in the source. `lib/ai/browser/catalog.js` lists the MLC
+conversions from the `mlc-ai` account with their download counts, and joins each
+one against the installed web-llm's `prebuiltAppConfig`.
+
+Two Qwen3 builds used to be hardcoded in `lib/ai/browser/models.js` with
+hand-copied sizes and VRAM figures, which meant the app's idea of what it could
+run drifted from web-llm's whenever either side moved. That file now holds no
+model names at all — only id arithmetic (the f32 twin, the variants to delete).
 
 That join is the point. Weights alone do not run in a browser — a model also
 needs a WebGPU shader library compiled for its architecture and quantisation and
@@ -276,9 +282,13 @@ Details that are not decoration:
 - **q4f16 → q4f32 fallback.** A GPU without the WebGPU feature `shader-f16` fails
   to compile the f16 shaders — *after* the whole model has downloaded. So the
   adapter is asked first, and every id, size and cache check follows the answer.
-  For a model picked from the search there is no curated twin, so `resolveModelId`
-  swaps the quantisation in the id and takes the result only if web-llm actually
-  ships a library for it.
+  There is no curated twin to look up: `resolveModelId` swaps the quantisation in
+  the id and takes the result only if web-llm actually ships a library for it.
+- **The thinking switch is Qwen's, not everyone's.** `enable_thinking: false` is
+  not a no-op on a model without a thinking mode — web-llm implements it by
+  writing a literal `<think></think>` block into the reply header, which would be
+  two stray tags atop every answer. It is sent only to models whose id says they
+  are hybrid-thinking.
 - **Main thread, not a worker.** A worker that fetches its script needs that
   script's response to carry COEP, and on a cross-origin-isolated page it
   otherwise fails to construct — at which point web-llm waits forever for a

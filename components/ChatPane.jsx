@@ -305,6 +305,13 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
           continue;
         }
 
+        // No model picked yet — there is no built-in one — so there is nothing
+        // to offer to download. Say which setting fixes it and move on.
+        if (run.kind === 'browser' && !ai?.modelId) {
+          failure = new Error(t('bai.noModelWhere'));
+          continue;
+        }
+
         // Several gigabytes is not something to start on someone's behalf, so a
         // browser run whose weights are not on this machine yet asks first. The
         // answer resolves the promise the turn is waiting on: download and carry
@@ -389,7 +396,11 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
             <p className="chat-empty-hint">
               {t('ai.chatEmpty1')}
               <br />
-              {onBrowser ? t('bai.emptyHint', { model: ai.model.label }) : t('ai.chatEmpty2')}
+              {!onBrowser
+                ? t('ai.chatEmpty2')
+                : ai.model
+                  ? t('bai.emptyHint', { model: ai.model.label })
+                  : t('bai.noModelWhere')}
             </p>
           </div>
         )}

@@ -175,33 +175,29 @@ export default function BrowserAiSettings({ ai }) {
   return (
     <div className="bai-body">
       <div className="bai-label">{t('bai.model')}</div>
-      {ai.models.map((m) => (
-        <button
-          key={m.id}
-          className={`bai-model ${m.id === ai.modelId ? 'on' : ''}`}
-          onClick={() => ai.setModel(m.id)}
-        >
-          <span className="bai-model-name">{m.label}</span>
-          <span className="bai-model-size">{m.sizeText}</span>
-          <span className="bai-model-desc">{t(`bai.desc.${m.descKey}`)}</span>
-        </button>
-      ))}
 
-      {/* A model that came from the search is not one of the two buttons above,
-          so it needs its own row — otherwise nothing on screen says what is
-          selected. */}
-      {ai.model?.fromSearch && (
+      {/* Whatever was chosen, described from what the picker measured. There is
+          no built-in model to fall back on, so "none yet" is a state this pane
+          has to show rather than a case that cannot happen. */}
+      {ai.model ? (
         <button className="bai-model on" onClick={() => setSearchOpen(true)}>
           <span className="bai-model-name">{ai.model.label}</span>
           <span className="bai-model-size">{ai.model.sizeText}</span>
           <span className="bai-model-desc">{t('bai.fromSearch')}</span>
         </button>
+      ) : (
+        <p className="bai-note">{t('bai.noModel')}</p>
       )}
 
-      {searchOpen ? (
+      {searchOpen || !ai.model ? (
         <ModelSearch
           ai={ai}
-          onPick={(m, info) => ai.setModel(m.id, info)}
+          onPick={(m, info) => {
+            ai.setModel(m.id, info);
+            // Picking must not fold the list away under the cursor — comparing
+            // two builds means picking one, looking, and picking the other.
+            setSearchOpen(true);
+          }}
         />
       ) : (
         <button className="bai-btn wide" onClick={() => setSearchOpen(true)}>
@@ -228,6 +224,7 @@ export default function BrowserAiSettings({ ai }) {
         </span>
       </label>
 
+      {/* Nothing to download until something is chosen. */}
       <div className="bai-actions">
         {ai.status.phase === 'downloading' ? (
           <div className="bai-progress">
@@ -235,10 +232,16 @@ export default function BrowserAiSettings({ ai }) {
             <span>{t('bai.downloading', { pct: ai.status.progress ?? 0 })}</span>
           </div>
         ) : (
-          <button className="bai-btn" onClick={() => ai.loadModel()}>
-            <Download size={13} strokeWidth={2.2} aria-hidden />
-            {onDisk ? t('bai.load') : t('bai.download', { size: ai.model.sizeText })}
-          </button>
+          ai.model && (
+            <button className="bai-btn" onClick={() => ai.loadModel()}>
+              <Download size={13} strokeWidth={2.2} aria-hidden />
+              {onDisk
+                ? t('bai.load')
+                : ai.model.sizeText
+                  ? t('bai.download', { size: ai.model.sizeText })
+                  : t('bai.downloadPlain')}
+            </button>
+          )
         )}
 
         {onDisk && ai.status.phase !== 'downloading' && (
