@@ -189,10 +189,6 @@ const DICT = {
         relay: 'Relay',
       },
       pollHint: 'ยิ่งถี่ยิ่งเห็นค่าเร็ว แต่กินแบตและเน็ตมากขึ้น · ตั้งได้ {min}–{max} วินาที',
-      aiWhere: 'AI ทำงานที่ไหน',
-      aiWhereServer: 'ใช้เครื่องมือดึงข้อมูลได้ ค้นเว็บได้ และเร็วกว่า — ลำดับด้านล่างนี้ใช้กับโหมดนี้',
-      aiWhereBrowser:
-        'ใช้ {model} ที่รันในเครื่องนี้ด้วยการ์ดจอ ข้อความไม่ออกจากเครื่อง — ลำดับด้านล่างจึงไม่มีผล · เลือก/โหลดโมเดลได้ที่หัวข้อ "ในเบราว์เซอร์ (GPU)"',
       deviceHint:
         'ส่วนนี้มีผลทันทีเมื่อกด ไม่ต้องกดบันทึก — การโหลด/ลบโมเดลเป็นการลงมือทำ ไม่ใช่ค่าที่รอยืนยัน',
       deviceWhere: 'การเลือกว่าจะใช้โหมดนี้หรือไม่ อยู่ที่หัวข้อ "ผู้ช่วย AI"',
@@ -206,14 +202,28 @@ const DICT = {
       },
       aiSummaryStyleHint:
         'เปลี่ยนเฉพาะการแสดงผล ใช้ผลสรุปเดิมที่แคชไว้ ไม่ต้องเรียก AI ใหม่ · จำค่าไว้ในเบราว์เซอร์นี้',
-      aiOrder: 'ลำดับการใช้ AI',
-      aiOrderOpt: {
-        server: 'ตามค่าเซิร์ฟเวอร์',
-        localFirst: 'เครื่อง Local ก่อน → Gemini',
-        geminiFirst: 'Gemini ก่อน → เครื่อง Local',
-        localOnly: 'ใช้เครื่อง Local อย่างเดียว',
-        geminiOnly: 'ใช้ Gemini อย่างเดียว',
+      /* ปุ่มเลือก AI สามตัว และแถวลำดับที่ลากจัดเรียงได้ */
+      enginePick: 'เลือก AI ที่จะใช้',
+      engine: {
+        gemini: 'AI บนคลาวด์',
+        local: 'เครื่อง Local',
+        browser: 'ในเบราว์เซอร์นี้',
       },
+      engineHint: {
+        gemini: 'Gemini ของ Google — ตอบดีที่สุด แต่คำถามและข้อมูลห้องจะถูกส่งออกไปนอกเครือข่าย',
+        local: 'โมเดลที่เรารันเอง เซิร์ฟเวอร์ของเว็บนี้เป็นผู้เรียก — ข้อมูลไม่ออกนอกเครือข่ายของคุณ',
+        browser: 'โมเดลทำงานบนการ์ดจอของเครื่องนี้ — ข้อความไม่ถูกส่งออกไปไหนเลย',
+      },
+      enginePriority: 'ลำดับการใช้ (ซ้ายไปขวา)',
+      engineUnused: 'ไม่ได้ใช้ — กดหรือลากเพื่อเพิ่มเข้าลำดับ',
+      engineAdd: 'เพิ่มเข้าลำดับ',
+      engineEarlier: 'เลื่อนไปทางซ้าย',
+      engineLater: 'เลื่อนไปทางขวา',
+      engineDrop: 'เอาออกจากลำดับ',
+      engineOneHint: 'ใช้ตัวนี้ตัวเดียว — ถ้าตอบไม่ได้ก็จะแจ้งว่าตอบไม่ได้ ไม่ไปเรียกตัวอื่น',
+      engineChainHint: 'ตัวซ้ายสุดตอบก่อน ถ้าตอบไม่ได้จึงไล่ไปตัวถัดไปทางขวา',
+      engineBrowserNote:
+        'ถ้ายังไม่ได้ดาวน์โหลดโมเดลลงเครื่อง ระบบจะถามก่อนดาวน์โหลดเสมอ ไม่ดาวน์โหลดเองเงียบ ๆ',
       aiServerOrder: 'ลำดับปัจจุบันของเซิร์ฟเวอร์: {order}',
       aiLocalBase: 'ที่อยู่ AI ในเครื่อง (OpenAI-compatible)',
       aiLocalModel: 'โมเดลของเครื่อง Local',
@@ -257,6 +267,11 @@ const DICT = {
       /* Gemini 3 มักไม่ส่งสรุปความคิดกลับมาในเทิร์นที่เรียกเครื่องมือ — บอกไปตรง ๆ
          ดีกว่าปล่อยให้ปุ่มดูเหมือนเสีย */
       noThoughts: 'รอบนี้โมเดลไม่ได้ส่งความคิดกลับมา',
+      /* การส่งต่อให้ AI ตัวถัดไปในลำดับ และการขออนุญาตก่อนดาวน์โหลดโมเดล */
+      tryingNext: 'ตัวนี้ตอบไม่ได้ กำลังส่งต่อให้ AI ตัวถัดไป...',
+      askDownload: 'ลำดับถัดไปคือ AI ในเบราว์เซอร์ แต่ยังไม่มีโมเดล {model} ({size}) ในเครื่องนี้',
+      askDownloadGo: 'ดาวน์โหลดแล้วตอบต่อ',
+      askDownloadSkip: 'ข้ามไปตัวถัดไป',
       stop: 'หยุดตอบ',
       stopped: 'หยุดโดยผู้ใช้',
 
@@ -277,6 +292,7 @@ const DICT = {
       server: 'บนเซิร์ฟเวอร์',
       browser: 'ในเบราว์เซอร์นี้ (GPU)',
       noWebgpu: 'เบราว์เซอร์นี้ไม่รองรับ WebGPU',
+      notDownloaded: 'ยังไม่ได้ดาวน์โหลดโมเดลลงเครื่องนี้',
       model: 'โมเดล',
       desc: {
         quality: 'ตอบดีกว่า ใช้ VRAM มากกว่า',
@@ -617,11 +633,6 @@ const DICT = {
         relay: 'Relay',
       },
       pollHint: 'More often means fresher numbers but more battery and bandwidth · {min}–{max} seconds',
-      aiWhere: 'Where the AI runs',
-      aiWhereServer:
-        'Can use tools and web search, and is faster — the priority below applies to this mode',
-      aiWhereBrowser:
-        '{model} runs on this machine on the GPU and nothing leaves it — so the priority below does not apply · pick and download models under "In this browser (GPU)"',
       deviceHint:
         'This section applies as you press, with no Save — downloading or deleting a model is an action, not a pending edit',
       deviceWhere: 'Whether to use this mode at all is chosen under "Assistant"',
@@ -635,14 +646,27 @@ const DICT = {
       },
       aiSummaryStyleHint:
         'Presentation only — reuses the cached summary, so switching costs no AI call. Remembered in this browser.',
-      aiOrder: 'Provider priority',
-      aiOrderOpt: {
-        server: 'Follow the server',
-        localFirst: 'Local first → Gemini',
-        geminiFirst: 'Gemini first → Local',
-        localOnly: 'Local only',
-        geminiOnly: 'Gemini only',
+      enginePick: 'Which AI answers',
+      engine: {
+        gemini: 'Cloud AI',
+        local: 'Local',
+        browser: 'In this browser',
       },
+      engineHint: {
+        gemini: "Google's Gemini — the best answers, but the question and the room's data leave your network",
+        local: 'The model we run ourselves, called by this site\'s server — nothing leaves your network',
+        browser: 'Runs on this machine\'s GPU — nothing is sent anywhere at all',
+      },
+      enginePriority: 'Order they are tried (left to right)',
+      engineUnused: 'Not used — tap or drag one in',
+      engineAdd: 'Add to the order',
+      engineEarlier: 'Move left',
+      engineLater: 'Move right',
+      engineDrop: 'Take out of the order',
+      engineOneHint: 'This one only — if it cannot answer, the turn says so rather than asking another.',
+      engineChainHint: 'The leftmost answers; if it fails, the next one to its right gets the question.',
+      engineBrowserNote:
+        'If the on-device model is not downloaded yet, you are asked first — it is never fetched silently.',
       aiServerOrder: "Server's current order: {order}",
       aiLocalBase: 'Local AI endpoint (OpenAI-compatible)',
       aiLocalModel: 'Local model',
@@ -683,6 +707,10 @@ const DICT = {
       thinkingLive: 'Thinking...',
       thoughtTitle: 'AI reasoning',
       noThoughts: 'The model returned no reasoning for this turn',
+      tryingNext: 'That one could not answer — handing the question to the next AI...',
+      askDownload: 'Next in line is the in-browser AI, but {model} ({size}) is not on this machine yet',
+      askDownloadGo: 'Download and continue',
+      askDownloadSkip: 'Skip to the next one',
       stop: 'Stop generating',
       stopped: 'Stopped by user',
 
@@ -701,6 +729,7 @@ const DICT = {
       server: 'On the server',
       browser: 'In this browser (GPU)',
       noWebgpu: 'This browser has no WebGPU',
+      notDownloaded: 'The on-device model is not downloaded on this machine',
       model: 'Model',
       desc: {
         quality: 'Better answers, more VRAM',

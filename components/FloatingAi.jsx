@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Bot, X, PanelRight, PictureInPicture2 } from 'lucide-react';
+import { aiChainFrom } from '@/config/client';
 import { useLang } from '@/hooks/useLang';
 import useAiWindow from '@/hooks/useAiWindow';
 import ChatPane from '@/components/ChatPane';
@@ -73,9 +74,13 @@ export default function FloatingAi({ deviceId, settings, serverAi, aiCaps, brows
       ? { width: win.dockWidth }
       : undefined;
 
-  // Until something answers we can only name the chain the server would use.
+  // Until something answers we can only name the chain that will be tried — the
+  // arranged one when there is one, since that is what the next question will
+  // actually walk, and the server's own order otherwise.
+  const planned = aiChainFrom(settings.aiOrder, serverAi ?? []);
   const source =
-    sourceLabel(t, lastSource) || (serverAi?.length ? serverAi.join(' → ') : t('ai.local'));
+    sourceLabel(t, lastSource) ||
+    (planned.length ? planned.map((id) => t(`settings.engine.${id}`)).join(' → ') : t('ai.local'));
 
   return (
     <>

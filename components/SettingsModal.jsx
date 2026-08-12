@@ -13,10 +13,11 @@ import {
   Share2,
   Sparkles,
 } from 'lucide-react';
-import { AI_ORDER_PRESETS, AI_SUMMARY_STYLES } from '@/config/client';
+import { AI_SUMMARY_STYLES, aiChainFrom } from '@/config/client';
 import { SENSORS } from '@/config/sensors';
 import { aiHeaders } from '@/lib/ai-client';
 import { useLang } from '@/hooks/useLang';
+import AiEngineChain from '@/components/AiEngineChain';
 import BrowserAiSettings from '@/components/BrowserAiSettings';
 
 /** Canonical ingest field names, straight from the sensor definitions. */
@@ -220,6 +221,9 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
   const [aiOpen, setAiOpen] = useState(true);
 
   const ai = serverCfg.ai ?? {};
+  // Nothing arranged yet shows the server's own order rather than an empty lane,
+  // so the first drag starts from what is actually happening today.
+  const chain = aiChainFrom(aiOrder, ai.order?.length ? ai.order : ['gemini']);
   // What the picker queries: whatever is typed here wins over the server's value.
   // Memoised on the values themselves — a fresh object each render would make
   // ModelField's effect re-fire on every keystroke elsewhere in the dialog.
@@ -232,6 +236,9 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
     const min = serverCfg.pollMsMin / 1000;
     const max = serverCfg.pollMsMax / 1000;
     const sec = Math.min(max, Math.max(min, Number(pollSec) || serverCfg.pollMsDefault / 1000));
+    // The hook keeps its own copy so it can check the model cache and warn about
+    // WebGPU; the chain is what decides, so it is told rather than asked.
+    browserAi?.setKind(chain[0] === 'browser' ? 'browser' : 'server');
     onSave({
       apiBase: apiBase.trim(),
       geminiKey: geminiKey.trim(),
@@ -361,47 +368,14 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
               </div>
               <p className="field-hint">{t('settings.aiSummaryStyleHint')}</p>
 
-              {/* Directly above the provider priority, because the priority list
-                  only means anything while the server answers — separating the
-                  two made it look like it ranked the browser model too. */}
-              {browserAi && (
-                <>
-                  <div className="field">
-                    <label>{t('settings.aiWhere')}</label>
-                    <select
-                      value={browserAi.kind}
-                      onChange={(e) => browserAi.setKind(e.target.value)}
-                    >
-                      <option value="server">{t('bai.server')}</option>
-                      <option value="browser" disabled={browserAi.webgpu === false}>
-                        {browserAi.webgpu === false
-                          ? `${t('bai.browser')} — ${t('bai.noWebgpu')}`
-                          : t('bai.browser')}
-                      </option>
-                    </select>
-                  </div>
-                  <p className="field-hint">
-                    {browserAi.kind === 'browser'
-                      ? t('settings.aiWhereBrowser', { model: browserAi.model.label })
-                      : t('settings.aiWhereServer')}
-                  </p>
-                </>
-              )}
-
-              <div className="field">
-                <label>{t('settings.aiOrder')}</label>
-                <select
-                  value={aiOrder}
-                  onChange={(e) => setAiOrder(e.target.value)}
-                  disabled={browserAi?.kind === 'browser'}
-                >
-                  {AI_ORDER_PRESETS.map((p) => (
-                    <option key={p.key} value={p.value}>
-                      {t(`settings.aiOrderOpt.${p.key}`)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* One control, two ways in: the buttons pick a single engine, the
+                  lane arranges a fallback. Both write the same chain, which is
+                  also what the x-ai-order header has always carried. */}
+              <AiEngineChain
+                chain={chain}
+                browserAi={browserAi}
+                onChange={(next) => setAiOrder(next.join(','))}
+              />
               <p className="field-hint">
                 {t('settings.aiServerOrder', { order: (ai.order ?? []).join(' → ') || '—' })}
               </p>

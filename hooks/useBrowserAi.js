@@ -89,9 +89,12 @@ export default function useBrowserAi({ enabled = true } = {}) {
     }
   }, [modelId]);
 
+  // Checked whatever the engine is: the browser model can sit anywhere in the
+  // chain, and the chat has to know whether reaching it means a load or a
+  // multi-gigabyte download it must ask about first.
   useEffect(() => {
-    if (kind === 'browser') void checkCache();
-  }, [kind, checkCache]);
+    void checkCache();
+  }, [checkCache]);
 
   const setKind = useCallback((next) => {
     setKindState(next);

@@ -144,7 +144,7 @@ entirely, leaving the server on its env configuration.
 
 | Header | Overrides |
 |---|---|
-| `x-ai-order` | provider priority, e.g. `local,gemini` |
+| `x-ai-order` | engine chain, e.g. `local,gemini` |
 | `x-ai-local-base` / `x-ai-local-model` | local endpoint + model |
 | `x-ai-gemini-key` (alias `x-gemini-key`) | AI Studio key |
 | `x-ai-gemini-base` / `x-ai-gemini-model` | Gemini endpoint + model |
@@ -153,6 +153,29 @@ entirely, leaving the server on its env configuration.
 Only `http:`/`https:` URLs are accepted. Because a caller-supplied base URL is a
 URL this server will then fetch, set `AI_ALLOW_CLIENT_OVERRIDES=false` on any
 deployment that isn't a controlled demo — the headers are then ignored entirely.
+
+## The engine chain
+
+Settings → Assistant offers three engines — **Cloud AI** (Gemini), **Local** (the
+endpoint we run ourselves), and **In this browser** (WebGPU) — as three buttons
+for the simple choice, and as a lane of boxes underneath for arranging a
+fallback. Left to right is the order they are tried; an engine dragged out of the
+lane is not used at all, and the lane can hold one box or all three but never
+zero. The arrows beside each box do the same job as dragging, because HTML5
+drag-and-drop does not fire on touch.
+
+One string holds all of it — the same comma-separated value `x-ai-order` has
+always carried, now allowed to name `browser` too. The server drops ids it does
+not know (`providerOrder` filters against `PROVIDERS`), so the header stays valid
+while the client reads the whole chain. `aiChainRuns` in `config/client.js` splits
+it into attempts: consecutive server providers travel as one request, since the
+server chain already walks them itself, so `gemini,browser,local` is three tries
+in that order rather than "both server providers, then the browser".
+
+A browser run whose weights are not on this machine **asks before downloading**.
+The turn pauses on a promise, the message shows the model and its size, and the
+answer either downloads and continues there or hands the question to the next
+engine. Several gigabytes is not something to start on someone's behalf.
 
 ## Tools, and the focus boundary
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Bot, Brain, ChevronDown, Globe, Square, Wrench } from 'lucide-react';
-import { CHAT_MAX_TURNS } from '@/config/client';
+import { CHAT_MAX_TURNS, aiChainFrom, aiChainRuns } from '@/config/client';
 import { aiJsonHeaders } from '@/lib/ai-client';
 import { chatEvents } from '@/lib/chat-client';
 import { browserChatEvents, clearContextCache } from '@/lib/ai/browser/chat';
@@ -99,8 +99,19 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
   const [thinking, setThinking] = useState(false);
   const bodyRef = useRef(null);
   const abortRef = useRef(null);
+  /** A turn paused on "the on-device model is not downloaded yet — download it?" */
+  const [ask, setAsk] = useState(null);
+  const askRef = useRef(null);
 
-  const onBrowser = ai?.kind === 'browser';
+  /**
+   * The arranged chain, as attempts. An engine that fails hands the question to
+   * the next one; the last one's failure is the turn's failure.
+   */
+  const chain = aiChainFrom(settings.aiOrder, ai?.kind === 'browser' ? ['browser'] : []);
+  const runs = aiChainRuns(chain.filter((id) => id !== 'browser' || ai?.webgpu !== false));
+  const onBrowser = (runs[0] ?? {}).kind === 'browser';
+  /** Weights already on this machine, so falling back costs a load, not a download. */
+  const browserReady = ai?.status?.phase === 'cached' || ai?.status?.phase === 'ready';
 
   // Absent config is treated as capable: /api/config may not have answered yet,
   // and the fallback path below recovers from a wrong guess on its own.
@@ -152,6 +163,102 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
     return data;
   };
 
+  /**
+   * One engine's go at the turn. Throws when it fails, which is how the caller
+   * learns to try the next one. The server runs carry their own slice of the
+   * chain as the order header, so [cloud, browser, local] really is three tries
+   * in that order rather than "both server providers, then the browser".
+   */
+  const runAttempt = async (run, { msg, history, signal }, produced) => {
+    const events =
+      run.kind === 'browser'
+        ? browserChatEvents({
+            messages: [...history, { role: 'user', content: msg }],
+            apiBase: settings.apiBase,
+            deviceId,
+            lang,
+            modelId: ai.modelId,
+            thinking,
+            sendContext: ai.sendContext,
+            labels: {
+              fetchingContext: t('bai.statusContext'),
+              loadingModel: t('bai.statusLoading'),
+              preparingModel: t('bai.statusPreparing'),
+              analyzingPrompt: t('bai.statusPrefill'),
+              thinking: t('bai.statusWaiting'),
+              thinkingStatus: t('ai.thinkingLive'),
+            },
+            signal,
+          })
+        : chatEvents({
+            url: `${settings.apiBase}/api/chat/stream`,
+            headers: aiJsonHeaders({ ...settings, aiOrder: run.providers.join(',') }),
+            body: {
+              message: msg,
+              history,
+              device_id: deviceId,
+              lang,
+              search: search && canSearch,
+              thinking,
+            },
+            signal,
+          });
+
+    for await (const ev of events) {
+      switch (ev.type) {
+        case 'start':
+          onSource?.({ provider: ev.provider, model: ev.model });
+          break;
+        case 'thinking':
+          patchLast((m) => ({
+            ...m,
+            thinking: m.thinking + ev.text,
+            thinkOpen: m.content ? m.thinkOpen : true,
+          }));
+          break;
+        case 'delta':
+          produced.any = true;
+          patchLast((m) => ({
+            ...m,
+            content: m.content + ev.text,
+            // Collapse exactly once — on the first text — so a user who
+            // re-opens the thoughts mid-answer keeps them open.
+            thinkOpen: m.content ? m.thinkOpen : false,
+            status: null,
+          }));
+          break;
+        // The browser engine has no tool calls to show; this is what it
+        // reports instead — downloading, prefilling, waiting for a token.
+        case 'status':
+          patchLast((m) => ({ ...m, status: ev.text }));
+          break;
+        case 'tool-start':
+          patchLast((m) => ({
+            ...m,
+            tools: [...m.tools, { name: ev.name, args: ev.args, running: true }],
+          }));
+          break;
+        case 'tool':
+          produced.any = true;
+          patchLast((m) => ({
+            ...m,
+            tools: m.tools.map((c) =>
+              c.running && c.name === ev.name
+                ? { ...c, running: false, ok: ev.ok, note: ev.note }
+                : c
+            ),
+          }));
+          break;
+        // The server reports a dead chain this way rather than by failing the
+        // stream, so it has to count as this engine's failure, not the turn's.
+        case 'error':
+          throw new Error(ev.message);
+        default:
+          break;
+      }
+    }
+  };
+
   const send = async () => {
     const msg = input.trim();
     if (!msg || busy) return;
@@ -186,120 +293,81 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
 
     const controller = new AbortController();
     abortRef.current = controller;
-    let produced = false;
+    const produced = { any: false };
+    let failure = null;
+    let ranServer = false;
 
     try {
-      if (!onBrowser && !canStream) throw new Error('streaming disabled');
-      const events = onBrowser
-        ? browserChatEvents({
-            messages: [...history, { role: 'user', content: msg }],
-            apiBase: settings.apiBase,
-            deviceId,
-            lang,
-            modelId: ai.modelId,
-            thinking,
-            sendContext: ai.sendContext,
-            labels: {
-              fetchingContext: t('bai.statusContext'),
-              loadingModel: t('bai.statusLoading'),
-              preparingModel: t('bai.statusPreparing'),
-              analyzingPrompt: t('bai.statusPrefill'),
-              thinking: t('bai.statusWaiting'),
-              thinkingStatus: t('ai.thinkingLive'),
-            },
-            signal: controller.signal,
-          })
-        : chatEvents({
-            url: `${settings.apiBase}/api/chat/stream`,
-            headers: aiJsonHeaders(settings),
-            body: {
-              message: msg,
-              history,
-              device_id: deviceId,
-              lang,
-              search: search && canSearch,
-              thinking,
-            },
-            signal: controller.signal,
-          });
+      for (const [i, run] of runs.entries()) {
+        if (controller.signal.aborted) break;
+        if (run.kind === 'server' && !canStream) {
+          failure = new Error('streaming disabled');
+          continue;
+        }
 
-      for await (const ev of events) {
-        switch (ev.type) {
-          case 'start':
-            onSource?.({ provider: ev.provider, model: ev.model });
-            break;
-          case 'thinking':
-            patchLast((m) => ({
-              ...m,
-              thinking: m.thinking + ev.text,
-              thinkOpen: m.content ? m.thinkOpen : true,
-            }));
-            break;
-          case 'delta':
-            produced = true;
-            patchLast((m) => ({
-              ...m,
-              content: m.content + ev.text,
-              // Collapse exactly once — on the first text — so a user who
-              // re-opens the thoughts mid-answer keeps them open.
-              thinkOpen: m.content ? m.thinkOpen : false,
-              status: null,
-            }));
-            break;
-          // The browser engine has no tool calls to show; this is what it
-          // reports instead — downloading, prefilling, waiting for a token.
-          case 'status':
-            patchLast((m) => ({ ...m, status: ev.text }));
-            break;
-          case 'tool-start':
-            patchLast((m) => ({
-              ...m,
-              tools: [...m.tools, { name: ev.name, args: ev.args, running: true }],
-            }));
-            break;
-          case 'tool':
-            produced = true;
-            patchLast((m) => ({
-              ...m,
-              tools: m.tools.map((c) =>
-                c.running && c.name === ev.name
-                  ? { ...c, running: false, ok: ev.ok, note: ev.note }
-                  : c
-              ),
-            }));
-            break;
-          case 'error':
-            patchLast((m) => ({ ...m, error: ev.message }));
-            addLog(`Chat: ${ev.message}`, 'warn');
-            break;
-          default:
-            break;
+        // Several gigabytes is not something to start on someone's behalf, so a
+        // browser run whose weights are not on this machine yet asks first. The
+        // answer resolves the promise the turn is waiting on: download and carry
+        // on here, or hand the question to whatever is next in the chain.
+        if (run.kind === 'browser' && !browserReady) {
+          patchLast((m) => ({ ...m, status: null }));
+          const choice = await new Promise((resolve) => {
+            askRef.current = resolve;
+            setAsk({ size: ai?.model?.sizeText, label: ai?.model?.label, resolve });
+          });
+          askRef.current = null;
+          setAsk(null);
+          if (choice !== 'download' || controller.signal.aborted) {
+            failure = failure ?? new Error(t('bai.notDownloaded'));
+            continue;
+          }
+          try {
+            await ai.loadModel();
+          } catch (e) {
+            failure = e;
+            continue;
+          }
+        }
+
+        try {
+          if (run.kind === 'server') ranServer = true;
+          await runAttempt(run, { msg, history, signal: controller.signal }, produced);
+          failure = null;
+          break;
+        } catch (e) {
+          failure = e;
+          if (controller.signal.aborted) break;
+          // Half an answer is already on screen: starting again somewhere else
+          // would rewrite what someone is reading, so this one keeps its failure.
+          if (produced.any) break;
+          addLog(`Chat ${run.kind === 'browser' ? 'browser' : run.providers.join(',')}: ${e.message}`, 'warn');
+          // Announce the handover — a switch of engine explains a pause that
+          // otherwise looks like the answer having stalled.
+          if (i < runs.length - 1) patchLast((m) => ({ ...m, status: t('ai.tryingNext') }));
         }
       }
-    } catch (e) {
+
       if (controller.signal.aborted) {
-        patchLast((m) => ({ ...m, error: m.content ? null : t('ai.stopped') }));
-      } else if (produced || onBrowser) {
-        // Half an answer is already on screen; say what broke and keep it.
-        //
-        // The browser engine never falls back either, even having produced
-        // nothing: someone who chose to keep the conversation on this machine
-        // did not ask for it to be quietly sent to a provider instead.
-        patchLast((m) => ({ ...m, error: e.message, status: null }));
-        addLog(`Chat ${onBrowser ? 'browser' : 'stream'}: ${e.message}`, 'err');
-      } else {
-        // Nothing shipped yet, so the plain endpoint can still answer this turn.
-        addLog(`Chat stream failed, using /api/chat: ${e.message}`, 'warn');
+        patchLast((m) => ({ ...m, error: produced.any ? null : t('ai.stopped') }));
+      } else if (failure && !produced.any && ranServer) {
+        // Nothing shipped and a server engine was in the chain, so the plain
+        // endpoint can still answer this turn.
+        addLog(`Chat stream failed, using /api/chat: ${failure.message}`, 'warn');
         try {
           const data = await sendPlain(msg, history, controller.signal);
           onSource?.(data);
-          patchLast((m) => ({ ...m, content: data.reply ?? '—' }));
+          patchLast((m) => ({ ...m, content: data.reply ?? '—', status: null }));
         } catch (e2) {
-          patchLast((m) => ({ ...m, error: e2.message }));
+          patchLast((m) => ({ ...m, error: e2.message, status: null }));
           addLog(`Chat error: ${e2.message}`, 'err');
         }
+      } else if (failure) {
+        patchLast((m) => ({ ...m, error: failure.message, status: null }));
+        addLog(`Chat error: ${failure.message}`, 'err');
       }
     } finally {
+      askRef.current = null;
+      setAsk(null);
       patchLast((m) => ({ ...m, streaming: false, status: null }));
       setMessages((prev) =>
         prev.length > CHAT_MAX_TURNS ? prev.slice(prev.length - CHAT_MAX_TURNS) : prev
@@ -348,17 +416,32 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
                 {m.status}
               </div>
             )}
+            {/* The paused turn, waiting on a yes: the download is gigabytes, so
+                it is offered rather than started. Either button resumes. */}
+            {m.role === 'assistant' && m.streaming && ask && i === messages.length - 1 && (
+              <div className="chat-ask">
+                <p>{t('ai.askDownload', { model: ask.label ?? '', size: ask.size ?? '?' })}</p>
+                <span className="chat-ask-acts">
+                  <button className="chat-ask-go" onClick={() => ask.resolve('download')}>
+                    {t('ai.askDownloadGo')}
+                  </button>
+                  <button onClick={() => ask.resolve('skip')}>{t('ai.askDownloadSkip')}</button>
+                </span>
+              </div>
+            )}
             {m.role === 'user' ? (
               <div className="chat-bubble">{m.content}</div>
             ) : (
               // While a status line is showing there is nothing to put in a
-              // bubble, and an empty one reads as a failed reply.
-              (m.content || m.error || (m.streaming && !m.status)) && (
+              // bubble, and an empty one reads as a failed reply. A turn paused
+              // on the download question is not typing either — the blinking
+              // caret would claim an answer is on its way when it is waiting.
+              (m.content || m.error || (m.streaming && !m.status && !ask)) && (
                 <div className="chat-bubble">
                   {m.content ? (
                     <Markdown text={m.content} className="markdown chat-md" />
                   ) : (
-                    m.streaming && <span className="chat-typing" aria-hidden />
+                    m.streaming && !ask && <span className="chat-typing" aria-hidden />
                   )}
                   {m.error && <span className="chat-err">{t('ai.chatError', { msg: m.error })}</span>}
                 </div>
@@ -429,9 +512,12 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
             className="chat-send stop"
             onClick={() => {
               abortRef.current?.abort();
+              // A turn paused on the download question is waiting on a promise,
+              // not on the network: aborting alone would leave it hanging.
+              askRef.current?.('skip');
               // The abort signal stops the loop reading chunks; WebLLM also has
               // to be told, or it keeps generating into nothing.
-              if (onBrowser) void interruptBrowser();
+              if (chain.includes('browser')) void interruptBrowser();
             }}
             title={t('ai.stop')}
             aria-label={t('ai.stop')}

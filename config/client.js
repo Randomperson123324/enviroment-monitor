@@ -52,16 +52,45 @@ export const TABS = [{ id: 'environment' }, { id: 'focus' }, { id: 'hydro' }];
 export const HYDRO_VIEWS = [{ id: 'water' }, { id: 'disease' }];
 
 /**
- * Provider-priority presets offered in Dev Settings. `value` is sent verbatim as
- * the x-ai-order header; '' means "don't override, follow the server's order".
+ * The three things that can answer, in the order the settings pane offers them.
+ * `browser` is not a server provider: it runs here, on this machine's GPU.
  */
-export const AI_ORDER_PRESETS = [
-  { value: '', key: 'server' },
-  { value: 'local,gemini', key: 'localFirst' },
-  { value: 'gemini,local', key: 'geminiFirst' },
-  { value: 'local', key: 'localOnly' },
-  { value: 'gemini', key: 'geminiOnly' },
-];
+export const AI_ENGINES = ['gemini', 'local', 'browser'];
+
+/**
+ * The engine chain: which ones answer, and in what order they are tried. Stored
+ * and sent as the same comma-separated string the x-ai-order header has always
+ * carried ('gemini,local'), now allowed to contain `browser` as well — the server
+ * drops ids it does not know, so the header stays valid either way and the client
+ * needs no second setting to remember.
+ *
+ * An empty string means "follow the server's own order", which is what a fresh
+ * install gets; the settings pane fills it in as soon as anything is arranged.
+ */
+export function aiChainFrom(order, fallback = []) {
+  const chain = String(order ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((id, i, all) => AI_ENGINES.includes(id) && all.indexOf(id) === i);
+  return chain.length ? chain : fallback;
+}
+
+/**
+ * Runs of the chain, each one an attempt: consecutive server providers go out as
+ * a single request (the server chain already walks them itself), and the browser
+ * engine is its own attempt. [gemini, browser, local] is therefore three tries,
+ * in that order, rather than "both server providers, then the browser".
+ */
+export function aiChainRuns(chain) {
+  const runs = [];
+  for (const id of chain) {
+    const last = runs[runs.length - 1];
+    if (id === 'browser') runs.push({ kind: 'browser' });
+    else if (last?.kind === 'server') last.providers.push(id);
+    else runs.push({ kind: 'server', providers: [id] });
+  }
+  return runs;
+}
 
 /**
  * Presentation of AI summaries. Purely client-side: both styles render the same
