@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bot,
   ChevronDown,
@@ -220,6 +220,25 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
   // the way, not the resting state.
   const [aiOpen, setAiOpen] = useState(true);
 
+  /**
+   * On a phone the section list is a horizontal strip, and the pane it controls
+   * is below it: choosing "AI" expands four children that land off the right
+   * edge, and expanding a list whose contents you cannot see is worse than not
+   * expanding it. So the chosen chip is scrolled into view. `nearest` leaves the
+   * strip alone whenever the chip is already visible, which is every time on
+   * desktop, where the list is a column that does not scroll at all.
+   */
+  const navRef = useRef(null);
+  useEffect(() => {
+    // aria-selected, not `.on`: the AI group header is highlighted whenever one
+    // of its children is showing, and it is the first match in the strip — so a
+    // `.on` lookup scrolls to the group and leaves the chosen child off-screen,
+    // which is the exact thing this is here to prevent.
+    navRef.current
+      ?.querySelector('.set-navbtn[aria-selected="true"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [section, aiOpen]);
+
   const ai = serverCfg.ai ?? {};
   // Nothing arranged yet shows the server's own order rather than an empty lane,
   // so the first drag starts from what is actually happening today.
@@ -267,7 +286,7 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
 
         {/* Tabs rather than links: each pane is part of one unsaved form, so
             moving between them must not be a navigation that could lose it. */}
-        <div className="set-nav" role="tablist" aria-label={t('settings.nav')}>
+        <div className="set-nav" ref={navRef} role="tablist" aria-label={t('settings.nav')}>
           <button
             role="tab"
             aria-selected={section === 'connection'}

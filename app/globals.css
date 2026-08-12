@@ -3181,7 +3181,17 @@ textarea {
   gap: 5px;
   max-height: 230px;
   overflow-y: auto;
+  /* A scroller inside a scrolling pane: without this, a flick that reaches the
+     end of the list carries on and scrolls the pane behind it, which on a phone
+     loses your place in a 160-model list. */
+  overscroll-behavior: contain;
   padding-right: 2px;
+}
+
+@media (max-width: 720px) {
+  .bai-results {
+    max-height: 40dvh;
+  }
 }
 
 .bai-result {
@@ -3303,8 +3313,18 @@ textarea {
   background: rgba(4, 14, 24, 0.45);
   backdrop-filter: blur(6px);
   display: grid;
+  /*
+    minmax(0, 1fr), not the implicit `auto` track. An auto track takes its size
+    from the item's min-content, so a dialog with a fixed `width` sized the track
+    to itself: on a phone the settings dialog laid out at its full 760px inside a
+    390px screen, the right half — including Save — hanging off the edge with
+    nothing to scroll. Capping the track is what makes the `max-width: 100%`
+    below mean "the screen".
+  */
+  grid-template-columns: minmax(0, 1fr);
   place-items: center;
   padding: 16px;
+  overflow-y: auto;
 }
 
 .modal {
@@ -3469,9 +3489,30 @@ textarea {
 /* Narrow: the same panes, with the section list as a scrolling strip on top —
    a 190px column plus a form field does not fit on a phone. */
 @media (max-width: 720px) {
+  .modal-ov {
+    /* Every px of width counts here, and the phone's own rounded corners and
+       home indicator are not places to put a dialog edge. */
+    padding: 10px max(10px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-bottom));
+  }
+
+  .modal,
+  .set-modal {
+    width: 100%;
+    padding: 16px;
+    border-radius: 1.25rem;
+  }
+
   .set-modal {
     grid-template-columns: 1fr;
     gap: 0;
+    /* dvh, not vh: mobile browsers measure vh against the *expanded* viewport,
+       so a dialog capped in vh keeps its footer under the address bar until the
+       toolbar happens to collapse. */
+    max-height: min(90dvh, 760px);
+  }
+
+  .modal-scroll {
+    max-height: min(80dvh, 780px);
   }
 
   .set-title,
@@ -3482,14 +3523,52 @@ textarea {
   .set-nav {
     flex-direction: row;
     overflow-x: auto;
+    /* The strip is a horizontal scroller on a touch screen, so it must not also
+       start a vertical drag, and it must not paint a scrollbar over the chips. */
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
     padding-bottom: 10px;
     margin-bottom: 12px;
     border-bottom: 1px solid var(--line);
   }
 
+  .set-nav::-webkit-scrollbar {
+    display: none;
+  }
+
   .set-navbtn {
     flex: 0 0 auto;
     border-color: var(--line);
+  }
+
+  /* Indentation says "child of the row above" in a column and nothing at all in
+     a row, where it just reads as a gap in the strip. */
+  .set-navchild {
+    margin-left: 0;
+  }
+}
+
+/*
+  Touch: a 16px form font is the threshold below which iOS Safari zooms the page
+  on focus, and it does not zoom back out — the dialog is then wider than the
+  screen and has to be pinched down by hand. Everything typed into is bumped, and
+  the icon-sized controls grow to something a fingertip can hit.
+*/
+@media (pointer: coarse) {
+  .field input,
+  .field select,
+  .bai-search-box input,
+  .chat-input {
+    font-size: 16px;
+  }
+
+  .ai-chain-acts button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .ai-chain-box {
+    padding: 7px 8px;
   }
 }
 
