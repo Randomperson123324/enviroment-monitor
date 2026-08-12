@@ -236,6 +236,15 @@ export const AI_WINDOW = {
   minHeight: 320,
   /** How close to the right edge a drop counts as "snap back to docked". */
   snapZone: 72,
+  /**
+   * Dragged this far leftward across the screen, a drop means "fill it" — the
+   * gesture reads as pulling the window out over the page rather than moving it
+   * somewhere. Measured on the pointer as a fraction of the viewport travelled
+   * from the right edge, so 0.6 means "past the 40% mark".
+   */
+  fullDragRatio: 0.6,
+  /** Touching the top edge fills the screen too, as window managers do. */
+  topSnapZone: 40,
   /** Movement before a press on the title bar counts as a drag, not a click. */
   dragThreshold: 4,
   /**

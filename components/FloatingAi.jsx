@@ -53,14 +53,31 @@ export default function FloatingAi({
    * because a ~400px dock split between a conversation and a form leaves neither
    * usable.
    */
+  const [chatTab, setChatTab] = useState(true);
   const [settingsTab, setSettingsTab] = useState(initialView === 'settings');
   const [view, setView] = useState(initialView);
 
-  /** Closing the tab always lands back on the conversation, as a browser does. */
-  const closeSettingsTab = () => {
-    setSettingsTab(false);
-    setView('chat');
+  /**
+   * Closing a tab moves focus to the one left standing; closing the last one
+   * closes the window, which is what a browser does and the only answer that
+   * makes sense — a panel with no tabs has nothing to show.
+   */
+  const closeTab = (which) => {
+    const other = which === 'chat' ? settingsTab : chatTab;
+    if (!other) {
+      setClosing(true);
+      return;
+    }
+    if (which === 'chat') {
+      setChatTab(false);
+      setView('settings');
+    } else {
+      setSettingsTab(false);
+      setView('chat');
+    }
   };
+
+  const closeSettingsTab = () => closeTab('settings');
 
   // The "/" shortcut lives in Dashboard (one global key listener for the app) and
   // reaches the assistant through this event, so the panel keeps owning its own
@@ -100,6 +117,10 @@ export default function FloatingAi({
   const finishClose = () => {
     setOpen(false);
     setClosing(false);
+    // A window that reopens with the tabs you closed is not a window you closed.
+    setChatTab(true);
+    setSettingsTab(false);
+    setView('chat');
   };
 
   // Safety net: the panel must never be left stuck open if the animation event
@@ -121,11 +142,13 @@ export default function FloatingAi({
   // Desktop only: docked to the right edge, draggable out, snappable, resizable.
   const win = useAiWindow(open && !closing);
 
-  const style = win.floating
-    ? { left: win.rect.x, top: win.rect.y, width: win.rect.w, height: win.rect.h }
-    : win.docked
-      ? { width: win.dockWidth }
-      : undefined;
+  const style = win.full
+    ? undefined
+    : win.floating
+      ? { left: win.rect.x, top: win.rect.y, width: win.rect.w, height: win.rect.h }
+      : win.docked
+        ? { width: win.dockWidth }
+        : undefined;
 
   // Until something answers we can only name the chain that will be tried — the
   // arranged one when there is one, since that is what the next question will
@@ -145,6 +168,7 @@ export default function FloatingAi({
             closing ? 'closing' : '',
             win.docked ? 'docked' : '',
             win.floating ? 'floating' : '',
+            win.full ? 'full' : '',
             win.busy ? 'dragging' : '',
           ]
             .filter(Boolean)
@@ -170,18 +194,31 @@ export default function FloatingAi({
                 over a settings form otherwise. With settings closed there is one
                 tab, which reads as the title it replaced. */}
             <div className="ai-tabs" role="tablist" aria-label={t('ai.title')}>
-              <button
-                role="tab"
-                aria-selected={view === 'chat'}
-                className={`ai-tab ${view === 'chat' ? 'on' : ''}`}
-                onClick={() => setView('chat')}
-                // The bar is the window's drag handle, and a drag that starts on
-                // a tab must move the window, not select text in the label.
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                <Bot size={15} strokeWidth={2.2} aria-hidden />
-                <span>{t('ai.title')}</span>
-              </button>
+              {chatTab && (
+                <span className={`ai-tab ${view === 'chat' ? 'on' : ''}`}>
+                  <button
+                    role="tab"
+                    aria-selected={view === 'chat'}
+                    className="ai-tab-face"
+                    onClick={() => setView('chat')}
+                    // The bar is the window's drag handle, and a drag that starts
+                    // on a tab must move the window, not select its label.
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <Bot size={15} strokeWidth={2.2} aria-hidden />
+                    <span>{t('ai.title')}</span>
+                  </button>
+                  <button
+                    className="ai-tab-close"
+                    onClick={() => closeTab('chat')}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    title={t('ai.closeTab')}
+                    aria-label={t('ai.closeTab')}
+                  >
+                    <X size={12} strokeWidth={2.6} aria-hidden />
+                  </button>
+                </span>
+              )}
 
               {settingsTab && (
                 <span className={`ai-tab ${view === 'settings' ? 'on' : ''}`}>
@@ -283,8 +320,8 @@ export default function FloatingAi({
         </div>
       )}
 
-      {/* Drop preview for the snap zone, so the edge shows what a release does. */}
-      {win.snapping && <div className="ai-snap-hint" aria-hidden />}
+      {/* Drop preview, so the screen shows the shape a release would take. */}
+      {win.snapping && <div className={`ai-snap-hint ${win.snapping}`} aria-hidden />}
       <button
         className={`fab ${open && !closing ? 'open' : ''}`}
         onClick={toggle}

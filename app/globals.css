@@ -4794,7 +4794,9 @@ span.ai-tab {
     background: color-mix(in srgb, var(--accent) 45%, transparent);
   }
 
-  /* Where a release would snap the window back to. */
+  /* Where a release would put the window — the narrow dock at the right edge, or
+     the whole screen. The preview is the shape itself, so the gesture is
+     answered before the drop rather than after it. */
   .ai-snap-hint {
     position: fixed;
     top: 8px;
@@ -4807,6 +4809,37 @@ span.ai-tab {
     border: 2px dashed color-mix(in srgb, var(--accent) 70%, transparent);
     background: var(--accent-soft);
     animation: ai-expand 0.18s ease both;
+  }
+
+  .ai-snap-hint.full {
+    inset: 8px;
+    width: auto;
+    border-radius: 1.25rem;
+  }
+
+  /* Filling the screen: dragged most of the way across, or up against the top.
+     The window keeps its own frame — this is the assistant taking the screen,
+     not becoming the page. */
+  .ai-float.full {
+    inset: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    border-left: none;
+    transform-origin: center center;
+    animation: none;
+  }
+
+  /* Nothing to pull: every edge of a full-screen window is the screen. The
+     title bar still drags, which is how it comes back out. */
+  .ai-float.full .ai-grip {
+    display: none;
   }
 }
 

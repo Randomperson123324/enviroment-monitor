@@ -266,6 +266,7 @@ const DICT = {
       searchUnset: 'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่าการค้นเว็บ (ไม่มี TAVILY_API_KEY)',
       thinkOn: 'แสดงความคิด: เปิด — แตะเพื่อปิด',
       thinkOff: 'แสดงความคิด: ปิด — แตะเพื่อดูว่า AI คิดอะไร',
+      closeTab: 'ปิดแท็บผู้ช่วย AI',
       thinkingLive: 'กำลังคิด...',
       thoughtTitle: 'ความคิดของ AI',
       /* Gemini 3 มักไม่ส่งสรุปความคิดกลับมาในเทิร์นที่เรียกเครื่องมือ — บอกไปตรง ๆ
@@ -724,6 +725,7 @@ const DICT = {
       searchUnset: 'Web search is not configured on the server (no TAVILY_API_KEY)',
       thinkOn: 'Show thinking: on — tap to turn off',
       thinkOff: 'Show thinking: off — tap to watch the AI reason',
+      closeTab: 'Close the assistant tab',
       thinkingLive: 'Thinking...',
       thoughtTitle: 'AI reasoning',
       noThoughts: 'The model returned no reasoning for this turn',

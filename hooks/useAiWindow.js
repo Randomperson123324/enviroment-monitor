@@ -53,7 +53,7 @@ function loadState() {
     if (!raw || typeof raw !== 'object') return defaultState();
     const base = defaultState();
     return {
-      mode: raw.mode === 'floating' ? 'floating' : 'docked',
+      mode: raw.mode === 'floating' || raw.mode === 'full' ? raw.mode : 'docked',
       dockWidth: Number.isFinite(raw.dockWidth) ? raw.dockWidth : base.dockWidth,
       rect: {
         x: Number.isFinite(raw.rect?.x) ? raw.rect.x : base.rect.x,
@@ -70,8 +70,13 @@ function loadState() {
 export default function useAiWindow(open) {
   const [desktop, setDesktop] = useState(false);
   const [state, setState] = useState(defaultState);
-  /** True while a drag is hovering the snap-back zone, for the drop preview. */
-  const [snapping, setSnapping] = useState(false);
+  /**
+   * Which drop the current drag would perform, for the preview: 'dock' near the
+   * right edge, 'full' when the window has been pulled most of the way across or
+   * up against the top, null anywhere else. A word rather than a boolean, because
+   * the preview has to show *which* shape is coming.
+   */
+  const [snapping, setSnapping] = useState(null);
   const [busy, setBusy] = useState(false);
   const panelRef = useRef(null);
   const drag = useRef(null);
@@ -92,6 +97,19 @@ export default function useAiWindow(open) {
   }, [state]);
 
   const docked = desktop && state.mode === 'docked';
+  const full = desktop && state.mode === 'full';
+
+  /**
+   * What dropping here would do. Filling the screen wins over docking: the two
+   * zones only meet in the top-right corner, and someone who has dragged the
+   * window to the very top is asking for the big shape, not the narrow one.
+   */
+  const dropAt = (x, y) => {
+    if (y < AI_WINDOW.topSnapZone) return 'full';
+    if (x < window.innerWidth * (1 - AI_WINDOW.fullDragRatio)) return 'full';
+    if (x > window.innerWidth - AI_WINDOW.snapZone) return 'dock';
+    return null;
+  };
 
   /**
    * The docked panel shares the screen with the page rather than covering it, so
@@ -180,7 +198,7 @@ export default function useAiWindow(open) {
     const handler = drag.current;
     drag.current = null;
     setBusy(false);
-    setSnapping(false);
+    setSnapping(null);
     handler?.end?.(e);
   }, []);
 
@@ -202,18 +220,32 @@ export default function useAiWindow(open) {
 
       const box = panelRef.current?.getBoundingClientRect();
       if (!box) return;
-      const offsetX = e.clientX - box.left;
-      const offsetY = e.clientY - box.top;
       const from = { x: e.clientX, y: e.clientY };
       let dragging = false;
       const size = {
-        w: state.mode === 'docked' ? clamp(box.width, AI_WINDOW.minWidth, maxDockWidth()) : state.rect.w,
+        w:
+          state.mode === 'floating'
+            ? state.rect.w
+            : clamp(
+                state.mode === 'full' ? state.rect.w : box.width,
+                AI_WINDOW.minWidth,
+                maxDockWidth()
+              ),
         h: clamp(
-          state.mode === 'docked' ? state.rect.h : box.height,
+          state.mode === 'floating' ? box.height : state.rect.h,
           AI_WINDOW.minHeight,
           window.innerHeight - 16
         ),
       };
+      /*
+        Where the window sits under the cursor once it starts moving. A window
+        filling the screen has no useful grab offset — the pointer could be a
+        thousand pixels from where the restored window's title bar will be — so it
+        is re-hung under the cursor in proportion, the way a maximised window
+        behaves when you pull it down.
+      */
+      const offsetX = state.mode === 'full' ? size.w / 2 : e.clientX - box.left;
+      const offsetY = state.mode === 'full' ? 18 : e.clientY - box.top;
 
       beginDrag(e, {
         move: (ev) => {
@@ -223,19 +255,23 @@ export default function useAiWindow(open) {
             if (Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < AI_WINDOW.dragThreshold) return;
             dragging = true;
           }
-          const nearRight = ev.clientX > window.innerWidth - AI_WINDOW.snapZone;
-          setSnapping(nearRight);
+          // Snapping is decided by the pointer, not the window, so the window
+          // itself never has to leave the screen to reach a zone.
+          setSnapping(dropAt(ev.clientX, ev.clientY));
           setState((s) => ({
             ...s,
             mode: 'floating',
-            // Snapping is decided by the pointer, not the window, so the window
-            // itself never has to leave the screen to reach the snap zone.
             rect: clampToViewport({ ...size, x: ev.clientX - offsetX, y: ev.clientY - offsetY }),
           }));
         },
         end: (ev) => {
           if (!dragging) return;
-          if (ev.clientX > window.innerWidth - AI_WINDOW.snapZone) {
+          const drop = dropAt(ev.clientX, ev.clientY);
+          if (drop === 'full') {
+            // The floating rect is kept as it was: it is what the window restores
+            // to when it is dragged back off the edge.
+            setState((s) => ({ ...s, mode: 'full' }));
+          } else if (drop === 'dock') {
             setState((s) => ({ ...s, mode: 'docked', dockWidth: clamp(size.w, AI_WINDOW.minWidth, maxDockWidth()) }));
           }
         },
@@ -298,6 +334,11 @@ export default function useAiWindow(open) {
   const toggleDock = useCallback(() => {
     if (!desktop) return;
     setState((s) => {
+      // Filling the screen is a third state the button has to be able to leave;
+      // it returns to the edge, which is where the panel lives by default.
+      if (s.mode === 'full') {
+        return { ...s, mode: 'docked', dockWidth: clamp(s.dockWidth, AI_WINDOW.minWidth, maxDockWidth()) };
+      }
       if (s.mode === 'docked') {
         const w = clamp(s.dockWidth, AI_WINDOW.minWidth, maxDockWidth());
         const h = clamp(s.rect.h, AI_WINDOW.minHeight, window.innerHeight - 96);
@@ -315,6 +356,7 @@ export default function useAiWindow(open) {
   return {
     desktop,
     docked,
+    full,
     floating: desktop && state.mode === 'floating',
     dockWidth: state.dockWidth,
     rect: state.rect,
