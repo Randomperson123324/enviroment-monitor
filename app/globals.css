@@ -357,6 +357,19 @@ textarea {
   place-items: center;
 }
 
+/* Lit while what it opened is still open — the same accent fill the rail's
+   assistant button wears, because they are the same kind of statement: this
+   button is holding a panel open. */
+.icon-btn.on {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-contrast);
+}
+
+.icon-btn.on:hover {
+  color: var(--accent-contrast);
+}
+
 /* Language toggle carries a short text code alongside its icon. */
 .lang-btn {
   width: auto;

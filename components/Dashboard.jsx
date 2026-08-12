@@ -108,6 +108,18 @@ function DashboardInner({ initialPanel }) {
   const openAi = (view) =>
     window.dispatchEvent(new CustomEvent('env-monitor:open-ai', { detail: { view } }));
 
+  /**
+   * The header's gear lights up while its tab is open, the same way the rail's
+   * assistant button does — a button that opened something should say so, and the
+   * panel is the only one who knows which tabs exist.
+   */
+  const [settingsOn, setSettingsOn] = useState(false);
+  useEffect(() => {
+    const onState = (e) => setSettingsOn(Boolean(e.detail?.settings));
+    window.addEventListener('env-monitor:ai-state', onState);
+    return () => window.removeEventListener('env-monitor:ai-state', onState);
+  }, []);
+
   /** Confirms only what happened: a 403 from a wrong API base is not a refresh. */
   const refresh = useCallback(async () => {
     const res = await dash.refresh();
@@ -149,6 +161,7 @@ function DashboardInner({ initialPanel }) {
         status={status}
         onRefresh={refresh}
         onOpenSettings={() => openAi('settings')}
+        settingsOn={settingsOn}
         onOpenHelp={() => setHelpOpen(true)}
         activeTab={tab}
         onSelectTab={switchTab}

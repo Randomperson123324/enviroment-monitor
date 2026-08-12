@@ -27,6 +27,7 @@ export default function Header({
   status,
   onRefresh,
   onOpenSettings,
+  settingsOn = false,
   onOpenHelp,
   activeTab,
   onSelectTab,
@@ -85,7 +86,12 @@ export default function Header({
           <button className="icon-btn" onClick={onOpenHelp} title={`${t('header.help')} (?)`}>
             <Keyboard size={17} strokeWidth={2.2} aria-hidden />
           </button>
-          <button className="icon-btn" onClick={onOpenSettings} title={`${t('header.settings')} (S)`}>
+          <button
+            className={`icon-btn ${settingsOn ? 'on' : ''}`}
+            onClick={onOpenSettings}
+            aria-pressed={settingsOn}
+            title={`${t('header.settings')} (S)`}
+          >
             <Settings size={17} strokeWidth={2.2} aria-hidden />
           </button>
           <button className="icon-btn" onClick={onToggleTheme} title={`${t('header.toggleTheme')} (T)`}>

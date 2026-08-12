@@ -84,13 +84,22 @@ export default function FloatingAi({
   // open state instead of having it lifted into the page for one keystroke.
   useEffect(() => {
     const openPanel = (e) => {
+      const wanted = e.detail?.view;
       setClosing(false);
-      setOpen(true);
-      // The gear asks for the settings tab: open it if it is not there, focus it
-      // if it is — the same press does both, like clicking a link that is
-      // already open in a tab.
-      if (e.detail?.view === 'settings') setSettingsTab(true);
-      if (e.detail?.view) setView(e.detail.view);
+      /*
+        The gear opens settings and *only* settings: on a closed panel it does not
+        drag the conversation along, because someone reaching for the gear asked
+        to change a setting, not to start a chat. On a panel already open the
+        conversation stays where it is and settings join it as a second tab —
+        closing something the user did not ask to close would be worse.
+      */
+      setOpen((wasOpen) => {
+        if (!wasOpen && wanted === 'settings') setChatTab(false);
+        return true;
+      });
+      if (wanted === 'settings') setSettingsTab(true);
+      if (wanted === 'chat') setChatTab(true);
+      if (wanted) setView(wanted);
     };
     window.addEventListener('env-monitor:open-ai', openPanel);
     return () => window.removeEventListener('env-monitor:open-ai', openPanel);
@@ -100,7 +109,17 @@ export default function FloatingAi({
   // do both jobs the floating button did. "/" keeps opening rather than toggling:
   // a shortcut that closes the panel you just asked for is a trap.
   useEffect(() => {
-    const onToggle = () => toggle();
+    const onToggle = () => {
+      // The rail's button is about the conversation, not the window: with the
+      // panel open on settings alone it brings the conversation back rather than
+      // closing what the gear just opened.
+      if (open && !closing && !chatTab) {
+        setChatTab(true);
+        setView('chat');
+        return;
+      }
+      toggle();
+    };
     window.addEventListener('env-monitor:toggle-ai', onToggle);
     return () => window.removeEventListener('env-monitor:toggle-ai', onToggle);
   });
@@ -109,10 +128,13 @@ export default function FloatingAi({
   // not own. Announcing it keeps the rail in step without lifting `open` into the
   // page for one highlight.
   useEffect(() => {
+    const live = open && !closing;
     window.dispatchEvent(
-      new CustomEvent('env-monitor:ai-state', { detail: { open: open && !closing } })
+      new CustomEvent('env-monitor:ai-state', {
+        detail: { open: live, chat: live && chatTab, settings: live && settingsTab, view },
+      })
     );
-  }, [open, closing]);
+  }, [open, closing, chatTab, settingsTab, view]);
 
   const finishClose = () => {
     setOpen(false);

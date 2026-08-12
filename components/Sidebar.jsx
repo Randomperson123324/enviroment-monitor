@@ -27,7 +27,9 @@ export default function Sidebar({ activeTab, onSelectTab }) {
   const [aiOpen, setAiOpen] = useState(false);
 
   useEffect(() => {
-    const onState = (e) => setAiOpen(Boolean(e.detail?.open));
+    // The conversation's tab, not merely the window: a panel showing settings
+    // alone is not the assistant being open, and this button says it is.
+    const onState = (e) => setAiOpen(Boolean(e.detail?.chat));
     window.addEventListener('env-monitor:ai-state', onState);
     return () => window.removeEventListener('env-monitor:ai-state', onState);
   }, []);
