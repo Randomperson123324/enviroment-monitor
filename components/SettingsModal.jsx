@@ -430,7 +430,10 @@ export default function SettingsModal({ settings, serverCfg, browserAi, onSave, 
                 headers={probeHeaders}
                 value={aiLocalModel}
                 onChange={setAiLocalModel}
-                placeholder={t('settings.modelAuto')}
+                // Name the model the server is pinned to, as the cloud pane
+                // does: "automatic" stopped being the whole truth the moment
+                // this deployment started shipping a default model.
+                placeholder={ai.localModel || t('settings.modelAuto')}
               />
               <p className="field-hint">{t('settings.aiLocalHint')}</p>
             </>

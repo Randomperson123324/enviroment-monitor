@@ -15,10 +15,17 @@ Default order: **`local` → `gemini`**.
 Orchestration lives in `lib/ai/index.js`; endpoint/model resolution in
 `lib/ai/discovery.js`; the relay in `lib/ai/relay.js`.
 
-## Nothing is hardcoded
+## Defaults, and what happens when they are wrong
 
-`AI_LOCAL_MODEL` defaults to empty, which means **ask the endpoint**. Model
-resolution per request:
+Out of the box the chain is **Self-hosted AI first, Cloud AI behind it**
+(`AI_PROVIDER_ORDER=local,gemini`), running `gemma4:e2b` on the self-hosted
+endpoint — the room's readings stay on our own network unless our own model
+cannot answer.
+
+The model name is a pin, not a promise. If the endpoint refuses it, `runChain`
+asks what it does have and retries on that, so a renamed or unloaded model costs
+a slower first answer rather than the provider. `AI_LOCAL_MODEL=` (empty) skips
+the pin and asks first, every time. Model resolution per request:
 
 ```
 Dev-Settings header → env var → auto-discovered → error (chain falls through)

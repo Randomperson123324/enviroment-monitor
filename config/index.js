@@ -107,8 +107,9 @@ const config = {
    * reachable server-side only — the local endpoint is plain HTTP, so a browser
    * on an HTTPS page cannot call it directly (mixed content).
    *
-   * No model id is hardcoded for the local provider: an empty `model` means
-   * "ask the endpoint which one is loaded" (see lib/ai/discovery.js).
+   * The self-hosted endpoint answers first by default, and the cloud is the
+   * fallback behind it: the room's readings stay on our own network unless our
+   * own model cannot answer.
    */
   ai: {
     order: list('AI_PROVIDER_ORDER', ['local', 'gemini']),
@@ -121,8 +122,14 @@ const config = {
      */
     local: {
       baseUrl: str('AI_LOCAL_BASE_URL', 'http://kagenou.serveminecraft.net:2000'),
-      /** '' = auto-discover the currently loaded model */
-      model: str('AI_LOCAL_MODEL', ''),
+      /**
+       * The model this deployment runs. A pin is not a promise: if the endpoint
+       * refuses the name, `runChain` asks it what it does have and retries on
+       * that (lib/ai/index.js), so a renamed or unloaded model degrades to a
+       * slower first answer rather than a dead provider. Set to '' to skip the
+       * pin entirely and always ask the endpoint first.
+       */
+      model: str('AI_LOCAL_MODEL', 'gemma4:e2b'),
       /** llama-swap needs no key; kept for LM Studio / gateway parity */
       apiKey: str('AI_LOCAL_API_KEY'),
       thinking: bool('AI_LOCAL_THINKING', false),

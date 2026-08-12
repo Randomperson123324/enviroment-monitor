@@ -107,9 +107,20 @@ export default function ChatPane({ deviceId, settings, caps, ai, addLog, onSourc
    * The arranged chain, as attempts. An engine that fails hands the question to
    * the next one; the last one's failure is the turn's failure.
    */
-  const chain = aiChainFrom(settings.aiOrder, ai?.kind === 'browser' ? ['browser'] : []);
+  const chain = aiChainFrom(
+    settings.aiOrder,
+    // Nobody has arranged anything yet, which is the state every browser starts
+    // in: follow the deployment's own order (self-hosted first, cloud behind it)
+    // rather than treating "not arranged" as "nothing to try".
+    ai?.kind === 'browser' ? ['browser'] : (caps?.order ?? [])
+  );
   const runs = aiChainRuns(chain.filter((id) => id !== 'browser' || ai?.webgpu !== false));
-  const onBrowser = (runs[0] ?? {}).kind === 'browser';
+  // Belt and braces: /api/config may not have answered yet, and a turn with no
+  // attempts at all ends in an empty bubble — no answer and no error. One server
+  // run with no order header lets the server decide, which is what it did before
+  // the chain existed.
+  if (!runs.length) runs.push({ kind: 'server', providers: [] });
+  const onBrowser = runs[0].kind === 'browser';
   /** Weights already on this machine, so falling back costs a load, not a download. */
   const browserReady = ai?.status?.phase === 'cached' || ai?.status?.phase === 'ready';
 
