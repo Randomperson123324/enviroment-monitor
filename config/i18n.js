@@ -162,7 +162,7 @@ const DICT = {
       title: 'ตั้งค่า',
       apiBase: 'ที่อยู่เซิร์ฟเวอร์ API (เว้นว่าง = เซิร์ฟเวอร์เดียวกัน)',
       apiBasePlaceholder: 'เช่น http://192.168.1.50:3000 (ใส่ IP ดิบได้)',
-      geminiKey: 'Gemini API Key (ไม่บังคับ — ใช้แทนของเซิร์ฟเวอร์)',
+      geminiKey: 'API Key ของ Cloud AI (ไม่บังคับ — ใช้แทนของเซิร์ฟเวอร์)',
       geminiPlaceholder: 'เว้นว่างไว้เพื่อใช้ key ของเซิร์ฟเวอร์',
       ingestHintPre: 'อุปกรณ์ส่งข้อมูลเข้า',
       ingestHintMid: 'ด้วยค่าเหล่านี้ (ค่าที่อ่านไม่ได้ให้ส่ง null ห้ามส่ง 0):',
@@ -185,7 +185,7 @@ const DICT = {
         assistant: 'ผู้ช่วย AI',
         device: 'AI ในอุปกรณ์ (GPU)',
         local: 'AI ที่โฮสต์เอง',
-        gemini: 'Gemini',
+        gemini: 'Cloud AI',
         relay: 'Relay',
       },
       pollHint: 'ยิ่งถี่ยิ่งเห็นค่าเร็ว แต่กินแบตและเน็ตมากขึ้น · ตั้งได้ {min}–{max} วินาที',
@@ -210,7 +210,7 @@ const DICT = {
         browser: 'AI ในอุปกรณ์',
       },
       engineHint: {
-        gemini: 'Gemini ของ Google — ตอบดีที่สุด แต่คำถามและข้อมูลห้องจะถูกส่งออกไปนอกเครือข่าย',
+        gemini: 'ใช้ Gemini ของ Google — ตอบดีที่สุด แต่คำถามและข้อมูลห้องจะถูกส่งออกไปนอกเครือข่าย',
         local: 'โมเดลที่เรารันเอง เซิร์ฟเวอร์ของเว็บนี้เป็นผู้เรียก — ข้อมูลไม่ออกนอกเครือข่ายของคุณ',
         browser: 'โมเดลทำงานบนการ์ดจอของเครื่องนี้ — ข้อความไม่ถูกส่งออกไปไหนเลย',
       },
@@ -227,8 +227,8 @@ const DICT = {
       aiServerOrder: 'ลำดับปัจจุบันของเซิร์ฟเวอร์: {order}',
       aiLocalBase: 'ที่อยู่ AI ที่โฮสต์เอง (OpenAI-compatible)',
       aiLocalModel: 'โมเดลของ AI ที่โฮสต์เอง',
-      aiGeminiBase: 'Gemini Base URL',
-      aiGeminiModel: 'โมเดล Gemini',
+      aiGeminiBase: 'Base URL ของ Cloud AI',
+      aiGeminiModel: 'โมเดลของ Cloud AI',
       modelAuto: 'อัตโนมัติ (ตามที่เซิร์ฟเวอร์เลือก)',
       modelLoading: 'กำลังโหลดรายชื่อโมเดล...',
       modelStatus: { loaded: 'โหลดแล้ว', unloaded: 'ยังไม่โหลด' },
@@ -347,7 +347,7 @@ const DICT = {
       failed: 'สรุปไม่สำเร็จ: {msg}',
       failedPinned: 'AI ในเครื่อง ({providers}) ใช้งานไม่ได้: {msg}',
       pinnedNote:
-        'หมวดนี้ใช้ AI ในเครื่อง ({providers}) เท่านั้น จะไม่ส่งข้อมูลกล้องไปยัง Gemini หรือบริการภายนอก',
+        'หมวดนี้ใช้ AI ในเครื่อง ({providers}) เท่านั้น จะไม่ส่งข้อมูลกล้องไปยัง Cloud AI หรือบริการภายนอก',
     },
 
     focus: {
@@ -620,7 +620,7 @@ const DICT = {
       title: 'Settings',
       apiBase: 'API server URL (blank = same server)',
       apiBasePlaceholder: 'e.g. http://192.168.1.50:3000 (raw IP is fine)',
-      geminiKey: 'Gemini API Key (optional — overrides the server key)',
+      geminiKey: 'Cloud AI API key (optional — overrides the server key)',
       geminiPlaceholder: 'Leave blank to use the server key',
       ingestHintPre: 'Devices post data to',
       ingestHintMid: 'with these values (send null, never 0, for a sensor you cannot read):',
@@ -642,7 +642,7 @@ const DICT = {
         assistant: 'Assistant',
         device: 'On-device AI (GPU)',
         local: 'Self-hosted AI',
-        gemini: 'Gemini',
+        gemini: 'Cloud AI',
         relay: 'Relay',
       },
       pollHint: 'More often means fresher numbers but more battery and bandwidth · {min}–{max} seconds',
@@ -666,7 +666,7 @@ const DICT = {
         browser: 'On-device AI',
       },
       engineHint: {
-        gemini: "Google's Gemini — the best answers, but the question and the room's data leave your network",
+        gemini: "Runs on Google's Gemini — the best answers, but the question and the room's data leave your network",
         local: 'The model we run ourselves, called by this site\'s server — nothing leaves your network',
         browser: 'Runs on this machine\'s GPU — nothing is sent anywhere at all',
       },
@@ -683,8 +683,8 @@ const DICT = {
       aiServerOrder: "Server's current order: {order}",
       aiLocalBase: 'Self-hosted AI endpoint (OpenAI-compatible)',
       aiLocalModel: 'Self-hosted model',
-      aiGeminiBase: 'Gemini base URL',
-      aiGeminiModel: 'Gemini model',
+      aiGeminiBase: 'Cloud AI base URL',
+      aiGeminiModel: 'Cloud AI model',
       modelAuto: 'Automatic (server picks)',
       modelLoading: 'Loading models...',
       modelStatus: { loaded: 'loaded', unloaded: 'not loaded' },
@@ -794,7 +794,7 @@ const DICT = {
       failed: 'Summary failed: {msg}',
       failedPinned: 'On-device AI ({providers}) is unavailable: {msg}',
       pinnedNote:
-        'This tab uses on-device AI ({providers}) only — camera data is never sent to Gemini or any external service.',
+        'This tab uses on-device AI ({providers}) only — camera data is never sent to Cloud AI or any external service.',
     },
 
     focus: {
