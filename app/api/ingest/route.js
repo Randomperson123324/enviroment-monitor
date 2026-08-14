@@ -22,7 +22,12 @@ const FIELD_ALIASES = {
   pm25: ['pm25', 'pm2_5'],
   pm10: ['pm10'],
   sound: ['sound'],
+  // ⚠️ `light` and `lux` are different columns on purpose, not a duplicate.
+  // `light` is the retired LDR reading — a raw 0–1023 ADC count with no unit.
+  // `lux` is the BH1750's real measurement in lx. Writing one into the other
+  // would make every historical point jump scale for no visible reason (docs/05).
   light: ['light'],
+  lux: ['lux', 'illuminance'],
   webcam_json: ['webcam_json', 'webcam'],
 };
 

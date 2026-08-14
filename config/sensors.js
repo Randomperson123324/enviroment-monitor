@@ -30,6 +30,19 @@ export const THRESHOLDS = {
   pm1: { min: 0, max: 1000, clean: 10, warn: 18, danger: 26, critical: 52 },
   pm25: { min: 0, max: 1000, clean: 15, warn: 25, danger: 37.5, critical: 75 },
   pm10: { min: 0, max: 1000, clean: 45, warn: 120, danger: 180, critical: 300 },
+  /**
+   * Desk illuminance in lux (BH1750). The ideal band is the maintained
+   * illuminance EN 12464-1 / ISO 8995-1 ask for at a workstation: 500 lx for
+   * reading, writing and screen work, 300 lx for lighter tasks — so 300–750
+   * covers a study desk without pretending to more precision than a single
+   * sensor on one spot can give.
+   *
+   * Below 150 lx is corridor lighting: readable, but not for sustained work.
+   * The high side is about screen glare and contrast, not danger to health —
+   * a desk by a window legitimately reads past 2000 lx on a bright day, which
+   * is why this sensor carries a smaller score penalty than temperature.
+   */
+  lux: { min: 0, max: 65535, okLo: 300, okHi: 750, warnLo: 150, warnHi: 2000 },
 };
 
 /**
@@ -41,6 +54,12 @@ export const SCORE_PENALTY = {
   hum: { warn: 10, danger: 24 },
   pm25: { warn: 15, danger: 35, critical: 60 },
   pm10: { warn: 8, danger: 20, critical: 40 },
+  /**
+   * Smaller than temperature on purpose. Bad lighting makes a room tiring to
+   * study in, which is worth saying — but unlike heat or dust, being outside
+   * the band is not a health risk, and the high end is often just daylight.
+   */
+  lux: { warn: 8, danger: 18 },
 };
 
 /**
@@ -172,11 +191,48 @@ export const SENSORS = [
   risingSensor({ id: 'pm25', field: 'pm25', unit: 'µg/m³', dp: 0, group: 'pm', avgHours: PM_AVG_HOURS }),
   risingSensor({ id: 'pm10', field: 'pm10', unit: 'µg/m³', dp: 0, group: 'pm', avgHours: PM_AVG_HOURS }),
   risingSensor({ id: 'pm1', field: 'pm1', unit: 'µg/m³', dp: 0, group: 'pm', advise: false, avgHours: PM_AVG_HOURS }),
+  {
+    id: 'lux',
+    field: 'lux',
+    unit: 'lx',
+    dp: 0,
+    group: 'light',
+    shape: 'band',
+    avgHours: null,
+    range: [THRESHOLDS.lux.min, THRESHOLDS.lux.max],
+    // The bar stops at the glare threshold rather than the sensor's 65535
+    // ceiling: on a 0–65535 bar every indoor reading would sit pinned to the
+    // far left and the comfort band would be a hairline.
+    bar: { min: 0, max: THRESHOLDS.lux.warnHi, comfort: [THRESHOLDS.lux.okLo, THRESHOLDS.lux.okHi] },
+    level: (v) => bandLevel(v, THRESHOLDS.lux),
+    textKey: (v) => {
+      const t = THRESHOLDS.lux;
+      if (v < t.warnLo) return 'dark2';
+      if (v < t.okLo) return 'dark';
+      if (v > t.warnHi) return 'bright2';
+      if (v > t.okHi) return 'bright';
+      return 'ok';
+    },
+    issueKey: (v) => bandIssueKey(v, THRESHOLDS.lux, { lo: 'dark', hi: 'bright' }),
+    advice: (v) => bandAdvice(v, THRESHOLDS.lux, { lo: 'dark', hi: 'bright' }),
+  },
 ];
 
-/** Chart split: climate shares one axis, the PM channels share another (µg/m³). */
+/**
+ * Tiles show everything except the PM channels, which rotate through one shared
+ * tile of their own.
+ */
 export const MAIN_SENSORS = SENSORS.filter((s) => s.group !== 'pm');
+
+/**
+ * Chart split — one chart per unit family, so every line on a chart can share
+ * an axis honestly instead of being scaled by an invented divisor.
+ * Climate (°C 12–38, % 10–95) · PM (µg/m³) · light (lx, which reaches four
+ * digits indoors and five in daylight — it would flatten the other two).
+ */
+export const CLIMATE_SENSORS = SENSORS.filter((s) => s.group === 'climate');
 export const PM_SENSORS = SENSORS.filter((s) => s.group === 'pm');
+export const LIGHT_SENSORS = SENSORS.filter((s) => s.group === 'light');
 
 /** Health-score display bands (highest first). `id` keys UI palettes (ring color). */
 export const SCORE_BANDS = [

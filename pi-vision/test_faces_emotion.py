@@ -16,10 +16,13 @@
   - **โหมดไม่เดา (FACES_GUESS=false) ต้องยังปฏิเสธได้จริง** — คนที่ไม่มีในแกลเลอรี
     และหน้าคล้ายกันต้องไม่ถูกติดชื่อ
   - วางรูปใหม่แล้วระบบเห็นเอง โดยไม่ต้องรีสตาร์ต
+  - **เกณฑ์ที่คำนวณจากชุดรูป (calibrate)** ต้องอยู่เหนือระยะของรูปคนเดียวกัน และ
+    ใต้ระยะของคนละคน · ชุดรูปที่แยกคนไม่ออกต้องถูก**รายงาน** ไม่ใช่ตั้งเกณฑ์หลวมให้ผ่าน
 
 รัน:  python3 test_faces_emotion.py
 """
 
+import random
 import sys
 import tempfile
 from pathlib import Path
@@ -125,17 +128,41 @@ check("เฟรมที่ไม่มี blendshapes ไม่รีเซ็
 print("\n── แกลเลอรีใบหน้าจากรูป ───────────────────────────────")
 
 # สองนโยบายของการตัดสิน — เทสทั้งคู่ เพราะสลับได้ด้วย FACES_GUESS
+#
+# ปิด auto_threshold ในชุดนี้ทั้งหมด เพราะที่ตรวจตรงนี้คือ**นโยบายการตัดสิน**
+# ซึ่งต้องวัดที่เกณฑ์คงที่ ไม่งั้นเวลาเทสล้มจะแยกไม่ออกว่าการตัดสินเพี้ยน
+# หรือแค่เกณฑ์ขยับ — การคำนวณเกณฑ์เองมีชุดเทสของตัวเองอยู่ข้างล่าง
 CFG = {"threshold": 0.045, "ratio": 0.75, "min_size": 0.12, "rescan_seconds": 0.0,
-       "guess": True}
+       "guess": True, "auto_threshold": False}
 CFG_STRICT = {**CFG, "guess": False}
 
+# ค่าเดียวกับ config.py — ชุดเทสของการคำนวณเกณฑ์เองใช้ชุดนี้
+CFG_AUTO = {**CFG, "auto_threshold": True, "auto_intra_percentile": 0.9,
+            "auto_spread": 1.5, "auto_inter_fraction": 0.5,
+            "auto_min": 0.01, "auto_max": 0.09}
 
-def gallery_for(mapping, directory, cfg=CFG):
-    """แกลเลอรีที่ถอดลายเซ็นจากชื่อไฟล์ตาม mapping — ไม่ต้องมีรูปจริง"""
+
+def gallery_for(mapping, directory, cfg=CFG, jitter=0.0, seed=11):
+    """
+    แกลเลอรีที่อ่าน "รูป" จากชื่อไฟล์ตาม mapping — ไม่ต้องมีรูปจริง
+
+    คืน `PhotoFace` แบบเดียวกับตัวจริง (`fc.landmark_extractor`) คือมีทั้งลายเซ็น
+    และท่าหันหน้าในรูปใบนั้น เพราะทั้งสองอย่างมาจาก landmark ชุดเดียวกัน
+
+    `jitter` จำลองว่ารูปแต่ละใบของคนเดียวกัน**ไม่เหมือนกันเป๊ะ** (มุม แสง วันที่ถ่าย)
+    ต้องมีข้อนี้เวลาทดสอบการคำนวณเกณฑ์ ไม่งั้นรูปทุกใบให้ลายเซ็นเดียวกันหมด
+    ระยะของรูปคนเดียวกันจะเป็น 0 ซึ่งไม่มีทางเกิดขึ้นจากรูปจริง
+    """
+    rng = random.Random(seed)
 
     def extract(path):
         shape = mapping.get(Path(path).parent.name) or mapping.get(Path(path).stem)
-        return lm.face_signature(make_face(**shape)) if shape else None
+        if not shape:
+            return None
+        points = make_face(**shape)
+        if jitter:
+            points = noisy(points, jitter, rng)
+        return fc.PhotoFace(signature=lm.face_signature(points), pose=lm.head_pose(points))
 
     return fc.FaceGallery(directory, cfg, extract)
 
@@ -189,8 +216,6 @@ def live_signature(shape, frames=20, level=0.015, seed=7):
     ลงทะเบียนแบบเป๊ะทุกหลักไม่มีทางเกิดขึ้นจากกล้อง — และ ratio test จะดูเหมือน
     ไม่ทำงานทั้งที่จริง ๆ มันไม่ควรทำงานเมื่อระยะเป็นศูนย์
     """
-    import random
-
     rng = random.Random(seed)
     sigs = [lm.face_signature(noisy(make_face(**shape), level, rng)) for _ in range(frames)]
     dims = len(sigs[0])
@@ -265,6 +290,198 @@ with tempfile.TemporaryDirectory() as tmp:
     fc.ensure_directory(root / "faces")
     check("สร้างโฟลเดอร์ faces/ พร้อมคำอธิบายให้ผู้ใช้",
           (root / "faces" / "README.txt").exists())
+
+print("\n── ตั้งเกณฑ์เองจากชุดรูป (calibrate) ──────────────────")
+
+
+def photos(root, name, count, ext=".jpg"):
+    """สร้างไฟล์รูปเปล่า ๆ ให้คนหนึ่งคน — หลายใบ = โฟลเดอร์ต่อคน"""
+    if count == 1:
+        (root / f"{name}{ext}").write_bytes(b"x")
+        return
+    folder = root / name
+    folder.mkdir()
+    for i in range(count):
+        (folder / f"{i}{ext}").write_bytes(b"x")
+
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Ann", 3)
+    photos(root, "Bee", 3)
+    g = gallery_for({"Ann": PEOPLE["A"], "Bee": PEOPLE["B"]}, root, CFG_AUTO, jitter=0.006)
+    g.scan()
+    cal = g.calibration
+    detail = f"(intra {cal.intra:.4f} · เกณฑ์ {cal.threshold:.4f} · inter {cal.inter:.4f})"
+
+    check("ชุดรูปที่ครบ → คำนวณเกณฑ์เอง ไม่ใช้ค่าใน .env", cal.source == "auto", detail)
+    # หัวใจของทั้งฟีเจอร์: เกณฑ์ต้องอยู่ในช่องว่างระหว่างสองค่าที่วัดได้จากรูป
+    check("เกณฑ์อยู่เหนือระยะที่รูปคนเดียวกันห่างกัน (ไม่งั้นจำคนของตัวเองไม่ได้)",
+          cal.intra < cal.threshold, detail)
+    check("และอยู่ใต้ระยะของคู่คนที่ใกล้กันที่สุด (ไม่งั้นติดชื่อผิดคน)",
+          cal.threshold < cal.inter, detail)
+    check("เกณฑ์ที่ใช้จริงคือค่าที่คำนวณได้ ไม่ใช่ค่าใน .env",
+          g.threshold == cal.threshold and g.threshold != CFG_AUTO["threshold"], detail)
+    check("ชุดรูปนี้แยกคนออกจากกันได้ → ไม่มีคำเตือน",
+          cal.separated and cal.warning is None, detail)
+    check("รายงานคู่ที่ใกล้กันที่สุดว่าเป็นใคร", cal.closest == ("Ann", "Bee"), f"({cal.closest})")
+
+    # เกณฑ์ที่กว้างขึ้นตามความเลอะของชุดรูปต้องมีผลจริง ไม่ใช่แค่ตัวเลขสวย ๆ
+    live_a = live_signature(PEOPLE["A"])
+    hit = g.identify(live_a, face_size=0.3)
+    check("ใบหน้าจากกล้องยังถูกจำได้อย่างมั่นใจด้วยเกณฑ์ที่คำนวณเอง",
+          hit is not None and hit[0] == "Ann" and hit[2] is True, f"({hit})")
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Ann", 3)
+    photos(root, "Bee", 3)
+    g_off = gallery_for({"Ann": PEOPLE["A"], "Bee": PEOPLE["B"]}, root,
+                        {**CFG_AUTO, "auto_threshold": False}, jitter=0.006)
+    g_off.scan()
+    check("FACES_AUTO_THRESHOLD=false → ใช้ค่าใน .env ตรง ๆ เหมือนเดิม",
+          g_off.threshold == CFG_AUTO["threshold"] and g_off.calibration.source == "config")
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Ann", 1)
+    g_one = gallery_for({"Ann": PEOPLE["A"]}, root, CFG_AUTO)
+    g_one.scan()
+    # คนเดียวรูปเดียว = ไม่มีทั้งระยะของคนเดียวกันและระยะระหว่างคน — ไม่มีอะไรให้วัด
+    check("คนเดียวรูปเดียว → ไม่เดาเกณฑ์ กลับไปใช้ค่าใน .env",
+          g_one.calibration.source == "config" and g_one.threshold == CFG_AUTO["threshold"])
+    check("และบอกเหตุผลว่าทำไมถึงคำนวณไม่ได้", bool(g_one.calibration.reason))
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Ann", 4)
+    g_solo = gallery_for({"Ann": PEOPLE["A"]}, root, CFG_AUTO, jitter=0.006)
+    g_solo.scan()
+    cal = g_solo.calibration
+    check("คนเดียวหลายรูป → ตั้งเกณฑ์จากการกระจายของรูปคนนั้นได้",
+          cal.source == "auto" and cal.intra is not None and cal.inter is None,
+          f"({cal.threshold:.4f})")
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Ann", 3)
+    photos(root, "Twin", 3)
+    g_twin = gallery_for({"Ann": PEOPLE["A"], "Twin": TWIN}, root, CFG_AUTO, jitter=0.006)
+    g_twin.scan()
+    cal = g_twin.calibration
+    detail = f"(intra {cal.intra:.4f} · inter {cal.inter:.4f} · เกณฑ์ {cal.threshold:.4f})"
+    # ชุดรูปที่มีฝาแฝดแยกไม่ออกจริง ๆ — สิ่งที่ต้องไม่เกิดคือระบบตั้งเกณฑ์หลวมให้ผ่าน
+    check("รูปคนละคนใกล้กว่ารูปคนเดียวกัน → รู้ตัวว่าแยกไม่ออก", not cal.separated, detail)
+    check("และเตือนโดยระบุว่าเป็นคู่ไหน",
+          cal.warning is not None and "Ann" in cal.warning and "Twin" in cal.warning)
+    # เพดานที่ต่ำกว่าพื้นต้องดึงเกณฑ์**ลง** ไม่ใช่ปล่อยให้พื้นดันเกณฑ์ขึ้นไปคลุมทั้งคู่
+    check("ไม่ขยายเกณฑ์ตามความเลอะของรูป — เกณฑ์ต้องต่ำกว่าพื้นที่คำนวณจากรูปคนเดียวกัน",
+          cal.threshold < cal.intra * CFG_AUTO["auto_spread"], detail)
+    check("เกณฑ์ยังอยู่ในขอบเขตที่ตั้งไว้ ไม่หลุดไปสุดทาง",
+          CFG_AUTO["auto_min"] <= cal.threshold <= CFG_AUTO["auto_max"], detail)
+    # ข้อที่สำคัญที่สุดของชุดรูปแบบนี้ — ตัวเลขเป็นอย่างไรไม่สำคัญเท่าว่าปลายทาง
+    # ต้องไม่ได้ชื่อที่ดู "มั่นใจ" ทั้งที่ระบบแยกสองคนนี้ไม่ออก
+    hit_twin = g_twin.identify(live_signature(PEOPLE["A"]), face_size=0.3)
+    check("คู่ที่แยกไม่ออก → ไม่มีทางได้ชื่อแบบมั่นใจ (ติด ? หรือไม่ตอบ)",
+          hit_twin is None or hit_twin[2] is False, f"({hit_twin})")
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Ann", 2)
+    photos(root, "Bee", 2)
+    g = gallery_for({"Ann": PEOPLE["A"], "Bee": PEOPLE["B"], "Cee": PEOPLE["C"]},
+                    root, {**CFG_AUTO, "rescan_seconds": 1.0}, jitter=0.006)
+    g.scan()
+    before = g.threshold
+    photos(root, "Cee", 2)
+    changed = g.maybe_rescan(now=2.0)
+    # เกณฑ์ของชุดรูปเก่าไม่ใช่เกณฑ์ของชุดรูปใหม่ — คนที่เพิ่งเพิ่มเข้ามาอาจหน้าคล้ายคนเดิม
+    # จนเพดานต้องต่ำลง ถ้าใช้เกณฑ์เดิมต่อ คนใหม่จะถูกตัดสินด้วยเกณฑ์ของห้องที่ไม่มีเขา
+    check("วางรูปคนใหม่ระหว่างรัน → คำนวณเกณฑ์ใหม่ด้วย ไม่ใช้ของเดิมต่อ",
+          changed and "Cee" in g.names and g.threshold == g.calibration.threshold
+          and g.calibration.closest is not None,
+          f"(เดิม {before:.4f} → ใหม่ {g.threshold:.4f})")
+
+print("\n── ท่านิ่งที่อ่านจากรูปลงทะเบียน ─────────────────────")
+
+# รูปหน้าตรงบอกได้ว่า "ตรง" ของคนนี้ให้ค่าเท่าไร — analyzer เอาไปใช้แทนการนั่งนิ่ง
+BIAS = 0.05                       # คนนี้จมูกเบี้ยว ตอนมองตรงก็ยังได้ yaw ไม่เป็นศูนย์
+TILTED = dict(PEOPLE["A"])        # โครงหน้าเดิม แต่รูปที่ใช้ลงทะเบียนหันข้างอยู่
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Ann", 3)
+    g = gallery_for({"Ann": {**PEOPLE["A"], "yaw": BIAS}}, root, CFG_AUTO)
+    g.scan()
+    expected = lm.head_pose(make_face(**PEOPLE["A"], yaw=BIAS))
+    neutral = g.people["Ann"].neutral
+    check("อ่านท่านิ่งจากรูปได้", neutral is not None)
+    check("ตรงกับท่าในรูปจริง ๆ", abs(neutral[0] - expected[0]) < 1e-9, f"({neutral} vs {expected})")
+    check("ค่าที่ได้ไม่เป็นศูนย์ — bias ประจำตัวคือสิ่งที่ต้องหักออก", abs(neutral[0]) > 1e-6)
+
+    # แกน pitch ของหน้าตรงไม่ได้อยู่ใกล้ศูนย์เลย (จมูกอยู่ต่ำกว่าแนวตาเป็นทุนเดิม)
+    # ถ้าเผลอเอาเกณฑ์การก้ม/เงยมาจับตรง ๆ รูปหน้าตรงทุกใบจะถูกปฏิเสธหมด
+    check("pitch ของหน้าตรงห่างจากศูนย์มาก — จึงเทียบกับศูนย์ไม่ได้", neutral[1] > 0.06,
+          f"(pitch {neutral[1]:+.3f})")
+
+    good, rejected = fc.usable_neutrals({"Ann": g.people["Ann"]}, 0.08, 0.06, pitch_quorum=3)
+    check("bias ปกติ → ใช้เป็นจุดอ้างอิงได้", good.get("Ann") == neutral and not rejected)
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Turned", 3)
+    g = gallery_for({"Turned": {**TILTED, "yaw": 0.5}}, root, CFG_AUTO)
+    g.scan()
+    good, rejected = fc.usable_neutrals(g.people, 0.08, 0.06, pitch_quorum=3)
+    # ถ้ายอมรับรูปแบบนี้ คนคนนี้นั่งมองตรงจะถูกนับว่า "หันหน้า" ตลอดเวลา
+    check("รูปที่คนหันข้างอยู่ → ไม่รับเป็นจุดอ้างอิง และบอกเหตุผล",
+          not good and "yaw" in rejected.get("Turned", ""), f"({rejected})")
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    for name in ("Ann", "Bee", "Cee", "Dee"):
+        photos(root, name, 2)
+    # สามคนถ่ายมุมเดียวกัน · Dee ก้มหน้าในรูปของเธอ
+    g = gallery_for({"Ann": {**PEOPLE["A"], "yaw": BIAS}, "Bee": PEOPLE["B"],
+                     "Cee": PEOPLE["C"], "Dee": {**PEOPLE["A"], "pitch": 0.6}},
+                    root, CFG_AUTO)
+    g.scan()
+    good, rejected = fc.usable_neutrals(g.people, 0.08, 0.06, pitch_quorum=3)
+    check("คนที่ก้ม/เงยต่างจากกลุ่ม → ถูกคัดออกด้วยการเทียบมัธยฐานของแกลเลอรี",
+          "Dee" in rejected and "pitch" in rejected["Dee"], f"({rejected})")
+    check("ส่วนคนที่เหลือยังใช้ได้ตามปกติ", set(good) == {"Ann", "Bee", "Cee"}, f"({sorted(good)})")
+
+    # คนน้อยเกินไป มัธยฐานยังไม่มีความหมาย — ต้องข้ามการตรวจแกนนั้น ไม่ใช่เดา
+    two = {k: g.people[k] for k in ("Ann", "Dee")}
+    good2, rejected2 = fc.usable_neutrals(two, 0.08, 0.06, pitch_quorum=3)
+    check("แกลเลอรีเล็กเกินไป → ข้ามการตรวจ pitch แทนที่จะตัดสินจากข้อมูลที่ไม่พอ",
+          set(good2) == {"Ann", "Dee"} and not rejected2, f"({rejected2})")
+
+with tempfile.TemporaryDirectory() as tmp:
+    root = Path(tmp)
+    photos(root, "Ann", 3)
+    g = gallery_for({"Ann": {**PEOPLE["A"], "yaw": BIAS}}, root, CFG_AUTO)
+    g.scan()
+    if main is not None:
+        pose_cfg = {"method": "geometric", "yaw_threshold": 0.08, "pitch_threshold": 0.06,
+                    "neutral_from_photos": True, "photo_neutral_max_ratio": 1.0,
+                    "photo_neutral_min_people": 3}
+        picked = main.photo_neutrals(g, pose_cfg, announce=False)
+        check("main คัดเฉพาะคนที่รูปหน้าตรงพอ", picked == {"Ann": g.people["Ann"].neutral})
+        check("ปิดฟีเจอร์ → วิธีวัดไม่รองรับ",
+              not main.photo_neutral_supported({**pose_cfg, "neutral_from_photos": False},
+                                               {"transform_matrix": False}))
+        check("วิธี matrix → ไม่รองรับ (คนละหน่วยกับค่าจากรูป)",
+              not main.photo_neutral_supported({**pose_cfg, "method": "matrix"},
+                                               {"transform_matrix": True}))
+        check("วิธี auto ที่โมเดลส่ง matrix มาด้วย → ไม่รองรับเหมือนกัน",
+              not main.photo_neutral_supported({**pose_cfg, "method": "auto"},
+                                               {"transform_matrix": True}))
+        check("วิธี auto ที่ไม่มี matrix → ถอยไป geometric จึงรองรับ",
+              main.photo_neutral_supported({**pose_cfg, "method": "auto"},
+                                           {"transform_matrix": False}))
+    else:
+        print("  skip การคัดท่านิ่งฝั่ง main — ไม่มี cv2/mediapipe ในเครื่องนี้")
 
 print("\n── หน้านิ่งต้องมองเห็นได้ ว่าไม่ใช่ฟีเจอร์พัง ──────────────")
 

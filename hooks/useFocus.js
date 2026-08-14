@@ -150,7 +150,9 @@ export default function useFocus({ focusCfg, addLog }) {
           const record = msg.payload?.data?.record ?? msg.payload?.record;
           if ((msg.event === 'postgres_changes' || msg.payload?.data?.type === 'INSERT') && record?.id) {
             mergeRows([record], focusCfg.fetchLimit * 2);
-            addLog(`[กล้อง] บุคคลที่ ${record.person} ขยับ ${movementCount(record.movement)} ครั้ง`, 'ok');
+            // ชื่อมาจากแกลเลอรีรูปบน Pi — ไม่มีชื่อก็ยังมีหมายเลข track เหมือนเดิม
+            const who = record.name ? `${record.name} (#${record.person})` : `บุคคลที่ ${record.person}`;
+            addLog(`[กล้อง] ${who} ขยับ ${movementCount(record.movement)} ครั้ง`, 'ok');
           }
         } catch {
           /* non-JSON frames are expected noise */

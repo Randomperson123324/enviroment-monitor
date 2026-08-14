@@ -7,9 +7,11 @@ import '@/components/charts/setup';
 import SectionHeader from '@/components/SectionHeader';
 import {
   SENSORS,
-  MAIN_SENSORS,
+  CLIMATE_SENSORS,
   PM_SENSORS,
+  LIGHT_SENSORS,
   PM_AVG_HOURS,
+  THRESHOLDS,
   AQI_LEVELS,
   AQI_SOURCE,
   aqiLevel,
@@ -29,12 +31,14 @@ import { useLang } from '@/hooks/useLang';
 function HistoryChart({ view, smooth, colors }) {
   const { t } = useLang();
 
-  // Both remaining series share one axis honestly (°C 12–38, % 10–95), so the
-  // divisor trick the MQ-2's ppm needed — a line labelled "ก๊าซ ÷10" — is gone.
+  // Both series share one axis honestly (°C 12–38, % 10–95), so the divisor
+  // trick the MQ-2's ppm needed — a line labelled "ก๊าซ ÷10" — is gone. Light
+  // is kept off this chart for the same reason: lux runs to four digits indoors
+  // and five in daylight, which would press both of these flat against zero.
   const data = useMemo(() => {
     return {
       labels: view.labels,
-      datasets: MAIN_SENSORS.map((s) => ({
+      datasets: CLIMATE_SENSORS.map((s) => ({
         label: t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
         data: smoothSeries(view[s.id], smooth),
         borderColor: colors[s.id],
@@ -107,6 +111,61 @@ function PmChart({ view, smooth, colors }) {
       scales: {
         x: timeAxis(colors, view.labels.length),
         y: valueAxis(colors, { scale: { suggestedMin: 0 } }),
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: colors.tick, boxWidth: 10, padding: 8, usePointStyle: true },
+        },
+        tooltip: { ...tooltipOptions(colors, view.timestamps), mode: 'index', intersect: false },
+      },
+    }),
+    [colors, view]
+  );
+
+  return <Line data={data} options={options} />;
+}
+
+/**
+ * Light gets its own chart for the same reason PM does: its unit is nowhere
+ * near the others'. The y-axis is capped at the glare threshold rather than
+ * left to autoscale, because one sunny afternoon by the window reads tens of
+ * thousands of lux and would squash every evening reading into the baseline.
+ * Values above the cap still draw — they just leave the top of the frame,
+ * which reads correctly as "off the scale, and that is the point".
+ */
+function LightChart({ view, smooth, colors }) {
+  const { t } = useLang();
+
+  const data = useMemo(
+    () => ({
+      labels: view.labels,
+      datasets: LIGHT_SENSORS.map((s) => ({
+        label: t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
+        data: smoothSeries(view[s.id], smooth),
+        borderColor: colors[s.id],
+        backgroundColor: gradientFill(colors[s.id], 0.22),
+        tension: 0.42,
+        pointRadius: 0,
+        borderWidth: 2,
+        spanGaps: true,
+        fill: true,
+      })),
+    }),
+    [view, smooth, colors, t]
+  );
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: timeAxis(colors, view.labels.length),
+        y: valueAxis(colors, {
+          scale: { suggestedMin: 0, suggestedMax: THRESHOLDS.lux.warnHi },
+        }),
       },
       plugins: {
         legend: {
@@ -294,6 +353,20 @@ export default function ChartsSection({ dash, theme }) {
           </div>
           <div className="chart-stage-md">
             <PmChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+          </div>
+        </div>
+      )}
+
+      {hasSeriesData(view, LIGHT_SENSORS) && (
+        <div className="panel section-gap">
+          <div className="chart-head">
+            <div className="panel-title">{t('charts.lightTitle')}</div>
+            <div className="panel-meta">
+              {t('charts.lightMeta', { lo: THRESHOLDS.lux.okLo, hi: THRESHOLDS.lux.okHi })}
+            </div>
+          </div>
+          <div className="chart-stage-md">
+            <LightChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
           </div>
         </div>
       )}

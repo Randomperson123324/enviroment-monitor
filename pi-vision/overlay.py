@@ -82,6 +82,10 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
     # `?` = เดาจากคนที่ใกล้ที่สุดแต่ยังไม่ผ่านเกณฑ์ (ความหมายเดียวกับ `#5?` ของ id ชั่วคราว)
     if reading.name:
         who = reading.name if getattr(reading, "name_confident", True) else f"{reading.name}?"
+    elif display_cfg.get("known_only"):
+        # ตัวตนมาจากโฟลเดอร์อย่างเดียว จึงไม่ขึ้นหมายเลข · และไม่ใช่ "unknown" เพราะ
+        # ค่าว่างแปลว่า "ยังไม่รู้" ไม่ใช่ "ไม่มีในโฟลเดอร์" — เหตุผลเต็มอยู่ใน main._who
+        who = "identifying"
     else:
         who = f"#{reading.person_id}"
     tag = f"{who} " if show_id else ""
@@ -121,6 +125,17 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
         # ฟีเจอร์ปิดอยู่หรือแค่ยังไม่มีอารมณ์ให้อ่าน (ดู _mood ใน main.py)
         if reading.emotion:
             bits.append(reading.emotion)
+        # ท่าทางร่างกายขึ้นก่อนค่าของตา เพราะเป็นสิ่งที่มองหาบนจอก่อนเสมอ
+        # ตัวใหญ่กว่า เปลี่ยนช้ากว่า และเป็นเหตุผลที่คนเปิดโหมดนี้
+        gesture = getattr(reading, "gesture", None)
+        if gesture:
+            bits.append(gesture.upper())
+        posture = getattr(reading, "posture", None)
+        if posture:
+            # `?` = เดาจากหลักฐานอ้อม ๆ ไม่ได้วัดจริง (มองไม่เห็นขา ฯลฯ)
+            # ความหมายเดียวกับ `?` ท้ายชื่อคนที่ยังไม่ผ่านเกณฑ์ (ดู faces.py)
+            bits.append(posture if getattr(reading, "posture_confident", True)
+                        else f"{posture}?")
         if display_cfg.get("show_eyes", True):
             bits.append(f"eye {reading.blink_score:.2f}")
         if reading.direction:
@@ -149,6 +164,18 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
         for ring in (lm.LEFT_EYE_RING, lm.RIGHT_EYE_RING):
             pts = np.array([(int(points[i].x * w), int(points[i].y * h)) for i in ring], np.int32)
             cv2.polylines(img, [pts], True, eye_color, 1, LINE)
+
+
+def draw_zoom_rects(img, rects):
+    """
+    กรอบบาง ๆ รอบบริเวณที่ถูกครอปไปขยายอ่าน landmark
+
+    วาดไว้เพื่อให้เห็นด้วยตาว่าการซูมกำลังทำงานกับใคร — ถ้าคนไกลไม่มีชื่อขึ้น
+    กรอบนี้บอกได้ทันทีว่าเป็นเพราะไม่ได้ถูกซูม หรือซูมแล้วแต่เทียบกับรูปไม่ได้
+    ซึ่งเป็นคนละปัญหาและแก้คนละทาง
+    """
+    for x1, y1, x2, y2 in rects or ():
+        cv2.rectangle(img, (x1, y1), (x2, y2), COLORS["eye"], 1, LINE)
 
 
 def draw_menu(img, title, items, footer=None):

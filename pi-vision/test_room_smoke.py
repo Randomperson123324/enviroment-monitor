@@ -21,6 +21,9 @@ if hasattr(sys.stdout, "reconfigure"):
 
 FAILURES = []
 FRAMES_TO_RUN = 80
+# fps ที่ลูปถูกบังคับให้เดินตอนเทสต์ — 80 เฟรมที่ค่านี้ = เวลาจริงราว 5.3 วินาที
+# ซึ่งยาวพอให้ผ่านช่วง calibrate ท่านิ่ง (3 วินาที) แล้วมีค่าตาขึ้นจอให้ตรวจ
+LOOP_FPS = 15
 
 
 def check(name, condition, detail=""):
@@ -139,8 +142,11 @@ def install_fakes(monkey_state, only_face=None, photo_face=None,
 
     # ตัวอ่านรูปปลอม — คืน landmark ของคนคนหนึ่ง เพื่อให้เส้นทาง "จำชื่อจากรูป"
     # ถูกเดินจริงในลูป ไม่ใช่ข้ามไปเพราะสร้างตัวอ่านไม่ได้
+    # รับ *a เพราะของจริงยังรับ cam_cfg กับ roi_cfg ไปตัดรูปให้เป็นอัตราส่วนของกล้อง
+    # ก่อนถอดลายเซ็น (ดู build_photo_reader) · ตัวปลอมคืน landmark ตรง ๆ ไม่ได้อ่านไฟล์
+    # จึงไม่ต้องใช้สองค่านั้น แต่ต้องรับไว้ให้เรียกได้เหมือนกัน
     fake_reader = types.SimpleNamespace(close=lambda: None)
-    main.build_photo_reader = lambda cfg: (lambda path: photo_face, fake_reader)
+    main.build_photo_reader = lambda cfg, *a: (lambda path: photo_face, fake_reader)
 
     # ชี้แกลเลอรีไปที่โฟลเดอร์ชั่วคราว — ห้ามแตะ faces/ ของผู้ใช้ซึ่งมีรูปคนจริงอยู่
     if faces_dir is not None:
@@ -150,6 +156,13 @@ def install_fakes(monkey_state, only_face=None, photo_face=None,
     if window_seconds is not None:
         monkey_state["window_seconds"] = main.CONFIG["window"]["seconds"]
         main.CONFIG["window"]["seconds"] = window_seconds
+
+    # ⚠️ ตรึง fps ไว้ ไม่ให้ .env ของแต่ละเครื่องมีสิทธิ์ตัดสินผลเทสต์
+    # ลูปหลักหน่วงตัวเองตามค่านี้ 80 เฟรมจึงกินเวลาจริงต่างกันตาม fps — และสิ่งที่
+    # ขึ้นจอ (เช่นค่าตาที่โผล่หลัง calibrate ครบ 3 วินาที) วัดจากเวลาจริง ไม่ใช่จำนวนเฟรม
+    # ตั้ง CAMERA_FPS=30 ไว้ใน .env แล้วเทสต์ล้มโดยที่โค้ดไม่ได้ผิด คือเคยเกิดมาแล้ว
+    monkey_state["camera_fps"] = main.CONFIG["camera"]["fps"]
+    main.CONFIG["camera"]["fps"] = LOOP_FPS
     if guess is not None:
         monkey_state["guess"] = main.CONFIG["faces"]["guess"]
         main.CONFIG["faces"]["guess"] = guess
@@ -216,6 +229,8 @@ def run(mode_key, **kw):
             main.CONFIG["faces"]["dir"] = state["faces_dir"]
         if "window_seconds" in state:
             main.CONFIG["window"]["seconds"] = state["window_seconds"]
+        if "camera_fps" in state:
+            main.CONFIG["camera"]["fps"] = state["camera_fps"]
         if "guess" in state:
             main.CONFIG["faces"]["guess"] = state["guess"]
     return code, state

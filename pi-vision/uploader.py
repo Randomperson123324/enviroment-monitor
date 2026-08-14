@@ -40,7 +40,9 @@ class Uploader:
     """
 
     def __init__(self, cfg: dict, post=None, log=print):
-        self.url = cfg["url"].rstrip("/")
+        # ตัด /rest/v1 ที่ติดมาด้วยทิ้ง — URL ที่ก๊อปจากหน้า Supabase มีท่อนนี้อยู่แล้ว
+        # และ _urllib_post เติมให้เองอีกที ปล่อยไว้จะได้ /rest/v1/rest/v1/... = 404
+        self.url = cfg["url"].rstrip("/").removesuffix("/rest/v1")
         self.key = cfg["key"]
         self.focus_table = cfg["focus_table"]
         self.room_table = cfg["room_table"]

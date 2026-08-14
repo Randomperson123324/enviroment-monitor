@@ -117,6 +117,18 @@ class Track:
         """ตำแหน่งที่คาดว่าจะอยู่หลังผ่านไป dt วินาที"""
         return self.cx + self.vx * dt, self.cy + self.vy * dt
 
+    def predict_box(self, dt: float) -> tuple[float, float, float, float]:
+        """กรอบเดิมที่เลื่อนไปตามตำแหน่งที่ทำนาย — ขนาดคงเดิม
+
+        ต้องเลื่อนก่อนเอาไปคิด IoU ไม่งั้นสัญญาณ IoU จะขัดกับสัญญาณระยะทาง:
+        ระยะทางวัดจากตำแหน่งที่**ทำนาย** แต่ IoU วัดจากกรอบ**ที่เห็นครั้งล่าสุด**
+        คนที่เดินเร็วพอให้กรอบสองเฟรมไม่ทับกันเลยจะได้ IoU = 0 คือโดนลงโทษเต็ม ๆ
+        ทั้งที่การทำนายชี้ตำแหน่งถูกแล้ว — ซึ่งคือกรณีที่เราอยากให้จับคู่ติดที่สุด
+        """
+        dx, dy = self.vx * dt, self.vy * dt
+        x1, y1, x2, y2 = self.box
+        return x1 + dx, y1 + dy, x2 + dx, y2 + dy
+
     def learn_signature(self, sig: tuple[float, ...] | None, max_samples: int) -> None:
         """
         เฉลี่ยลายเซ็นใหม่เข้ากับของเดิมแบบ running mean
@@ -164,6 +176,12 @@ class Track:
 class PersonTracker:
     def __init__(self, tracker_cfg: dict):
         self.max_distance = tracker_cfg["max_distance"]
+        # ส่วนเผื่อที่กว้างขึ้นตามเวลาที่หายไป และเพดานของมัน — ดู _gate()
+        # ไม่ระบุ = ค่าที่ทำให้ได้พฤติกรรมเดิมเป๊ะ (ไม่ขยายเลย) เพื่อให้ config เก่ายังใช้ได้
+        self.gate_drift = tracker_cfg.get("gate_drift", 0.0)
+        self.max_gate = tracker_cfg.get("max_gate", self.max_distance)
+        # ทำนายล่วงหน้าได้ไกลสุดกี่วินาที — ใหญ่มาก = พฤติกรรมเดิม (ทำนายเต็ม dt)
+        self.predict_horizon = tracker_cfg.get("predict_horizon", float("inf"))
         self.forget_seconds = tracker_cfg["forget_seconds"]
         self.w_distance = tracker_cfg["weight_distance"]
         self.w_iou = tracker_cfg["weight_iou"]
@@ -197,21 +215,46 @@ class PersonTracker:
         self.new_ids_issued = 0               # นับ id ใหม่ที่แจกไป (ยิ่งน้อยยิ่งดี)
 
     # ── การคิด cost ───────────────────────────────────────
+    def _gate(self, dt: float) -> float:
+        """ระยะไกลสุดที่ยังยอมให้จับคู่ — **กว้างขึ้นตามเวลาที่คนคนนั้นหายไป**
+
+        เดิมเป็นค่าคงที่ ซึ่งกลาย ๆ เป็นการบอกว่า "คนหายไป 1 เฟรมกับหายไป 1 วินาที
+        เคลื่อนที่ได้ไกลเท่ากัน" ที่วัดมาแล้วว่าไม่จริง · คนที่ตรวจไม่เจอสองสามเฟรม
+        (หันหน้า · ภาพเบลอตอนขยับเร็ว) กลับมาอยู่ไกลเกินวงที่ตายตัวก็ถูกตัดสิน
+        ว่าเป็นคนใหม่ทันที ทั้งที่การทำนายชี้ไปถูกทางแล้ว
+
+        การทำนายเองก็แม่นน้อยลงเรื่อย ๆ ตามเวลา จึงต้องเผื่อกว้างขึ้นตามกันไป
+        แต่ต้องมีเพดาน ไม่งั้นคนที่หายไปนาน ๆ จะจับคู่กับใครก็ได้ทั้งเฟรม
+        """
+        return min(self.max_gate, self.max_distance + self.gate_drift * max(0.0, dt))
+
     def _cost(self, track: Track, det: Detection, dt: float) -> float:
         """
         cost ยิ่งต่ำยิ่งน่าจะเป็นคนเดียวกัน
 
         รวมสามสัญญาณ: ระยะจากตำแหน่งที่ทำนายไว้ · 1−IoU ของกรอบ · ความต่างของขนาด
+
+        `dt` = เวลาตั้งแต่ **track ตัวนี้** ถูกเห็นครั้งล่าสุด (ไม่ใช่ค่ากลางของทั้งเฟรม)
         """
-        px, py = track.predict(dt) if self.use_prediction else (track.cx, track.cy)
+        if self.use_prediction:
+            # ⚠️ อย่าทำนายไกลเกินขอบฟ้า · ความเร็วมาจากผลต่างของตำแหน่งสองเฟรมซึ่งมี
+            # สัญญาณรบกวนติดมาด้วย การคูณมันด้วย dt ยาว ๆ คือการขยายสัญญาณรบกวนนั้น
+            # และคนที่**หยุดเดิน**ระหว่างที่หายไปจะถูกทำนายว่าไปไกลลิบ ทั้งที่ยืนอยู่ที่เดิม
+            # พ้นขอบฟ้าไปแล้วให้ถือว่าเขาอยู่ที่เดิม ซึ่งเดาผิดน้อยกว่าเดาว่าเดินต่อ
+            horizon = min(dt, self.predict_horizon)
+            px, py = track.predict(horizon)
+            box = track.predict_box(horizon)
+        else:
+            px, py, box = track.cx, track.cy, track.box
         dist = math.hypot(det.cx - px, det.cy - py)
-        if dist > self.max_distance:
+        gate = self._gate(dt)
+        if dist > gate:
             return COST_IMPOSSIBLE
 
         size_ratio = abs(track.size - det.size) / max(track.size, det.size, 1e-6)
         return (
-            self.w_distance * (dist / max(self.max_distance, 1e-6))
-            + self.w_iou * (1.0 - iou(track.box, det.box))
+            self.w_distance * (dist / max(gate, 1e-6))
+            + self.w_iou * (1.0 - iou(box, det.box))
             + self.w_size * size_ratio
         )
 
@@ -278,13 +321,18 @@ class PersonTracker:
             return None            # อันดับหนึ่งกับสองใกล้กันเกินไป — ไม่เสี่ยงเดา
         return scored[0][1]
 
-    def _apply_swap_guard(self, pairs: list, dets: list[Detection], dt: float) -> None:
+    def _apply_swap_guard(self, pairs: list, dets: list[Detection], now: float) -> None:
         """
         ตรวจทุกคู่ว่าถ้าสลับ track กันแล้ว cost รวมต่ำลงไหม — ถ้าใช่ให้สลับ
 
         แก้กรณีคลาสสิกที่ greedy พลาด: สองคนเดินสวนกัน คนที่อยู่ใกล้กว่าเล็กน้อย
         ถูกหยิบไปก่อนทั้งที่จริง ๆ เป็นของอีกคน
+
+        คิด dt แยกรายคนเหมือน assign() — สองคนที่กำลังเทียบกันอาจหายไปคนละนาน
         """
+        def dt_of(track: Track) -> float:
+            return max(1e-3, now - track.last_seen)
+
         improved = True
         guard = 0
         while improved and guard < len(pairs):
@@ -294,8 +342,10 @@ class PersonTracker:
                 for j in range(i + 1, len(pairs)):
                     di, ti = pairs[i]
                     dj, tj = pairs[j]
-                    now_cost = self._cost(ti, dets[di], dt) + self._cost(tj, dets[dj], dt)
-                    swap_cost = self._cost(tj, dets[di], dt) + self._cost(ti, dets[dj], dt)
+                    now_cost = (self._cost(ti, dets[di], dt_of(ti))
+                                + self._cost(tj, dets[dj], dt_of(tj)))
+                    swap_cost = (self._cost(tj, dets[di], dt_of(tj))
+                                 + self._cost(ti, dets[dj], dt_of(ti)))
                     if swap_cost < now_cost:
                         pairs[i], pairs[j] = (di, tj), (dj, ti)
                         improved = True
@@ -309,16 +359,19 @@ class PersonTracker:
         """
         self._forget_stale(now)
 
-        # dt เฉลี่ยจาก track ที่มีอยู่ — ใช้ทำนายตำแหน่ง
-        dt = 0.0
-        if self._tracks:
-            dt = max(1e-3, now - max(t.last_seen for t in self._tracks.values()))
+        # ⚠️ dt ต้องเป็นของ **แต่ละ track** ไม่ใช่ค่าเดียวใช้ร่วมกันทั้งเฟรม
+        # ของเดิมคิดจาก track ที่เพิ่งเห็นล่าสุด ผลคือถ้ามีคนหนึ่งนั่งนิ่งให้เห็นทุกเฟรม
+        # dt จะเท่ากับหนึ่งเฟรมเสมอ — แล้วคนอีกคนที่หายไปหนึ่งวินาทีก็ถูกทำนายตำแหน่ง
+        # ล่วงหน้าแค่หนึ่งเฟรม ทั้งที่เขาเดินมาทั้งวินาที · ยิ่งในห้องที่มีคนนั่งอยู่ด้วย
+        # ยิ่งพลาด เพราะคนที่นั่งนิ่งนั่นแหละที่กดให้ dt ของทุกคนเหลือเฟรมเดียว
+        def elapsed(track: Track) -> float:
+            return max(1e-3, now - track.last_seen)
 
         # สร้างคู่ที่เป็นไปได้ทั้งหมด แล้วเรียงจาก cost ต่ำไปสูง
         candidates = []
         for di, det in enumerate(detections):
             for pid, track in self._tracks.items():
-                c = self._cost(track, det, dt)
+                c = self._cost(track, det, elapsed(track))
                 if c < COST_IMPOSSIBLE:
                     candidates.append((c, di, pid))
         candidates.sort(key=lambda x: x[0])
@@ -334,7 +387,7 @@ class PersonTracker:
             used_tracks.add(pid)
 
         if self.swap_guard and len(pairs) > 1:
-            self._apply_swap_guard(pairs, detections, dt)
+            self._apply_swap_guard(pairs, detections, now)
 
         result: list[Track | None] = [None] * len(detections)
         for di, track in pairs:

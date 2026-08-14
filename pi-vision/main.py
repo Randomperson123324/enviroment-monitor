@@ -20,7 +20,8 @@ pi-vision — ตรวจจับใบหน้า วัดการหั�
 
 ปุ่มลัดขณะรัน
     q / Esc   ออก
-    c         calibrate ท่านิ่งใหม่ทุกคน
+    c         calibrate ท่านิ่งใหม่ทุกคนจากท่าที่ทำอยู่ตอนนี้
+              (ทับท่านิ่งที่อ่านมาจากรูปด้วย และจะไม่กลับไปใช้ค่าจากรูปอีกจนกว่าจะได้ id ใหม่)
     m         สลับการวาด mesh
     f         ลืมทุก id และลายเซ็นทันที (ความเป็นส่วนตัว)
     e         สลับการโชว์คะแนนอารมณ์ดิบทั้งสี่ค่า (ใช้ปรับ EMOTION_THRESHOLD)
@@ -34,6 +35,7 @@ pi-vision — ตรวจจับใบหน้า วัดการหั�
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 import threading
 import time
@@ -43,10 +45,13 @@ from pathlib import Path
 import cv2
 
 import analyzer as az
+import body as bd
+import detect          # ไม่ย่อเป็น dt — ชนกับตัวแปร dt (เวลาต่อเฟรม) ในลูปหลัก
 import faces as fc
 import landmarks as lm
 import modes
 import overlay as ov
+import roi
 import uploader as up_mod
 from camera import Camera, CameraError, list_cameras
 from config import CONFIG
@@ -59,6 +64,7 @@ KEY_TOGGLE_MESH = ord("m")
 KEY_FLUSH = ord(" ")
 KEY_FORGET = ord("f")               # ลืมทุก id และลายเซ็นทันที (ความเป็นส่วนตัว)
 KEY_CAMERA_MENU = ord("v")          # เปิด/ปิดเมนูเลือกกล้อง (v = video source)
+KEY_RESOLUTION = ord("r")           # เปิด/ปิดเมนูเลือกความละเอียด (r = resolution)
 KEY_EMOTION = ord("e")              # โชว์คะแนนอารมณ์ดิบ เพื่อดูว่า threshold เหมาะไหม
 WAIT_KEY_MS = 1
 FPS_SMOOTHING = 0.9                 # ยิ่งใกล้ 1 ยิ่งนิ่ง
@@ -67,7 +73,8 @@ DOWNLOAD_CHUNK = 1 << 16
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="ตรวจจับใบหน้าและวัดสมาธิด้วย MediaPipe")
-    p.add_argument("--mode", choices=modes.ORDER, help="ทับค่า VISION_MODE และข้ามคำถามตอนเปิด")
+    # choices=ALL ไม่ใช่ ORDER — โหมดที่ไม่อยู่ในเมนู (room) ต้องยังสั่งด้วย --mode ได้
+    p.add_argument("--mode", choices=modes.ALL, help="ทับค่า VISION_MODE และข้ามคำถามตอนเปิด")
     p.add_argument("--source", choices=("auto", "csi", "usb"), help="ทับค่า CAMERA_SOURCE")
     p.add_argument("--no-window", action="store_true", help="ไม่เปิดหน้าต่าง (สำหรับ SSH)")
     p.add_argument("--mesh", action="store_true", help="วาด landmark ครบ 468 จุด")
@@ -78,6 +85,10 @@ def resolve_mode(cli_mode: str | None, env_mode: str, stream=None) -> modes.Mode
     """
     ลำดับความสำคัญ: flag > VISION_MODE ใน .env > ถามผู้ใช้
     ไม่มี TTY (cron · systemd · ท่อ) จะไม่ค้างรอ input — ใช้ค่าเริ่มต้นแล้วบอกให้รู้
+
+    ⚠️ ทางที่ **ไม่มีใครเลือก** ใช้ `HEADLESS_DEFAULT` ไม่ใช่ `DEFAULT` (ดู modes.py)
+    เมนูข้อ 1 เป็นโหมดที่จำหน้าและติดชื่อจริง การให้เครื่องที่บูตเองโดยไม่มีคนอยู่
+    เริ่มทำแบบนั้นเงียบ ๆ ไม่ใช่ค่าเริ่มต้นที่ควรได้มาโดยไม่มีใครตัดสินใจ
     """
     if cli_mode:
         return modes.get(cli_mode)
@@ -86,8 +97,9 @@ def resolve_mode(cli_mode: str | None, env_mode: str, stream=None) -> modes.Mode
 
     stream = stream or sys.stdin
     if not (hasattr(stream, "isatty") and stream.isatty()):
-        chosen = modes.get(None)
-        print(f"[pi-vision] ไม่มีหน้าจอให้ถาม — ใช้โหมด{chosen.label} · ระบุ --mode เพื่อเลือกเอง")
+        chosen = modes.get(modes.HEADLESS_DEFAULT)
+        print(f"[pi-vision] ไม่มีหน้าจอให้ถาม — ใช้โหมด{chosen.label}"
+              f" · ระบุ --mode หรือ VISION_MODE เพื่อเลือกเอง")
         return chosen
 
     for line in modes.menu_lines():
@@ -96,7 +108,8 @@ def resolve_mode(cli_mode: str | None, env_mode: str, stream=None) -> modes.Mode
         try:
             raw = input(f"  เลือก [{modes.ORDER.index(modes.DEFAULT) + 1}]: ")
         except EOFError:
-            return modes.get(None)
+            # stdin ปิดกลางคัน = ไม่มีใครตอบ ไม่ใช่ "กด Enter" — ใช้ทางที่ไม่มีคนเลือก
+            return modes.get(modes.HEADLESS_DEFAULT)
         chosen = modes.parse_choice(raw)
         if chosen is not None:
             return chosen
@@ -118,6 +131,10 @@ def choose_camera(cam_cfg: dict, scan=None, stream=None) -> dict:
     scan = scan or list_cameras
     stream = stream if stream is not None else sys.stdin
     if not (hasattr(stream, "isatty") and stream.isatty()):
+        return cam_cfg
+    if str(cam_cfg.get("usb_name") or "").strip():
+        # ปักชื่อกล้องไว้ใน .env แล้ว = ตอบคำถามนี้ไปแล้ว · Camera.open() จะไปหาชื่อนั้น
+        # และฟ้องเองถ้าหาไม่เจอ ซึ่งเป็นข้อความที่บอกสาเหตุได้ดีกว่าเมนูตรงนี้
         return cam_cfg
 
     print("[pi-vision] กำลังสำรวจกล้อง…")
@@ -162,7 +179,11 @@ def _with_camera(cam_cfg: dict, choice: dict) -> dict:
 
 
 def ensure_model(model_cfg: dict) -> Path:
-    """ดาวน์โหลดโมเดล MediaPipe ครั้งแรก ถ้ายังไม่มีในเครื่อง"""
+    """ดาวน์โหลดโมเดล MediaPipe ครั้งแรก ถ้ายังไม่มีในเครื่อง
+
+    รับ dict ที่มี path/url/auto_download — ใช้ได้กับทุกโมเดล ไม่ใช่เฉพาะ face_landmarker
+    (หมวด `body` ใช้คีย์ชุดเดียวกันจึงส่งเข้ามาตรง ๆ ได้)
+    """
     path = Path(model_cfg["path"])
     if path.exists():
         return path
@@ -212,7 +233,210 @@ def build_landmarker(model_cfg: dict):
     return vision.FaceLandmarker.create_from_options(options)
 
 
-def build_photo_reader(model_cfg: dict):
+def _cell(box, grid: int = 16) -> tuple[int, int]:
+    """
+    ช่องหยาบ ๆ ที่กรอบนี้ตกอยู่ — กุญแจสำหรับจำว่า "ซูมตรงนี้ไปเมื่อไร"
+
+    คนที่ไกลเกินกว่าจะเคยถูกอ่าน landmark ยังไม่มี track และไม่มี id ให้ผูก
+    แต่เป็นกลุ่มที่ต้องการคิวซูมมากที่สุดพอดี จึงผูกกับ**ตำแหน่งบนภาพ**แทน
+
+    หยาบพอที่คนยืนนิ่งจะตกช่องเดิมข้ามเฟรม (ไม่งั้นจะดูเหมือนคนใหม่ทุกเฟรมแล้วแย่ง
+    คิวคนอื่นตลอด) และละเอียดพอที่คนสองคนที่ยืนห่างกันจะไม่ใช้ช่องเดียวกัน
+    """
+    return (int((box[0] + box[2]) / 2 * grid), int((box[1] + box[3]) / 2 * grid))
+
+
+def build_detector(detect_cfg: dict):
+    """สร้าง FaceDetector รุ่น full-range — โหมดติดตามกิจกรรมเท่านั้น"""
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision
+
+    options = vision.FaceDetectorOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=str(ensure_model(detect_cfg))),
+        running_mode=vision.RunningMode.VIDEO,
+        min_detection_confidence=detect_cfg["min_confidence"],
+        min_suppression_threshold=detect_cfg["min_suppression"],
+    )
+    return vision.FaceDetector.create_from_options(options)
+
+
+def build_zoom_reader(model_cfg: dict):
+    """
+    FaceLandmarker อีกตัวสำหรับอ่าน **ภาพครอป** — โหมด IMAGE ไม่ใช่ VIDEO
+
+    ต้องเป็น IMAGE เพราะภาพที่ป้อนเข้าไปกระโดดไปมาระหว่างคนแต่ละคนในเฟรมเดียวกัน
+    ตัวติดตามภายในของโหมด VIDEO จะสับสนทันที (เหตุผลเดียวกับ build_photo_reader)
+
+    แยกจากตัวหลักที่อ่านภาพเต็ม เพราะตัวหลักอยู่โหมด VIDEO และต้องได้เฟรมเรียงตามเวลา
+    """
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision
+
+    options = vision.FaceLandmarkerOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=str(ensure_model(model_cfg))),
+        running_mode=vision.RunningMode.IMAGE,
+        num_faces=1,                      # ครอปมาแล้วหนึ่งกรอบ = หนึ่งใบหน้า
+        min_face_detection_confidence=model_cfg["min_detection_confidence"],
+        output_face_blendshapes=model_cfg["blendshapes"],
+        output_facial_transformation_matrixes=model_cfg["transform_matrix"],
+    )
+    return vision.FaceLandmarker.create_from_options(options)
+
+
+def zoom_read(reader, frame, box, roi_cfg: dict, previous=None):
+    """
+    ครอปใบหน้าออกมา ขยาย แล้วอ่าน landmark — คืน `(landmarks, blendshapes, matrix, rect, grow)`
+
+    `grow` คืออัตราที่ภาพครอปถูกขยายก่อนป้อนโมเดล — analyzer เอาไปใช้ตัดสินว่า
+    landmark ชุดนี้น่าเชื่อแค่ไหน (ดู quality gate)
+
+    คืน `(None, None, None, rect, grow)` เมื่อครอปแล้วยังหาใบหน้าไม่เจอ ซึ่งเกิดได้ปกติ
+    กับกรอบผีจากตัวตรวจ · ผู้เรียกทิ้งกรอบนั้นไปแล้วลองใหม่เฟรมหน้าได้เลย
+
+    landmark ที่คืนออกไปเป็นพิกัดของ**เฟรมเต็ม**แล้ว (ดู roi.remap) ส่วนที่เหลือของ
+    ระบบจึงไม่ต้องรู้เลยว่ามีการครอปเกิดขึ้น
+    """
+    import mediapipe as mp
+
+    h, w = frame.shape[:2]
+    rect = roi.blend_rect(previous, roi.crop_rect(box, w, h, roi_cfg["margin"]),
+                          roi_cfg["smoothing"])
+    x1, y1, x2, y2 = rect
+    patch = frame[y1:y2, x1:x2]
+    if patch.size == 0:
+        return None, None, None, rect, 1.0
+
+    # ขยายให้ใหญ่พอที่โมเดลจะเห็นรายละเอียด — ทั้งสองแกนคูณด้วยค่าเดียวกัน
+    # เพื่อไม่ให้อัตราส่วนเสีย (เหตุผลเต็มอยู่ในหัวไฟล์ roi.py)
+    short = min(patch.shape[0], patch.shape[1])
+    grow = min(max(roi_cfg["min_px"] / max(short, 1), 1.0),
+               roi_cfg["max_px"] / max(short, 1))
+    if grow > 1.0:
+        patch = cv2.resize(patch, None, fx=grow, fy=grow, interpolation=cv2.INTER_LINEAR)
+
+    rgb = cv2.cvtColor(patch, cv2.COLOR_BGR2RGB)
+    result = reader.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
+    if not result or not result.face_landmarks:
+        return None, None, None, rect, grow
+
+    points = roi.remap(result.face_landmarks[0], rect, w, h)
+    shapes = _nth(getattr(result, "face_blendshapes", None) or [], 0)
+    matrix = _nth(getattr(result, "facial_transformation_matrixes", None) or [], 0)
+    return points, shapes, matrix, rect, grow
+
+
+def build_body_landmarker(body_cfg: dict):
+    """สร้าง PoseLandmarker (landmark ร่างกาย 33 จุด) — โหมดติดตามกิจกรรมเท่านั้น
+
+    แยกจาก FaceLandmarker คนละตัวคนละโมเดล · โหมดอื่นไม่เรียกฟังก์ชันนี้เลย
+    จึงไม่มีใครจ่ายค่า 5.8 MB กับเวลา inference ของท่าทางถ้าไม่ได้ใช้
+    """
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision
+
+    options = vision.PoseLandmarkerOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=str(ensure_model(body_cfg))),
+        running_mode=vision.RunningMode.VIDEO,
+        num_poses=body_cfg["max_people"],
+        min_pose_detection_confidence=body_cfg["min_detection_confidence"],
+        min_pose_presence_confidence=body_cfg["min_presence_confidence"],
+        min_tracking_confidence=body_cfg["min_tracking_confidence"],
+    )
+    return vision.PoseLandmarker.create_from_options(options)
+
+
+def attach_bodies(tracks, poses) -> dict[int, int]:
+    """
+    จับคู่ร่างที่ตรวจเจอ กับ track ใบหน้าที่มีอยู่ — คืน `{person_id: ลำดับของร่าง}`
+
+    คืน**ลำดับ** ไม่ใช่ตัว landmark เพราะผู้เรียกต้องหยิบสองลิสต์ที่เรียงตรงกัน
+    (พิกัดบนภาพ และพิกัดหน่วยเมตรสามแกน) ลำดับเป็นกุญแจที่ใช้ได้กับทั้งคู่
+
+    landmark 0 ของ pose คือจมูก จึงบอกได้ว่าหัวของร่างนี้อยู่ตรงไหนโดยไม่ต้องคำนวณ
+    อะไรเพิ่ม · จับคู่กับ track ที่จมูกตกอยู่ในกรอบใบหน้าพอดี ถ้าไม่มีกรอบไหนครอบเลย
+    ให้ track ที่ศูนย์กลางใกล้ที่สุด **แต่ต้องใกล้กว่าครึ่งหนึ่งของขนาดกรอบ**
+    ไม่งั้นคนที่ยืนคนละมุมห้องจะถูกจับคู่กันเพราะเป็นตัวเลือกเดียวที่เหลือ
+
+    หนึ่ง track ได้ร่างเดียว และหนึ่งร่างไปได้ track เดียว — เรียงตามระยะแล้วหยิบทีละคู่
+    """
+    pairs = []
+    for pi, points in enumerate(poses):
+        head = bd.head_center(points)
+        if head is None:
+            continue
+        for track in tracks:
+            x1, y1, x2, y2 = track.box
+            inside = x1 <= head[0] <= x2 and y1 <= head[1] <= y2
+            gap = math.hypot(head[0] - track.cx, head[1] - track.cy)
+            if inside or gap < max(x2 - x1, y2 - y1) * 0.5:
+                # ร่างที่จมูกอยู่ในกรอบพอดีชนะร่างที่แค่อยู่ใกล้เสมอ
+                pairs.append((0.0 if inside else gap, pi, track.person_id))
+    pairs.sort()
+
+    used_poses: set[int] = set()
+    out: dict[int, int] = {}
+    for _cost, pi, pid in pairs:
+        if pi in used_poses or pid in out:
+            continue
+        used_poses.add(pi)
+        out[pid] = pi
+    return out
+
+
+def read_gesture(points, track, body_cfg: dict, now: float, world=None, aspect: float = 1.0):
+    """
+    ท่าแขนกับท่ายืน/นั่ง/นอนของคนนี้ — คืน `(gesture, posture, posture_sure)`
+
+    ตัวจับเวลาถือค้างอยู่ใน `track.state` เหมือน state อื่น ๆ ของ analyzer จึงรอด
+    การหลุดสั้น ๆ ไปด้วยกัน และหายไปพร้อมกันเมื่อ track หายจริง
+
+    ท่าทางร่างกายใช้ตัวถือค้าง**คนละตัว**กับท่าแขน เพราะสองอย่างนี้เปลี่ยนคนละจังหวะ
+    (ยกมือครึ่งวินาที · นั่งครึ่งชั่วโมง) และใช้เวลาถือค้างคนละค่า
+    """
+    hold = track.state.get("gesture_hold")
+    if hold is None:
+        hold = bd.GestureHold(body_cfg)
+        track.state["gesture_hold"] = hold
+    posture_hold = track.state.get("posture_hold")
+    if posture_hold is None:
+        posture_hold = bd.PostureHold(body_cfg)
+        track.state["posture_hold"] = posture_hold
+
+    raw = bd.gesture(points, body_cfg)
+    wrist_x = unit = None
+    if raw == bd.HAND_UP:
+        unit = bd.scale(points)
+        # ข้อมือข้างที่ยกอยู่ — ข้างที่สูงกว่า (y น้อยกว่า) คือข้างที่ยก
+        left, right = points[bd.L_WRIST], points[bd.R_WRIST]
+        wrist_x = left.x if left.y < right.y else right.x
+    gesture = hold.update(raw, now, wrist_x, unit or 1.0)
+
+    # ส่งท่าล่าสุดกลับเข้าไปเป็น `previous` — ใช้เมื่อเฟรมนี้ไม่มีหลักฐานใหม่เลย
+    # `world` คือ landmark หน่วยเมตรสามแกน ซึ่งเป็นสิ่งที่ทำให้วัดมุมต้นขาได้จริง
+    pose_raw, sure = bd.posture(points, body_cfg, posture_hold.current, world=world)
+
+    # ── ยกระดับการเดาให้เป็นการวัด เมื่อมองไม่เห็นขา ──────────────
+    # เฟรมที่วัดขาได้จริง = โอกาสจดความสูงศีรษะของท่านั้นไว้ · เฟรมที่วัดไม่ได้ =
+    # เอาความสูงตอนนี้ไปเทียบกับที่จดไว้ แทนที่จะเดาว่า "ขาหายแปลว่านั่ง"
+    # ท่า**นอน**ไม่เข้าเส้นทางนี้เลย เพราะ posture() ตอบท่านอนแบบมั่นใจเสมอ
+    if body_cfg.get("head_posture", False):
+        head = track.state.get("head_posture")
+        if head is None:
+            head = bd.HeadPosture(body_cfg)
+            track.state["head_posture"] = head
+        level = bd.head_level(points, aspect, body_cfg["min_visibility"])
+        if sure:
+            head.learn(pose_raw, level)
+        else:
+            guessed = head.guess(level)
+            if guessed is not None:
+                pose_raw, sure = guessed
+
+    posture, posture_sure = posture_hold.update(pose_raw, sure, now)
+    return gesture, posture, posture_sure
+
+
+def build_photo_reader(model_cfg: dict, cam_cfg: dict | None = None, roi_cfg: dict | None = None):
     """
     ตัวอ่านใบหน้าจาก **ไฟล์รูป** — FaceLandmarker อีกตัวในโหมด IMAGE
 
@@ -221,6 +445,23 @@ def build_photo_reader(model_cfg: dict):
 
     คืนฟังก์ชัน `detect(path) -> landmarks | None` ให้ faces.py เอาไปใช้
     ตัว landmarker ถูกสร้างครั้งเดียวและปิดเมื่อเลิกใช้
+
+    ──────────────────────────────────────────────────────────────────────────
+    ⚠️ **รูปถูกตัดให้เป็นอัตราส่วนเดียวกับกล้องก่อนเสมอ** (`cam_cfg` ที่ส่งเข้ามา)
+
+    ลายเซ็นมีมิติ `face_h / face_w` อยู่ด้วย ซึ่งคิดจากพิกัด normalized — แกน x
+    หารด้วยความกว้างภาพ แกน y หารด้วยความสูงภาพ · อัตราส่วนของ**ไฟล์รูป**จึงเข้าไป
+    อยู่ในลายเซ็นโดยตรง
+
+    วัดจริงกับรูปในโฟลเดอร์: คนคนเดียวกันถ่ายเป็นแนวตั้ง 3:4 กับแนวนอน 4:3 ให้ลายเซ็น
+    ห่างกัน 0.071 ซึ่ง**เกินเกณฑ์ 0.045** — ระบบจะตัดสินว่าเป็นคนละคน ทั้งที่เป็นรูป
+    ใบเดียวกันที่ตัดต่างกัน · ส่วนการตัดชิดหน้ากับตัดครึ่งตัวที่อัตราส่วนเดียวกัน
+    ห่างกันแค่ 0.014 ซึ่งไม่มีผลอะไร
+
+    แปลว่า **สิ่งที่สำคัญคืออัตราส่วนของรูป ไม่ใช่ว่าตัดชิดหน้าแค่ไหน** และรูปจากมือถือ
+    (แนวตั้ง) เทียบกับภาพจากกล้อง (4:3) ไม่ได้เลยถ้าไม่แก้ตรงนี้ · จึงตัดให้ตรงกันเสียก่อน
+    ผู้ใช้จะได้วางรูปแบบไหนก็ได้โดยไม่ต้องรู้เรื่องนี้
+    ──────────────────────────────────────────────────────────────────────────
     """
     from mediapipe.tasks import python as mp_python
     from mediapipe.tasks.python import vision
@@ -234,15 +475,37 @@ def build_photo_reader(model_cfg: dict):
     )
     reader = vision.FaceLandmarker.create_from_options(options)
 
-    def detect(path):
-        image = cv2.imread(str(path))
-        if image is None:
-            return None
+    want_aspect = None
+    if cam_cfg:
+        want_aspect = cam_cfg["width"] / max(cam_cfg["height"], 1)
+    margin = (roi_cfg or {}).get("margin", 0.6)
+
+    def _read(image):
         rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         result = reader.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
         if not result or not result.face_landmarks:
             return None
         return result.face_landmarks[0]
+
+    def detect(path):
+        image = cv2.imread(str(path))
+        if image is None:
+            return None
+        points = _read(image)
+        if points is None or want_aspect is None:
+            return points
+
+        # อ่านรอบแรกเพื่อ**หาว่าหน้าอยู่ตรงไหน** แล้วตัดใหม่ให้ได้อัตราส่วนของกล้อง
+        # และอ่านอีกรอบ · ลายเซ็นที่ได้จึงเทียบกับภาพสดจากกล้องได้ตรง ๆ
+        h, w = image.shape[:2]
+        x1, y1, x2, y2 = roi.crop_rect(lm.bounding_box(points), w, h, margin,
+                                       aspect=want_aspect)
+        patch = image[y1:y2, x1:x2]
+        if patch.size == 0:
+            return points
+        # ตัดแล้วหาหน้าไม่เจอ (เกิดได้เมื่อหน้าอยู่ชิดขอบรูปมาก) — ใช้ของรอบแรกไปก่อน
+        # ดีกว่าทิ้งรูปนั้นทั้งใบ แม้ลายเซ็นจะเทียบได้ไม่ตรงเท่า
+        return _read(patch) or points
 
     return detect, reader
 
@@ -253,10 +516,77 @@ def _who(reading, known_only: bool = False) -> str:
 
     `?` ต่อท้าย = เดาจากคนที่ใกล้ที่สุด แต่ยังไม่ผ่านเกณฑ์ความมั่นใจ (ตรงกับที่ `#5?`
     ใช้อยู่แล้วสำหรับ id ที่ยังไม่แน่) — ชื่อที่ไม่มี `?` คือชื่อที่ผ่านเกณฑ์
+
+    โหมดที่รู้จักเฉพาะคนในรูปไม่ขึ้นหมายเลขให้ใคร — ตัวตนในโหมดนั้นมาจากโฟลเดอร์
+    อย่างเดียว การขึ้น `#3` ชวนให้อ่านว่าเลขนั้นคือตัวตนที่ระบบจำเขาได้ ทั้งที่เป็นแค่
+    ลำดับในเฟรมนี้ และคนคนนั้นไม่ได้ถูกบันทึกไว้ที่ไหนเลย
+
+    แต่ก็ **ไม่ใช่คำว่า "unknown"** เพราะ `name` ที่ยังว่างแปลว่า "ยังไม่รู้" ไม่ใช่
+    "ตรวจแล้วไม่มีในโฟลเดอร์" — ลายเซ็นยังนิ่งไม่พอ · ใบหน้ายังเล็กเกินไป · แกลเลอรี
+    ยังว่าง ล้วนให้ค่าว่างเหมือนกันหมด และทุกกรณีถูกลองใหม่ทุกเฟรมจนกว่าจะมั่นใจ
+    การประกาศว่า "ไม่รู้จักคนนี้" ตอนที่ระบบยังทำงานไม่เสร็จจึงเป็นคำตอบที่ผิด
     """
     if reading.name:
         return reading.name if reading.name_confident else f"{reading.name}?"
-    return f"#{reading.person_id}"
+    return "identifying" if known_only else f"#{reading.person_id}"
+
+
+def photo_neutral_supported(pose_cfg: dict, model_cfg: dict) -> bool:
+    """
+    วิธีวัดการหันหน้าที่ใช้อยู่ รับท่านิ่งจากรูปได้ไหม
+
+    ค่าจากรูปเป็นสัดส่วนแบบ geometric ส่วนวิธี matrix ให้องศา — คนละหน่วยกัน
+    เอามาหักกันจะได้ตัวเลขที่ดูสมเหตุสมผลแต่ผิดล้วน ๆ · วิธี auto จะเลือก matrix
+    เองถ้าโมเดลส่ง transformation matrix มาด้วย จึงต้องเช็คค่านั้นประกอบ
+    """
+    if not pose_cfg.get("neutral_from_photos", True):
+        return False
+    method = pose_cfg["method"]
+    if method == az.POSE_MATRIX:
+        return False
+    return not (method == az.POSE_AUTO and model_cfg["transform_matrix"])
+
+
+def photo_neutrals(gallery, pose_cfg: dict, announce: bool = True) -> dict:
+    """
+    ท่านิ่งของแต่ละคนที่อ่านได้จากรูป — `{ชื่อ: (yaw, pitch)}`
+
+    ตัดคนที่รูปของเขา**ไม่ได้หันตรง**ออก และบอกให้รู้เป็นราย ๆ เพราะเป็นสิ่งที่
+    ผู้ใช้แก้ได้ด้วยการเปลี่ยนรูป · ถ้าเงียบไว้ คนคนนั้นจะกลับไปนั่ง calibrate เอง
+    โดยไม่มีอะไรบอกว่าทำไมเขาคนเดียวที่ต้องรอ
+
+    เกณฑ์มาจากหมวด pose (`yaw_threshold` · `pitch_threshold`) ส่วนการตัดสินอยู่ใน
+    `faces.usable_neutrals` เพราะการตรวจแกน pitch ต้องดูคนทั้งแกลเลอรีประกอบ
+    """
+    limit = pose_cfg["photo_neutral_max_ratio"]
+    good, rejected = fc.usable_neutrals(
+        gallery.people,
+        yaw_limit=pose_cfg["yaw_threshold"] * limit,
+        pitch_limit=pose_cfg["pitch_threshold"] * limit,
+        pitch_quorum=int(pose_cfg["photo_neutral_min_people"]),
+    )
+    if announce:
+        for name, reason in sorted(rejected.items()):
+            print(f"[pi-vision] ! ใช้รูปของ {name} เป็นจุดอ้างอิงท่านิ่งไม่ได้: {reason}"
+                  " — คนนี้จะ calibrate เองตอนเห็นหน้า · เปลี่ยนเป็นรูปหน้าตรงแล้ววางทับได้เลย")
+        if good:
+            print(f"[pi-vision] อ่านท่านิ่งจากรูปได้ {len(good)} คน: {', '.join(good)}"
+                  " — คนกลุ่มนี้ไม่ต้องรอ calibrate")
+    return good
+
+
+def print_calibration(gallery) -> None:
+    """
+    บอกว่าเกณฑ์ความเหมือนตอนนี้เป็นเท่าไรและมาจากไหน
+
+    เกณฑ์ที่ระบบตั้งเองต้องมองเห็นได้ ไม่งั้นเวลามันจำผิดจะไม่มีทางรู้ว่าควรไปแก้ที่
+    ชุดรูปหรือที่ค่าใน .env — และคำเตือนเรื่องคู่ที่แยกไม่ออกต้องขึ้นแยกบรรทัด
+    เพราะเป็นเรื่องที่ผู้ใช้ต้องลงมือแก้ (เพิ่ม/เปลี่ยนรูป) ไม่ใช่แค่ข้อมูลประกอบ
+    """
+    print(f"[pi-vision] {gallery.calibration.message}")
+    warning = gallery.calibration.warning
+    if warning:
+        print(f"[pi-vision] {warning}")
 
 
 def _mood(reading) -> str:
@@ -315,8 +645,14 @@ def print_summary(summary: az.WindowSummary, threshold_per_min: float, mode: mod
     # ถ้าไม่พิมพ์ ค่าสองตัวนี้จะไม่มีทางถูกเห็นเลยตอนรันผ่าน SSH ทั้งที่ถูกส่งขึ้นฐานข้อมูล
     who = f" name={summary.name}" if summary.name else ""
     mood = f" emotion={summary.emotion}" if summary.emotion else ""
+    # `?` = ท่าที่เดาจากหลักฐานอ้อม ตรงกับที่ HUD ใช้อยู่ (ดู body.posture)
+    pose = (
+        f" posture={summary.posture}{'' if summary.posture_confident else '?'}"
+        if summary.posture
+        else ""
+    )
     print(
-        f"[{stamp}] person={summary.person}{who}{mood} faces={summary.face_count} "
+        f"[{stamp}] person={summary.person}{who}{mood}{pose} faces={summary.face_count} "
         f"(usable {summary.usable_faces}) movement={summary.movement} ({per_min:.1f}/min) "
         f"blinks={summary.blinks} avgEAR={ear} | {dirs}{flag}"
     )
@@ -334,7 +670,7 @@ def handle_key(
         return False
     if key == KEY_RECALIBRATE:
         an.recalibrate(tracks)
-        print("[pi-vision] calibrate ท่านิ่งใหม่ — มองตรงเข้ากล้อง")
+        print("[pi-vision] calibrate ท่านิ่งใหม่จากภาพสด (ไม่ใช้ค่าจากรูปแล้ว) — มองตรงเข้ากล้อง")
     elif key == KEY_TOGGLE_MESH:
         display_cfg["draw_mesh"] = not display_cfg["draw_mesh"]
     elif key == KEY_EMOTION:
@@ -467,6 +803,78 @@ class CameraMenu:
         ov.draw_menu(frame, "choose camera", items, footer)
 
 
+class ResolutionMenu:
+    """เมนูเปลี่ยนความละเอียดขณะรัน — กด r เปิด/ปิด, เลข 1–9 เลือกโหมด
+
+    แยกจาก CameraMenu เพราะเป็นคนละคำถาม (จะใช้กล้อง**ตัวไหน** กับ จะใช้**โหมดไหน**
+    ของกล้องตัวนั้น) และรายการต้องเปลี่ยนตามกล้องที่กำลังเปิดอยู่
+
+    ไม่ต้องใช้ thread เหมือน CameraMenu เพราะการถามรายการโหมดใช้เวลา ~0.16 วินาที
+    (ถามไดรเวอร์เฉย ๆ ไม่เปิดสตรีม) ต่างจากการสำรวจกล้องซึ่งเคยกินเป็นนาที
+    """
+
+    DIGITS = CameraMenu.DIGITS
+
+    # โหมดที่ช้ากว่านี้ไม่ต้องเอามาโชว์ — กล้องมักมีโหมดความละเอียดสูงมากที่วิ่งได้
+    # 2 fps ซึ่งใช้กับงานนี้ไม่ได้เลย และถ้าปล่อยไว้มันจะกินช่องเลข 1–9 จนโหมดที่
+    # ใช้ได้จริงหลุดออกจากรายการ (C922 มีโหมดแบบนั้นสี่ตัวเรียงอยู่หัวลิสต์พอดี)
+    MIN_FPS = 10.0
+
+    def __init__(self):
+        self.open = False
+        self.sizes: list[tuple[int, int, float]] = []
+        self.message = ""
+
+    def _refresh(self, camera) -> None:
+        # ถามใหม่ทุกครั้งที่เปิดเมนู — ถูกกว่าการจำไว้แล้วลืม invalidate ตอนสลับกล้อง
+        usable = [m for m in camera.sizes() if m[2] >= self.MIN_FPS]
+        self.sizes = usable[:len(self.DIGITS)]
+        self.message = "" if self.sizes else "this camera cannot list its modes"
+
+    def handle(self, key, camera) -> bool:
+        """คืน True ถ้าเมนู "กิน" ปุ่มนี้ไปแล้ว"""
+        if not self.open:
+            if key == KEY_RESOLUTION:
+                self.open = True
+                self._refresh(camera)
+                return True
+            return False
+
+        if key in EXIT_KEYS or key == KEY_RESOLUTION:
+            self.open = False
+        elif key in self.DIGITS:
+            i = self.DIGITS[key]
+            if i < len(self.sizes):
+                self._select(self.sizes[i], camera)
+        return True
+
+    def _select(self, size, camera) -> None:
+        w, h, _fps = size
+        try:
+            got = camera.resize(w, h)
+            print(f"[pi-vision] เปลี่ยนความละเอียดเป็น {got[0]}×{got[1]}")
+            self.open = False
+        except CameraError as exc:
+            self.message = "cannot use that mode"
+            print(f"[pi-vision] {exc}", file=sys.stderr)
+
+    def draw(self, frame, camera) -> None:
+        if not self.open:
+            return
+        # เทียบกับ camera.actual ไม่ใช่ขนาดของ frame — frame ผ่านการหมุนมาแล้ว
+        # ถ้าตั้ง CAMERA_ROTATE=90 ด้านกว้างกับด้านสูงจะสลับกัน แล้วไม่มีแถวไหนตรงเลย
+        now = camera.actual
+        items = []
+        for i, (w, h, fps) in enumerate(self.sizes):
+            current = "   (current)" if (w, h) == now else ""
+            items.append((f"{i + 1}. {w}x{h}   {w / h:.2f}   up to {fps:.0f}fps{current}",
+                          "ok" if current else "ink"))
+        if not self.sizes:
+            items.append(("(no modes reported)", "muted"))
+        footer = self.message or "press 1-9 to switch  ·  r / Esc to close"
+        ov.draw_menu(frame, "choose resolution", items, footer)
+
+
 def main() -> int:
     args = parse_args()
     cfg = CONFIG
@@ -500,6 +908,26 @@ def main() -> int:
 
     tracker_cfg = mode.apply_to_tracker(cfg["tracker"])
     landmarker = build_landmarker(cfg["model"])
+    # ตัวตรวจ full-range + ตัวอ่านภาพครอป — คู่กันเสมอ ตัวตรวจอย่างเดียวให้แค่กรอบเปล่า
+    detector = build_detector(cfg["detect"]) if mode.full_range else None
+    zoom_reader = build_zoom_reader(cfg["model"]) if mode.roi_zoom else None
+    if detector is not None:
+        print(f"[pi-vision] ตรวจใบหน้าระยะไกลอยู่ (full-range) — เห็นได้ราว 5 เมตร"
+              f" จากเดิม 2 เมตร")
+    if zoom_reader is not None:
+        print(f"[pi-vision] ซูมเข้าที่ใบหน้าก่อนอ่าน landmark"
+              f" (สูงสุด {cfg['roi']['max_per_frame']} หน้า/เฟรม)"
+              " — คนไกลจึงมีชื่อ · วัดตาได้ · อ่านอารมณ์ได้")
+    # โมเดลท่าทางร่างกายโหลดเฉพาะโหมดที่ใช้จริง — โหมดอื่นไม่จ่ายทั้งดิสก์และ CPU
+    body_landmarker = build_body_landmarker(cfg["body"]) if mode.activity else None
+    if body_landmarker is not None:
+        every = max(1, cfg["body"]["every_n_frames"])
+        print(f"[pi-vision] อ่านท่าทางร่างกายอยู่ (ทุก {every} เฟรม"
+              f" · สูงสุด {cfg['body']['max_people']} คน) — ยกมือ · โบกมือ · กอดอก"
+              " · เท้าเอว · ชี้ · ยืน/นั่ง/นอน")
+    if body_landmarker is not None:
+        print("[pi-vision]   ยืน/นั่ง ต้องเห็นขา ไม่เห็นก็ไม่ตอบ · นอนใช้แค่ลำตัว จึงตอบได้เสมอ")
+        print("[pi-vision]   ป้ายที่ขึ้นคือ**ท่า** ไม่ใช่เจตนา — 'hand up' รวมการยืดเส้นด้วย")
     tracker = PersonTracker(tracker_cfg)
     an = az.FaceAnalyzer(cfg, mirror=cam_cfg["mirror"],
                          report_person=mode.report_person, track_eyes=mode.eyes,
@@ -521,19 +949,32 @@ def main() -> int:
     # โหมดห้องรวมไม่รายงานรายบุคคล จึงไม่โหลดแกลเลอรีเลย ไม่ใช่แค่ไม่แสดงชื่อ
     gallery = None
     photo_reader = None
+    # ท่านิ่งจากรูปของแต่ละคน (ว่าง = ไม่มีใครใช้ได้ หรือวิธีวัดไม่รองรับ)
+    # อ่านใหม่ทุกครั้งที่แกลเลอรีถูกอ่านใหม่ เพราะรูปที่เปลี่ยนคือจุดอ้างอิงที่เปลี่ยน
+    neutrals: dict = {}
+    use_photo_neutral = photo_neutral_supported(cfg["pose"], cfg["model"])
     if mode.gallery:
         faces_dir = fc.ensure_directory(cfg["faces"]["dir"])
         try:
-            detect_photo, photo_reader = build_photo_reader(cfg["model"])
+            # ส่ง cam_cfg เข้าไปด้วย เพื่อให้รูปลงทะเบียนถูกตัดเป็นอัตราส่วนเดียวกับ
+            # ภาพจากกล้องก่อนถอดลายเซ็น — ไม่งั้นรูปแนวตั้งจะเทียบกับภาพสดไม่ได้เลย
+            detect_photo, photo_reader = build_photo_reader(cfg["model"], cam_cfg, cfg["roi"])
         except Exception as exc:
             # การจำชื่อเป็นของเสริม — ถ้าตัวอ่านรูปสร้างไม่ได้ ให้เดินต่อด้วยหมายเลข
             # ไม่ใช่ล้มทั้งบริการ เพราะการวัดการจดจ่อยังทำงานได้ครบโดยไม่มีชื่อ
             print(f"[pi-vision] อ่านรูปใบหน้าไม่ได้ ({exc}) — ใช้หมายเลขแทนชื่อ")
         else:
-            gallery = fc.FaceGallery(faces_dir, cfg["faces"], fc.landmark_extractor(detect_photo))
+            gallery = fc.FaceGallery(faces_dir, mode.apply_to_faces(cfg["faces"]),
+                                     fc.landmark_extractor(detect_photo))
             known = gallery.scan()
             if known:
                 print(f"[pi-vision] จำได้ {known} คนจากรูปใน {faces_dir}: {', '.join(gallery.names)}")
+                print_calibration(gallery)
+                if use_photo_neutral:
+                    neutrals = photo_neutrals(gallery, cfg["pose"])
+                elif cfg["pose"].get("neutral_from_photos", True):
+                    print("[pi-vision] วิธีวัดการหันหน้าแบบ matrix ใช้ท่านิ่งจากรูปไม่ได้ "
+                          "(คนละหน่วย) — ทุกคนยัง calibrate ท่านิ่งเองตามเดิม")
             elif mode.known_only:
                 # โหมดนี้รู้จักคนจากรูปเท่านั้น ไม่มีรูป = ไม่มีใครถูกบันทึกเลย
                 # ไม่ปิดโปรแกรม เพราะแกลเลอรีถูกอ่านซ้ำทุก ๆ ไม่กี่วินาที วางรูปตอนนี้ก็ติด
@@ -555,11 +996,24 @@ def main() -> int:
         return 1
 
     print(f"[pi-vision] โหมด: {mode.label} — {mode.summary}")
-    print(f"[pi-vision] กล้อง: {backend_name} · {cam_cfg['width']}×{cam_cfg['height']}")
-    print(
-        f"[pi-vision] calibrate ท่านิ่ง {cfg['pose']['calibration_seconds']:.0f} วินาที — "
-        "นั่งมองตรงเข้ากล้องไว้ก่อน"
-    )
+    # รายงานขนาด**ที่ได้จริง** ไม่ใช่ขนาดที่ขอ — กล้องมีสิทธิ์ให้โหมดอื่นแทน และเฟรม
+    # ที่ใหญ่กว่าที่คิดไว้คือสาเหตุที่ไปป์ไลน์ช้าลงแบบหาต้นเหตุไม่เจอ
+    got = camera.actual or (cam_cfg["width"], cam_cfg["height"])
+    note = f" · {camera.mode_note}" if camera.mode_note else ""
+    print(f"[pi-vision] กล้อง: {backend_name} · {camera.label or 'ไม่ทราบรุ่น'} · "
+          f"{got[0]}×{got[1]}{note}")
+    if neutrals:
+        # คนที่มีรูปไม่ต้องรอ ส่วนคนที่ไม่มีรูปยังต้องนั่งนิ่ง — ต้องบอกให้ครบทั้งสองอย่าง
+        # ไม่งั้นคนที่ไม่มีรูปจะไม่รู้ว่าทำไมตัวเองต้องรอคนเดียว
+        print(
+            f"[pi-vision] คนที่มีรูปใช้ท่านิ่งจากรูปทันที · คนอื่น calibrate "
+            f"{cfg['pose']['calibration_seconds']:.0f} วินาที — นั่งมองตรงเข้ากล้องไว้ก่อน"
+        )
+    else:
+        print(
+            f"[pi-vision] calibrate ท่านิ่ง {cfg['pose']['calibration_seconds']:.0f} วินาที — "
+            "นั่งมองตรงเข้ากล้องไว้ก่อน"
+        )
     if not mode.signatures:
         print("[pi-vision] โหมดนี้ไม่คำนวณลายเซ็นโครงหน้าเลย — ไม่มีข้อมูลชีวมิติถูกเก็บ")
     if mode.known_only:
@@ -578,11 +1032,12 @@ def main() -> int:
         )
     if display_cfg["enabled"]:
         print("[pi-vision] ปุ่มลัด: q=ออก · c=calibrate ใหม่ · m=mesh · f=ลืม id · "
-              "e=คะแนนอารมณ์ · v=เลือกกล้อง · space=สรุปทันที")
+              "e=คะแนนอารมณ์ · v=เลือกกล้อง · r=ความละเอียด · space=สรุปทันที")
 
     fps = 0.0
     last_t = time.monotonic()
     cam_menu = CameraMenu()
+    res_menu = ResolutionMenu()
     threshold = cfg["window"]["movement_threshold_per_min"]
     reid_on = tracker_cfg["reid_enabled"]
 
@@ -590,6 +1045,13 @@ def main() -> int:
     # โปรแกรมจะวนเร็วสุดกำลังและกิน CPU จนไปแย่งเวลาของงานอื่นบน Pi
     frame_interval = 1.0 / max(cam_cfg["fps"], 1)
     next_frame_at = time.monotonic()
+    frame_no = 0
+    body_every = max(1, cfg["body"]["every_n_frames"])
+    # จำว่าซูมช่องไหนไปเมื่อไร (วนคิวให้ทั่ว) และกรอบครอปล่าสุดของช่องนั้น (กันกระตุก)
+    # ผูกกับตำแหน่งบนภาพ ไม่ใช่ id เพราะคนไกลยังไม่มี id — ดู _cell()
+    zoom_seen: dict[tuple[int, int], float] = {}
+    zoom_rects: dict[tuple[int, int], tuple] = {}
+    ZOOM_MEMORY = 10.0                 # ลืมช่องที่ไม่มีใครอยู่แล้ว กันโตไม่จำกัด
 
     try:
         while True:
@@ -605,6 +1067,7 @@ def main() -> int:
                 return 1
 
             now = time.monotonic()
+            frame_no += 1
             dt = now - last_t
             last_t = now
             if dt > 0:
@@ -615,9 +1078,45 @@ def main() -> int:
             # detect_for_video ต้องได้ timestamp เป็น ms และ **ต้องเพิ่มขึ้นเสมอ**
             result = landmarker.detect_for_video(mp_image, int(now * 1000))
 
-            face_landmarks = result.face_landmarks or []
-            blendshapes = getattr(result, "face_blendshapes", None) or []
-            matrices = getattr(result, "facial_transformation_matrixes", None) or []
+            face_landmarks = list(result.face_landmarks or [])
+            blendshapes = list(getattr(result, "face_blendshapes", None) or [])
+            matrices = list(getattr(result, "facial_transformation_matrixes", None) or [])
+
+            # ── คนที่อยู่ไกลเกินกว่า landmarker จะเห็นจากภาพเต็ม ──────────
+            # ตัวตรวจ full-range หากรอบมาให้ แล้วซูมเข้าไปอ่าน landmark จากภาพครอป
+            # ผลที่ได้ต่อท้ายเข้าไปในลิสต์ชุดเดียวกัน — โค้ดข้างล่างจึงไม่ต้องรู้เลย
+            # ว่าใบหน้าไหนมาจากภาพเต็มและใบหน้าไหนมาจากการซูม
+            zoom_boxes = []
+            # อัตราขยายของแต่ละใบหน้า เรียงตรงกับ face_landmarks — ใบหน้าที่อ่านจาก
+            # ภาพเต็มเป็น 1.0 ส่วนที่ต่อท้ายจากการซูมมีค่าจริง (ดู az.FaceInput.detail_scale)
+            zoom_grow = [1.0] * len(face_landmarks)
+            if detector is not None and zoom_reader is not None:
+                for key in [k for k, t in zoom_seen.items() if now - t > ZOOM_MEMORY]:
+                    zoom_seen.pop(key, None)
+                    zoom_rects.pop(key, None)
+                seen = detector.detect_for_video(mp_image, int(now * 1000))
+                far = detect.unmatched(
+                    detect.to_boxes(seen.detections, frame.shape[1], frame.shape[0]),
+                    [lm.bounding_box(p) for p in face_landmarks],
+                    cfg["detect"]["merge_iou"],
+                )
+                # กรอบที่ซูมไปแล้วเมื่อไรจำไว้ตามตำแหน่ง เพื่อวนคิวให้ทั่วเมื่อคนเยอะ
+                # กว่าโควตา · กรอบที่ยังไม่เคยซูมได้คิวก่อนเสมอ (roi.NEVER)
+                for found in roi.pick(far, cfg["roi"]["max_per_frame"],
+                                      lambda f: zoom_seen.get(_cell(f.box), roi.NEVER)):
+                    cell = _cell(found.box)
+                    zoom_seen[cell] = now
+                    points, shapes, matrix, rect, grow = zoom_read(
+                        zoom_reader, frame, found.box, cfg["roi"], zoom_rects.get(cell)
+                    )
+                    zoom_rects[cell] = rect
+                    if points is None:
+                        continue          # กรอบผีจากตัวตรวจ — ทิ้งไป ลองใหม่เฟรมหน้า
+                    zoom_boxes.append(rect)
+                    face_landmarks.append(points)
+                    blendshapes.append(shapes)
+                    matrices.append(matrix)
+                    zoom_grow.append(grow)
 
             detections = []
             inputs = []
@@ -636,16 +1135,47 @@ def main() -> int:
                         landmarks=points,
                         blendshapes=_nth(blendshapes, i),
                         matrix=_nth(matrices, i),
+                        detail_scale=_nth(zoom_grow, i) or 1.0,
                     )
                 )
 
             tracks = tracker.assign(detections, now)
+
+            # ── ท่าทางร่างกาย ────────────────────────────────
+            # ไม่ทำทุกเฟรม: ท่าทางเปลี่ยนช้ากว่าเฟรมมาก และโมเดลนี้แพงที่สุดในลูป
+            # เฟรมที่ข้ามยังแสดงป้ายเดิมอยู่ เพราะ GestureHold เก็บไว้ใน track.state
+            # (frame_no - 1) ไม่ใช่ frame_no — เฟรมแรกต้องได้อ่านท่าทางเลย ไม่ใช่รอถึงเฟรมที่ 4
+            if body_landmarker is not None and (frame_no - 1) % body_every == 0:
+                body_result = body_landmarker.detect_for_video(mp_image, int(now * 1000))
+                poses = body_result.pose_landmarks or []
+                # landmark หน่วยเมตรสามแกน เรียงตรงกับ poses — ใช้วัดมุมต้นขา/ลำตัว
+                worlds = body_result.pose_world_landmarks or []
+                bodies = attach_bodies(tracks, poses)
+                for track in tracks:
+                    pi = bodies.get(track.person_id)
+                    if pi is None:
+                        continue
+                    # aspect: MediaPipe หาร x ด้วยความกว้างแต่หาร y ด้วยความสูง
+                    # ความสูงศีรษะจึงต้องรู้สัดส่วนเฟรมก่อนถึงเทียบกับความกว้างไหล่ได้
+                    gest, post, post_sure = read_gesture(
+                        poses[pi], track, cfg["body"], now,
+                        world=_nth(worlds, pi),
+                        aspect=frame.shape[1] / max(frame.shape[0], 1),
+                    )
+                    track.state["gesture"] = gest
+                    track.state["posture"] = post
+                    track.state["posture_confident"] = post_sure
 
             # เทียบกับแกลเลอรีรูป แล้วเก็บชื่อไว้ใน track.state ให้ analyzer หยิบไปใช้
             # ทำที่นี่เพราะ state อยู่กับ track จึงรอดการ re-ID และไม่ต้องเทียบซ้ำทุกเฟรม
             if gallery is not None:
                 if gallery.maybe_rescan(now) and gallery.enabled:
                     print(f"[pi-vision] อ่านรูปใหม่: {', '.join(gallery.names)}")
+                    # เกณฑ์ถูกคำนวณใหม่จากชุดรูปชุดใหม่ — ต้องบอกด้วย ไม่งั้นเกณฑ์
+                    # เปลี่ยนเงียบ ๆ ตอนวางรูปเพิ่ม แล้วผลที่เปลี่ยนไปจะอธิบายไม่ได้
+                    print_calibration(gallery)
+                    if use_photo_neutral:
+                        neutrals = photo_neutrals(gallery, cfg["pose"])
                 if gallery.enabled:
                     for track, det in zip(tracks, detections):
                         # ชื่อที่ยัง**ไม่มั่นใจ**ให้เทียบซ้ำเรื่อย ๆ เพราะลายเซ็นนิ่งขึ้นทุกเฟรม
@@ -662,6 +1192,24 @@ def main() -> int:
                         changed = track.state.get("name") != name
                         track.state["name"] = name
                         track.state["name_confident"] = confident
+                        # ท่านิ่งจากรูป — **ตามชื่อที่ระบบยกข้อมูลให้** ไม่ว่าจะมั่นใจหรือเดา
+                        #
+                        # เหตุผล: ปลายทางบันทึกแถวนี้ใต้ชื่อนี้อยู่แล้ว (โหมด known ไม่บันทึก
+                        # คนที่ไม่มีชื่อเลยด้วยซ้ำ) การวัดการหันหน้าด้วยจุดศูนย์ของคนอื่น
+                        # ทั้งที่ข้อมูลไปอยู่ใต้ชื่อนี้ จึงขัดกันเอง · และถ้าเดาผิด ความผิดพลาด
+                        # คือ "ผลต่างของ bias ระหว่างสองคน" ซึ่งเล็กและมีขอบเขต ส่วนการ
+                        # calibrate สดพลาดได้ไม่จำกัด (ท่าหันข้างกลายเป็นท่าตรงไปทั้งเซสชัน)
+                        #
+                        # คนแปลกหน้าจะได้จุดศูนย์นี้ก็ต่อเมื่อ FACES_GUESS=true ซึ่งแปลว่า
+                        # ผู้ใช้สั่งไว้แล้วว่า "ยกให้คนที่ใกล้ที่สุดเสมอ" · ตั้ง false เมื่อไร
+                        # คนที่ไม่ผ่านเกณฑ์จะไม่มีชื่อ จึงไม่ได้จุดศูนย์และ calibrate เองตามเดิม
+                        neutral = neutrals.get(name)
+                        if neutral and track.state.get("neutral_pose") != neutral:
+                            track.state["neutral_pose"] = neutral
+                            sure = "" if confident else " (ตามชื่อที่เดา)"
+                            print(f"[pi-vision] #{track.person_id} ใช้ท่านิ่งจากรูปของ {name}"
+                                  f"{sure} (yaw {neutral[0]:+.3f} pitch {neutral[1]:+.3f})"
+                                  " — ไม่ต้อง calibrate")
                         if changed or confident:
                             mark = "" if confident else " (เดา ยังไม่มั่นใจ)"
                             print(f"[pi-vision] #{track.person_id} คือ {name}"
@@ -692,6 +1240,7 @@ def main() -> int:
 
             for reading, (_track, face) in zip(readings, faces):
                 ov.draw_face(frame, reading, display_cfg, cfg["blink"], face.landmarks)
+            ov.draw_zoom_rects(frame, zoom_boxes)
 
             usable = sum(1 for r in readings if r.usable)
             methods = ""
@@ -737,9 +1286,10 @@ def main() -> int:
                 )
                 ov.draw_hud(frame, hud)
                 cam_menu.draw(frame)
+                res_menu.draw(frame, camera)
                 cv2.imshow(display_cfg["window_name"], frame)
                 key = cv2.waitKey(WAIT_KEY_MS) & 0xFF
-                if not cam_menu.handle(key, camera):
+                if not cam_menu.handle(key, camera) and not res_menu.handle(key, camera):
                     if not handle_key(key, an, tracker, tracks, display_cfg, cfg, readings,
                                       faces, now, threshold, mode):
                         break
@@ -761,9 +1311,17 @@ def main() -> int:
                         if mode.eyes
                         else ""
                     )
+                    # ท่าทางกับท่ายืน/นั่งเป็นคนละแกนกับการหันหน้า — คนยกมือขณะมองซ้ายได้
+                    # จึงต่อท้ายเป็นช่องของตัวเอง ไม่ใช่ไปทับ state
+                    body_bits = ""
+                    if r.gesture or r.posture:
+                        pose = r.posture or ""
+                        if pose and not r.posture_confident:
+                            pose += "?"          # เดา ไม่ได้วัด — ดู az.FaceReading
+                        body_bits = f"{(r.gesture or ''):<12}{pose:<9}"
                     hud.append(
                         (
-                            f"{who}{tag} {state:<7} {_mood(r)}{eye_bits}"
+                            f"{who}{tag} {state:<7} {body_bits}{_mood(r)}{eye_bits}"
                             f"mv {r.movement_in_window}  q{r.quality*100:3.0f}%",
                             "danger" if r.drowsy else ("warn" if r.direction else "ok"),
                         )
@@ -774,10 +1332,11 @@ def main() -> int:
                 hud.append((f"+{len(readings) - display_cfg['hud_max_faces']} more", "muted"))
             ov.draw_hud(frame, hud)
             cam_menu.draw(frame)
+            res_menu.draw(frame, camera)
             cv2.imshow(display_cfg["window_name"], frame)
 
             key = cv2.waitKey(WAIT_KEY_MS) & 0xFF
-            if not cam_menu.handle(key, camera):
+            if not cam_menu.handle(key, camera) and not res_menu.handle(key, camera):
                 if not handle_key(key, an, tracker, tracks, display_cfg, cfg, readings,
                                   faces, now, threshold, mode):
                     break
@@ -787,6 +1346,9 @@ def main() -> int:
     finally:
         camera.close()
         landmarker.close()
+        for extra in (detector, zoom_reader, body_landmarker):
+            if extra is not None:
+                extra.close()
         uploader.close()
         if photo_reader is not None:
             photo_reader.close()

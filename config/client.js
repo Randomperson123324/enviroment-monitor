@@ -299,6 +299,8 @@ export const CLIENT_FALLBACK = {
  * Validated chart palette (series hexes unchanged; chrome matches the soft surfaces).
  * The three PM series take violet/orange/pink slots from ID_SERIES_PALETTE below,
  * so they stay separable from each other and from temp/hum under CVD.
+ * `lux` takes the amber slot — the one colour that reads as "light" without
+ * borrowing the temperature red or the humidity blue.
  */
 export const CHART_COLORS = {
   light: {
@@ -307,6 +309,7 @@ export const CHART_COLORS = {
     pm1: '#e87ba4',
     pm25: '#4a3aa7',
     pm10: '#eb6834',
+    lux: '#eda100',
     score: '#1baf7a',
     focus: '#4a3aa7',
     focusOver: '#d03b3b',
@@ -322,6 +325,7 @@ export const CHART_COLORS = {
     pm1: '#d55181',
     pm25: '#9085e9',
     pm10: '#d95926',
+    lux: '#c98500',
     score: '#199e70',
     focus: '#9085e9',
     focusOver: '#d03b3b',

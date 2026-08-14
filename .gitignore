@@ -14,3 +14,9 @@ pi-vision/faces/*
 !pi-vision/faces/README.txt
 pi-vision/.env
 pi-vision/queue.jsonl
+
+# ไฟล์ zip ที่แพ็ก pi-vision/ ไว้ส่งไปลงเครื่อง Pi — มันแพ็ก faces/ ติดไปด้วย
+# จึงพา "รูปใบหน้าของคนจริง" ข้ามกฎข้างบนขึ้น repo ได้ทั้งที่กฎนั้นกันไว้แล้ว
+# (ลบรูปใน faces/ ทีหลังไม่ช่วย — ในไฟล์ zip เป็นสำเนาที่ถ่ายไว้ตอนแพ็ก)
+pi-vision.zip
+pi-vision*.zip

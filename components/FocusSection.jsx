@@ -19,11 +19,35 @@ import { useLang } from '@/hooks/useLang';
 // [glossary key shown literally, i18n key for its description]
 const GLOSSARY = [
   ['person', 'focus.gPerson'],
+  ['name', 'focus.gName'],
   ['movement', 'focus.gMovement'],
   ['direction', 'focus.gDirection'],
+  ['posture', 'focus.gPosture'],
+  ['emotion', 'focus.gEmotion'],
   ['face_count', 'focus.gFaceCount'],
   ['created_at', 'focus.gCreatedAt'],
 ];
+
+// Values pi-vision writes (body.py / emotion.py) → the i18n key that names them.
+const POSTURE_KEYS = {
+  standing: 'focus.poseStanding',
+  sitting: 'focus.poseSitting',
+  lying: 'focus.poseLying',
+};
+const EMOTION_KEYS = {
+  happy: 'focus.emoHappy',
+  sad: 'focus.emoSad',
+  surprised: 'focus.emoSurprised',
+  angry: 'focus.emoAngry',
+  neutral: 'focus.emoNeutral',
+};
+
+/**
+ * Translate a value the Pi wrote, falling back to the raw string.
+ * A label added on the Pi but not here should read as itself — translate() returns
+ * the key name for anything it does not know, which would surface as "focus.emoX".
+ */
+const vocab = (map, value, t) => (value ? (map[value] ? t(map[value]) : value) : null);
 
 // [direction field in the data, i18n key for its label]
 const DIRECTIONS = [
@@ -39,36 +63,146 @@ const MAX_ID_SERIES = ID_SERIES_PALETTE.dark.length;
 const hhmm = (ts) =>
   new Date(ts).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
 
+/** Recognised name when the Pi matched a gallery photo, the track number otherwise. */
+const personLabel = (s) => s.name ?? `#${s.person}`;
+
 /**
- * Group rows into per-person time buckets so each Face ID becomes its own line.
- * Slots are assigned by ascending ID so a newly-seen (higher) ID appends without
- * repainting the others — colour follows the entity, never its position.
+ * Merge one tallied field across buckets into a share-of-time breakdown.
+ * Returns `[{ label, count, pct }]`, commonest first, with `total` rows behind it.
+ */
+function mixOf(buckets, field) {
+  const totals = new Map();
+  for (const b of buckets) {
+    for (const [label, n] of b[field]) totals.set(label, (totals.get(label) ?? 0) + n);
+  }
+  const total = [...totals.values()].reduce((a, n) => a + n, 0);
+  const parts = [...totals.entries()]
+    .map(([label, count]) => ({ label, count, pct: total ? (count / total) * 100 : 0 }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+  return { total, parts };
+}
+
+/**
+ * The name each track number settled on — `Map(track -> name | undefined)`.
+ *
+ * Decided per track across every row it ever wrote, because pi-vision guesses the
+ * closest gallery face by default (FACES_GUESS) and a track can carry a stray name
+ * for a window or two before settling. Taking the majority means one bad window
+ * cannot rename a person; a real correction still wins within a minute, since the
+ * Pi writes a row every 15s. Ties fall to the newer name.
+ */
+function resolveTrackNames(chrono) {
+  const votes = new Map(); // track -> Map(name -> rows that said so)
+  for (const r of chrono) {
+    if (!r.name || r.person == null) continue;
+    const track = String(r.person);
+    if (!votes.has(track)) votes.set(track, new Map());
+    const tally = votes.get(track);
+    tally.set(r.name, (tally.get(r.name) ?? 0) + 1);
+  }
+
+  const winners = new Map();
+  for (const [track, tally] of votes) {
+    let best = null;
+    let bestCount = -1;
+    // chrono order means later names are seen later, so `>` leaves ties on the newer.
+    for (const [name, count] of tally) {
+      if (count >= bestCount) [best, bestCount] = [name, count];
+    }
+    winners.set(track, best);
+  }
+  return winners;
+}
+
+/**
+ * Group rows into per-person time buckets so each person becomes its own line.
+ *
+ * Keyed on the **recognised name** where there is one, not the track number. In the
+ * activity mode the user runs, pi-vision sets `reid=False` on purpose: identity comes
+ * from the faces/ folder alone, so someone who leaves the frame and returns is issued
+ * a brand-new number while their name comes back from the photo match. Keying on the
+ * number would draw one person as three unrelated lines (Pun #1, Pun #2, Pun #4).
+ * Tracks the Pi never named still key on their number — there is nothing else to use.
+ *
+ * Slots are assigned by ascending first-seen track number, so a newly-arrived person
+ * appends without repainting the others — colour follows the entity, never position.
  */
 function buildPersonSeries(rows, bucketMs, maxBars) {
-  const byPerson = new Map(); // person -> Map(ts -> bucket)
+  const byPerson = new Map(); // identity -> Map(ts -> bucket)
+  const trackIds = new Map(); // identity -> Set(track numbers folded into it)
   const tsSet = new Set();
 
-  for (const r of rows) {
+  // Oldest first, so every "last write wins" field below (direction, posture) really
+  // does end up holding the newest value. The rows arrive newest-first.
+  const chrono = [...rows].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+  const trackNames = resolveTrackNames(chrono);
+
+  for (const r of chrono) {
     const t = Date.parse(r.created_at);
     if (!Number.isFinite(t)) continue;
     const ts = Math.floor(t / bucketMs) * bucketMs;
-    const person = r.person == null ? '—' : String(r.person);
+    const track = r.person == null ? '—' : String(r.person);
+    // Resolved per track, not per row: a track's first rows are nameless while the
+    // face signature settles, and keying those on the number would split the very
+    // person this grouping exists to keep whole.
+    const name = trackNames.get(track) ?? null;
+    const person = name ?? track;
+    if (!trackIds.has(person)) trackIds.set(person, new Set());
+    trackIds.get(person).add(track);
     tsSet.add(ts);
     if (!byPerson.has(person)) byPerson.set(person, new Map());
     const slotMap = byPerson.get(person);
     if (!slotMap.has(ts)) {
-      slotMap.set(ts, { ts, movement: 0, face_count: 0, count: 0, direction: null });
+      slotMap.set(ts, {
+        ts,
+        movement: 0,
+        face_count: 0,
+        count: 0,
+        direction: null,
+        name: null,
+        posture: null,
+        postureSure: true,
+        emotion: null,
+        // Tallied per bucket rather than per person so the overview covers exactly
+        // the window the chart draws — buckets outside it are dropped below, and
+        // counts kept alongside the person would keep counting rows already scrolled
+        // off the left edge.
+        postures: new Map(),
+        emotions: new Map(),
+        unsurePostures: 0,
+      });
     }
     const b = slotMap.get(ts);
     b.movement += movementCount(r.movement);
     b.face_count = Math.max(b.face_count, r.face_count ?? 0);
     b.count++;
     if (r.direction) b.direction = r.direction;
+    if (name) b.name = name;
+    if (r.emotion) {
+      b.emotion = r.emotion;
+      b.emotions.set(r.emotion, (b.emotions.get(r.emotion) ?? 0) + 1);
+    }
+    if (r.posture) {
+      b.posture = r.posture;
+      // The Pi answers with a posture even when a desk hides the legs, and says so
+      // in this column. Treat a missing flag as unsure rather than as measured —
+      // rows written before the column existed have no evidence behind them.
+      b.postureSure = r.posture_confident === true;
+      b.postures.set(r.posture, (b.postures.get(r.posture) ?? 0) + 1);
+      if (!b.postureSure) b.unsurePostures++;
+    }
   }
 
   let labels = [...tsSet].sort((a, b) => a - b);
   if (labels.length > maxBars) labels = labels.slice(-maxBars);
   const inWindow = new Set(labels);
+
+  // Track numbers climb over time, so a person's lowest one stands in for "when we
+  // first saw them" — ordering by it keeps existing lines on their colour when a new
+  // person shows up, which ordering by name would not (a new "Ann" would sort first
+  // and repaint everyone after her).
+  const firstSeen = (person) =>
+    Math.min(...[...(trackIds.get(person) ?? [])].map((id) => Number(id) || Infinity));
 
   const persons = [...byPerson.keys()]
     .map((p) => {
@@ -77,9 +211,9 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
     })
     .filter((s) => s.pts.length > 0)
     .sort((a, b) => {
-      const na = Number(a.person);
-      const nb = Number(b.person);
-      if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+      const fa = firstSeen(a.person);
+      const fb = firstSeen(b.person);
+      if (fa !== fb) return fa - fb;
       return String(a.person).localeCompare(String(b.person));
     });
 
@@ -92,8 +226,26 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
     const total = pts.reduce((a, p) => a + p.movement, 0);
     const max = pts.reduce((a, p) => Math.max(a, p.movement), 0);
     const last = pts[pts.length - 1] ?? null;
+    const name = pts.reduce((found, p) => p.name ?? found, null);
+    // Every track number folded into this person, oldest first. Worth surfacing: it
+    // is what the Pi's own console and HUD print, so it is the only way to tie a line
+    // on this chart back to a line in the terminal.
+    const ids = [...(trackIds.get(person) ?? [])].sort((a, b) => Number(a) - Number(b));
+    // Posture and emotion are states, not identity: the newest reading wins, and the
+    // bucket that carried it also carries whether it was measured or inferred.
+    const posed = pts.reduce((found, p) => (p.posture ? p : found), null);
     return {
       person,
+      name,
+      ids,
+      posture: posed?.posture ?? null,
+      postureSure: posed?.postureSure ?? true,
+      emotion: pts.reduce((found, p) => p.emotion ?? found, null),
+      // How the whole window broke down, not just where it ended — one glance at
+      // "sat 80% of the time" says more about a session than the final reading does.
+      postureMix: mixOf(pts, 'postures'),
+      emotionMix: mixOf(pts, 'emotions'),
+      unsurePostures: pts.reduce((a, p) => a + p.unsurePostures, 0),
       slot,
       points,
       values,
@@ -118,7 +270,7 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
       const active = !dimmed || s.person === selected;
       return {
         _person: s.person,
-        label: `#${s.person}`,
+        label: personLabel(s),
         data: s.values,
         borderColor: active ? hue : withAlpha(hue, 0.22),
         backgroundColor: withAlpha(hue, 0.1),
@@ -189,7 +341,7 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
               if (!s) return null;
               const b = s.points[ctx.dataIndex];
               const lines = [
-                `#${s.person} · ${t('focus.tipMove', { y: ctx.parsed.y })}${ctx.parsed.y > threshold ? ' ⚠' : ''}`,
+                `${personLabel(s)} · ${t('focus.tipMove', { y: ctx.parsed.y })}${ctx.parsed.y > threshold ? ' ⚠' : ''}`,
               ];
               if (b?.direction) {
                 const d = b.direction;
@@ -197,6 +349,10 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
                   `   ${t('focus.tipDir', { l: d.Left ?? 0, r: d.Right ?? 0, u: d.Up ?? 0, d: d.Down ?? 0 })}`
                 );
               }
+              const pose = vocab(POSTURE_KEYS, b?.posture, t);
+              const mood = vocab(EMOTION_KEYS, b?.emotion, t);
+              const state = [pose && `${pose}${b.postureSure ? '' : '?'}`, mood].filter(Boolean);
+              if (state.length) lines.push(`   ${state.join(' · ')}`);
               return lines;
             },
           },
@@ -220,7 +376,9 @@ function IdDetail({ series, palette, colors, threshold, onClose, t }) {
       <div className="fcard-label">
         <span className="id-legend-item">
           <span className="id-swatch" style={{ background: hue }} />
-          {t('focus.detailTitle', { id: series.person })}
+          {series.name
+            ? t('focus.detailTitleNamed', { name: series.name })
+            : t('focus.detailTitle', { id: series.person })}
         </span>
         <button className="id-detail-close" onClick={onClose} aria-label={t('focus.closeDetail')}>
           <X size={15} strokeWidth={2.4} aria-hidden />
@@ -251,6 +409,31 @@ function IdDetail({ series, palette, colors, threshold, onClose, t }) {
           <div className="dir-label">{t('focus.faces')}</div>
           <div className="dir-val">{series.latestFace ?? '--'}</div>
         </div>
+        <div>
+          <div className="dir-label">{t('focus.posture')}</div>
+          <div className="dir-val">
+            {vocab(POSTURE_KEYS, series.posture, t) ?? '--'}
+            {/* Inferred, not measured — the same "?" the Pi's own HUD uses. Dropping
+                it would let a guess made behind a desk read as a reading. */}
+            {series.posture && !series.postureSure && (
+              <span className="pose-unsure" title={t('focus.postureUnsure')}>
+                ?
+              </span>
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="dir-label">{t('focus.emotion')}</div>
+          <div className="dir-val">{vocab(EMOTION_KEYS, series.emotion, t) ?? '--'}</div>
+        </div>
+        {/* Only worth the space once a person has been issued more than one number —
+            for a single track it just repeats the title. */}
+        {series.name && series.ids.length > 1 && (
+          <div className="id-track-list">
+            <div className="dir-label">{t('focus.trackIds', { n: series.ids.length })}</div>
+            <div className="dir-val">{series.ids.map((id) => `#${id}`).join(' · ')}</div>
+          </div>
+        )}
       </div>
 
       {dir && (
@@ -271,6 +454,51 @@ function IdDetail({ series, palette, colors, threshold, onClose, t }) {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+/** One "70% นั่ง" row with its bar. */
+function MixRow({ label, count, pct, hue }) {
+  return (
+    <div className="mix-row">
+      <div className="mix-head">
+        <span className="mix-label">{label}</span>
+        <span className="mix-pct">{Math.round(pct)}%</span>
+      </div>
+      <div className="dir-bar">
+        <div className="dir-fill" style={{ width: `${pct}%`, background: hue }} />
+      </div>
+      <div className="mix-count">{count}</div>
+    </div>
+  );
+}
+
+/**
+ * How the selected person's window broke down, under the detail card.
+ *
+ * Shares of time, not the latest reading — the card above already answers "right
+ * now". A session is better described by "sat for most of it, stood twice" than by
+ * whichever value happened to land in the final 15-second window.
+ */
+function PersonOverview({ series, hue, keys, titleKey, t }) {
+  const { total, parts } = series[keys.mix];
+  return (
+    <div className="overview-block">
+      <div className="dir-label">{t(titleKey)}</div>
+      {total === 0 ? (
+        <div className="overview-empty">{t('focus.noData')}</div>
+      ) : (
+        parts.map((p) => (
+          <MixRow
+            key={p.label}
+            label={vocab(keys.vocab, p.label, t)}
+            count={p.count}
+            pct={p.pct}
+            hue={hue}
+          />
+        ))
       )}
     </div>
   );
@@ -373,7 +601,9 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                       aria-pressed={selected === s.person}
                     >
                       <span className="id-swatch" style={{ background: hue }} />
-                      #{s.person}
+                      {/* A named line can span several track numbers, so no single
+                          number belongs on the chip. The detail card lists them. */}
+                      <span className={s.name ? 'id-person-name' : ''}>{personLabel(s)}</span>
                     </button>
                   );
                 })}
@@ -399,14 +629,46 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
 
         <div className="focus-cards">
           {selectedSeries ? (
-            <IdDetail
-              series={selectedSeries}
-              palette={palette}
-              colors={colors}
-              threshold={threshold}
-              onClose={() => setSelected(null)}
-              t={t}
-            />
+            <>
+              <IdDetail
+                series={selectedSeries}
+                palette={palette}
+                colors={colors}
+                threshold={threshold}
+                onClose={() => setSelected(null)}
+                t={t}
+              />
+              <div className="panel person-overview">
+                <div className="fcard-label">
+                  <span>{t('focus.overviewTitle', { who: personLabel(selectedSeries) })}</span>
+                </div>
+                <div className="fcard-sub">
+                  {t('focus.overviewSub', { mins: selectedSeries.buckets })}
+                </div>
+                <PersonOverview
+                  series={selectedSeries}
+                  hue={palette[selectedSeries.slot] ?? colors.tick}
+                  keys={{ mix: 'postureMix', vocab: POSTURE_KEYS }}
+                  titleKey="focus.posture"
+                  t={t}
+                />
+                {/* Counted, not just flagged: "3 of 12 were guesses" is a different
+                    fact from "the latest one was", and only the count tells you how
+                    much of the breakdown above rests on the legs being visible. */}
+                {selectedSeries.unsurePostures > 0 && (
+                  <div className="overview-note">
+                    {t('focus.unsureCount', { n: selectedSeries.unsurePostures })}
+                  </div>
+                )}
+                <PersonOverview
+                  series={selectedSeries}
+                  hue={palette[selectedSeries.slot] ?? colors.tick}
+                  keys={{ mix: 'emotionMix', vocab: EMOTION_KEYS }}
+                  titleKey="focus.emotion"
+                  t={t}
+                />
+              </div>
+            </>
           ) : (
             <div className="panel id-detail-hint">
               <div className="fcard-label">

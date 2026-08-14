@@ -2,7 +2,8 @@
 ตรรกะการวิเคราะห์ — แปลง landmark ดิบให้กลายเป็นตัวเลขที่มีความหมาย
 
 หน้าที่หลัก:
-  1. หาท่านิ่ง (neutral pose) **ของแต่ละคน** อัตโนมัติในช่วงไม่กี่วินาทีแรก
+  1. หาท่านิ่ง (neutral pose) **ของแต่ละคน** — จากรูปลงทะเบียนใน faces/ ถ้ามี
+     (ใช้ได้ทันที ไม่ต้องรอ) ไม่งั้นเรียนจากภาพสดในช่วงไม่กี่วินาทีแรก
   2. เรียนค่า EAR ตาเปิด **ของแต่ละคน** แล้วตั้งเกณฑ์การกะพริบเป็นสัดส่วนของค่านั้น
      — จำเป็นมากเมื่อมีหลายคน เพราะรูปตาแต่ละคนให้ค่า EAR ต่างกันได้เกิน 2 เท่า
   3. นับ "เหตุการณ์" การหันหน้า — หันค้างหนึ่งครั้ง = นับ 1 ไม่ใช่นับทุกเฟรม
@@ -40,6 +41,10 @@ POSE_GEOMETRIC = "geometric"
 POSE_MATRIX = "matrix"
 POSE_AUTO = "auto"
 
+# ที่มาของท่านิ่งที่ใช้เป็นจุดอ้างอิงของแต่ละคน
+NEUTRAL_PHOTOS = "photos"        # จากรูปลงทะเบียนใน faces/ — ไม่ต้องรอ ไม่ต้องนั่งนิ่ง
+NEUTRAL_LIVE = "live"            # จากการนั่งมองตรงช่วงวินาทีแรก (วิธีเดิม)
+
 
 def empty_direction_counts() -> dict[str, int]:
     return {d: 0 for d in DIRECTIONS}
@@ -52,6 +57,9 @@ class FaceInput:
     landmarks: object
     blendshapes: object = None       # list ของ Category หรือ None
     matrix: object = None            # numpy 4×4 หรือ None
+    # ภาพที่โมเดลได้เห็นจริง ใหญ่กว่าขนาดใบหน้าในเฟรมกี่เท่า (roi.py ครอปแล้วขยาย)
+    # 1.0 = อ่านจากภาพเต็มตามปกติ · ดูวิธีใช้ใน FaceAnalyzer.update (quality gate)
+    detail_scale: float = 1.0
 
 
 @dataclass
@@ -87,6 +95,15 @@ class FaceReading:
     # ชื่อนั้นผ่านเกณฑ์ความมั่นใจไหม — False = เดาจากคนที่ใกล้ที่สุด (FACES_GUESS)
     # แยกไว้เพื่อให้หน้าจอเติม `?` ได้ ไม่ใช่ให้ชื่อที่เดากับชื่อที่มั่นใจดูเหมือนกัน
     name_confident: bool = True
+    # ── ท่าทางร่างกาย (body.py) · โหมดติดตามกิจกรรมเท่านั้น ──
+    # None = โหมดนี้ไม่อ่านท่าทาง · อ่านแล้วไม่เข้าท่าไหน · หรือมองไม่เห็นตัวมากพอ
+    # ทั้งสามกรณีคือ "ยังไม่รู้" ไม่ใช่ "เขาไม่ได้ทำท่าอะไร" — ปลายทางอย่าตีความเป็นค่าว่าง
+    gesture: str | None = None
+    posture: str | None = None
+    # ท่ายืน/นั่ง/นอน **มีค่าเสมอเมื่อเปิดโหมดนี้** เพราะคนต้องอยู่ในท่าใดท่าหนึ่ง
+    # แต่บางครั้งเป็นการเดาจากหลักฐานอ้อม ๆ (เช่นมองไม่เห็นขา) ไม่ใช่การวัด
+    # ⚠️ อย่าเอาไปนับสถิติโดยไม่ดูค่านี้ — จะได้ตัวเลขที่ดูดีแต่เชื่อไม่ได้
+    posture_confident: bool = True
 
 
 @dataclass
@@ -117,6 +134,13 @@ class WindowSummary:
     # เก็บทั้งสองอย่างเพราะเป็นตัวตนต่างชนิด: เลขคือ "คนเดิมในเซสชันนี้"
     # ชื่อคือ "คนนี้คือใคร" และอาจไม่รู้ก็ได้
     name: str | None = None
+    # ท่าของคนนั้นตอนปิดหน้าต่าง: standing · sitting · lying (body.py)
+    # None = โหมดนี้ไม่ได้ดูร่างกาย หรือยังไม่เห็นตัวคนพอจะตอบ
+    posture: str | None = None
+    # ⚠️ ส่งคู่กับ posture เสมอ · body.posture() **ตอบทุกครั้ง** แม้ตอนที่ขาถูกโต๊ะบัง
+    # และคำตอบตอนนั้นเป็นการเดาจากหลักฐานอ้อม ไม่ใช่การวัด ปลายทางที่นับสถิติรวม
+    # โดยไม่ดูค่านี้จะได้ตัวเลขที่ดูดีแต่เชื่อไม่ได้ (ดูหัวข้อ posture ใน body.py)
+    posture_confident: bool = True
 
     @property
     def duration(self) -> float:
@@ -136,8 +160,11 @@ class WindowSummary:
         """
         แปลงเป็น payload ที่ INSERT ลงตาราง focus ได้ตรง ๆ
 
-        `name` และ `emotion` ต้องมีคอลัมน์รองรับก่อน (ดู README หัวข้อฐานข้อมูล)
+        `name` · `emotion` · `posture` ต้องมีคอลัมน์รองรับก่อน (ดู README หัวข้อฐานข้อมูล)
         ค่าที่เป็น None แปลว่า "ไม่รู้" ไม่ใช่ "ไม่มี" — ปลายทางอย่าตีความเป็นค่าว่าง
+
+        `posture_confident` ส่งเป็น None เมื่อไม่มีท่า เพื่อไม่ให้แถวที่ไม่มีท่าเลย
+        ดูเหมือนมี "ท่าที่มั่นใจ" ค่า true เป็นค่าตั้งต้นของ dataclass ไม่ใช่ผลการวัด
         """
         return {
             "person": self.person,
@@ -146,6 +173,8 @@ class WindowSummary:
             "face_count": self.face_count,
             "name": self.name,
             "emotion": self.emotion,
+            "posture": self.posture,
+            "posture_confident": self.posture_confident if self.posture else None,
         }
 
     def to_room_row(self) -> dict:
@@ -177,9 +206,26 @@ class _PersonState:
     calib_started: float | None = None
     neutral_yaw: float = 0.0
     neutral_pitch: float = 0.0
+    # ท่านิ่งที่ใช้อยู่มาจากไหน: "" = ยังไม่มี · NEUTRAL_PHOTOS · NEUTRAL_LIVE
+    neutral_source: str = ""
+    # ค่าจากรูปที่รับมาใช้ล่าสุด — เก็บไว้เทียบว่าเปลี่ยนไหมเมื่อชื่อถูกแก้ทีหลัง
+    photo_neutral: tuple[float, float] | None = None
+    # ผู้ใช้กด c เพื่อขอ calibrate สดเอง — ห้ามเอาค่าจากรูปมาทับอีก ไม่งั้นปุ่มนั้น
+    # จะไม่มีผลกับคนที่มีรูป (ค่าจากรูปจะถูกใส่กลับทันทีในเฟรมถัดไป)
+    prefer_live: bool = False
     ear_open: float | None = None       # EAR ตาเปิดของคนนี้ (เรียนตอน calibrate)
     ear_threshold: float = 0.0
-    calibrated: bool = False
+    ear_ready: bool = False
+
+    @property
+    def calibrated(self) -> bool:
+        """มีท่านิ่งให้เทียบแล้วหรือยัง — ได้มาจากรูปหรือจากการนั่งนิ่งก็นับเหมือนกัน
+
+        EAR ตาเปิดไม่รวมอยู่ในเงื่อนไขนี้ เพราะการวัดทิศทางไม่ต้องใช้มัน และวิธี
+        blendshape (ค่าเริ่มต้น) ไม่ต้องใช้เลย · ถ้ารวมไว้ด้วย คนที่ได้ท่านิ่งจากรูป
+        แล้วก็ยังต้องรอครบเวลาอยู่ดี ซึ่งลบล้างเหตุผลทั้งหมดของการอ่านท่านิ่งจากรูป
+        """
+        return bool(self.neutral_source)
 
     # การหันหน้า
     current_dir: str | None = None
@@ -231,6 +277,7 @@ class FaceAnalyzer:
 
         # ภาพที่พลิกกระจกแล้วทำให้ทิศในภาพตรงกับทิศของตัวผู้ใช้เอง
         # ถ้าไม่พลิกต้องสลับป้าย Left/Right ไม่งั้นแดชบอร์ดจะรายงานกลับข้าง
+        self._mirror = mirror
         self._dir_positive_x = DIR_RIGHT if mirror else DIR_LEFT
         self._dir_negative_x = DIR_LEFT if mirror else DIR_RIGHT
 
@@ -296,27 +343,95 @@ class FaceAnalyzer:
         return self.pose_cfg["yaw_threshold"], self.pose_cfg["pitch_threshold"]
 
     # ── ท่านิ่ง + EAR baseline ────────────────────────────
+    def _photo_neutral(self, track, pose_method: str) -> tuple[float, float] | None:
+        """
+        ท่านิ่งจากรูปลงทะเบียนของคนนี้ — main ใส่ไว้ใน `track.state["neutral_pose"]`
+        (เส้นทางเดียวกับ `name` · analyzer จึงยังไม่รู้จัก faces.py)
+
+        คืน None เมื่อใช้ไม่ได้ ซึ่งมีสองกรณี:
+          - ปิดฟีเจอร์ไว้
+          - กำลังใช้วิธี matrix ซึ่งคิดเป็น**องศา** ส่วนค่าจากรูปเป็นสัดส่วนแบบ
+            geometric · เอามาหักกันตรง ๆ จะได้ตัวเลขที่ดูใช้ได้แต่ผิดทั้งหมด
+            (main ไม่ประกาศฟีเจอร์นี้เมื่อเลือกวิธี matrix ตรงนี้เป็นด่านกันซ้ำ)
+
+        **การพลิกภาพต้องกลับเครื่องหมาย yaw**: ภาพจากกล้องถูกพลิกซ้าย-ขวาแล้ว
+        (CAMERA_MIRROR) แต่รูปในโฟลเดอร์ไม่ได้ถูกพลิก · การพลิกทำให้ x → 1-x
+        ทั้งปลายจมูกและจุดกึ่งกลางตา ผลคือ yaw = (nose - eye_mid)/w กลายเป็นค่าลบ
+        ของเดิมพอดี ส่วน pitch ไม่ถูกแตะเพราะแกน y ไม่เปลี่ยน · ถ้าไม่กลับให้
+        คนที่จมูกเอียงไปทางหนึ่งจะได้จุดอ้างอิงที่เอียงผิดข้าง = เพี้ยนสองเท่าของ bias
+        """
+        if not self.pose_cfg.get("neutral_from_photos", True):
+            return None
+        if pose_method != POSE_GEOMETRIC:
+            return None
+        neutral = track.state.get("neutral_pose")
+        if not neutral:
+            return None
+        yaw, pitch = neutral
+        return (-yaw if self._mirror else yaw), pitch
+
+    def _adopt_photo_neutral(self, st: _PersonState, track, pose_method: str) -> None:
+        """
+        ใช้ท่านิ่งจากรูปเป็นจุดอ้างอิงของคนนี้ ถ้ามีและยังไม่ได้ใช้ค่านั้น
+
+        ทับค่าที่ calibrate สดไว้แล้วด้วย (ไม่ใช่แค่ตอนที่ยังไม่มีค่า) เพราะชื่อจาก
+        แกลเลอรีมาช้ากว่าการ calibrate ได้ — ลายเซ็นต้องนิ่งก่อนถึงจะเทียบรูปได้
+        ถ้ายอมให้ค่าสดที่มาก่อนชนะ ฟีเจอร์นี้จะทำงานหรือไม่ทำงานขึ้นกับจังหวะ
+        ซึ่งเป็นพฤติกรรมที่อธิบายให้ผู้ใช้ฟังไม่ได้ · ค่าจากรูปเชื่อได้มากกว่าอยู่แล้ว
+        เพราะรูปเป็นภาพหน้าตรงจริง ๆ ไม่ใช่ "ท่าที่บังเอิญทำอยู่ตอนนั้น"
+
+        **เทียบกับค่าที่ใช้อยู่ ไม่ใช่แค่ดูว่าเคยใช้ค่าจากรูปแล้วหรือยัง** เพราะชื่อ
+        เปลี่ยนได้: main ยกชื่อที่ยังไม่มั่นใจให้ก่อน แล้วแก้เป็นชื่อที่มั่นใจทีหลัง
+        ถ้าล็อกค่าแรกไว้ จุดศูนย์จะยังเป็นของคนที่เดาผิดทั้งที่รู้แล้วว่าเป็นใคร
+        """
+        if st.prefer_live:
+            return
+        photo = self._photo_neutral(track, pose_method)
+        if photo is None or photo == st.photo_neutral:
+            return
+        st.neutral_yaw, st.neutral_pitch = photo
+        st.photo_neutral = photo
+        st.neutral_source = NEUTRAL_PHOTOS
+        st.calib_yaw.clear()
+        st.calib_pitch.clear()
+        # เปลี่ยนจุดอ้างอิงแล้ว ทิศที่ค้างอยู่คิดจากจุดอ้างอิงเดิม — เริ่มนับใหม่
+        st.current_dir = None
+        st.pending_dir = None
+
     def _update_calibration(
         self, st: _PersonState, yaw: float, pitch: float, ear: float, now: float
     ) -> float:
-        if st.calibrated:
+        """
+        เรียนค่าอ้างอิงรายคนจากภาพสด คืนความคืบหน้า 0–1
+
+        เรียนสองอย่างที่แยกจากกัน: **ท่านิ่ง** (ข้ามไปถ้าได้มาจากรูปแล้ว) และ
+        **EAR ตาเปิด** (เรียนสดเสมอ) — รูปนิ่งใบเดียวบอก EAR ตาเปิดไม่ได้น่าเชื่อถือ
+        เพราะถ้าคนในรูปกำลังกะพริบพอดี เกณฑ์การกะพริบของเขาจะเพี้ยนไปทั้งเซสชัน
+        ส่วนการ calibrate สดมีหลายร้อยเฟรมให้หยิบเปอร์เซ็นไทล์ ซึ่งกันเรื่องนี้อยู่แล้ว
+        """
+        done_pose = bool(st.neutral_source)
+        done_ear = st.ear_ready or not self.track_eyes
+        if done_pose and done_ear:
             return 1.0
         if st.calib_started is None:
             st.calib_started = now
 
-        st.calib_yaw.append(yaw)
-        st.calib_pitch.append(pitch)
-        if self.track_eyes:
+        if not done_pose:
+            st.calib_yaw.append(yaw)
+            st.calib_pitch.append(pitch)
+        if not done_ear:
             st.calib_ear.append(ear)
 
         elapsed = now - st.calib_started
         need = self.pose_cfg["calibration_seconds"]
-        if elapsed >= need and st.calib_yaw:
-            # ใช้ค่ามัธยฐาน ไม่ใช่ค่าเฉลี่ย — ทนต่อเฟรมที่ landmark กระโดด
-            st.neutral_yaw = statistics.median(st.calib_yaw)
-            st.neutral_pitch = statistics.median(st.calib_pitch)
+        if elapsed >= need:
+            if not done_pose and st.calib_yaw:
+                # ใช้ค่ามัธยฐาน ไม่ใช่ค่าเฉลี่ย — ทนต่อเฟรมที่ landmark กระโดด
+                st.neutral_yaw = statistics.median(st.calib_yaw)
+                st.neutral_pitch = statistics.median(st.calib_pitch)
+                st.neutral_source = NEUTRAL_LIVE
 
-            if self.track_eyes:
+            if not done_ear and st.calib_ear:
                 # EAR ตาเปิดของคนนี้: ใช้เปอร์เซ็นไทล์สูง เพราะระหว่าง calibrate
                 # ผู้ใช้ย่อมกะพริบตาบ้าง ค่าเฉลี่ยจะถูกดึงต่ำลง
                 ears = sorted(st.calib_ear)
@@ -324,8 +439,8 @@ class FaceAnalyzer:
                           int(len(ears) * self.blink_cfg["ear_open_percentile"]))
                 st.ear_open = ears[idx]
                 st.ear_threshold = st.ear_open * self.blink_cfg["ear_close_ratio"]
+                st.ear_ready = True
 
-            st.calibrated = True
             st.calib_yaw.clear()
             st.calib_pitch.clear()
             st.calib_ear.clear()
@@ -333,17 +448,26 @@ class FaceAnalyzer:
         return min(1.0, elapsed / max(need, 1e-6))
 
     def recalibrate(self, tracks) -> None:
-        """สั่ง calibrate ใหม่ทุกคน (ผูกกับปุ่มลัดใน main)"""
+        """
+        สั่ง calibrate ใหม่ทุกคน (ผูกกับปุ่มลัดใน main)
+
+        ตั้ง `prefer_live` ไว้ด้วย เพราะคำสั่งนี้แปลว่า "เอาท่าที่ฉันทำอยู่ตอนนี้
+        เป็นท่าตรง" ถ้าปล่อยให้ค่าจากรูปกลับมาทับในเฟรมถัดไป ปุ่มนี้จะไม่มีผลเลย
+        กับคนที่มีรูป และผู้ใช้จะไม่มีทางรู้ว่าทำไม
+        """
         for track in tracks:
             st = track.state.get("analyzer")
             if isinstance(st, _PersonState):
-                st.calibrated = False
+                st.neutral_source = ""
+                st.photo_neutral = None
+                st.prefer_live = True
                 st.calib_started = None
                 st.calib_yaw.clear()
                 st.calib_pitch.clear()
                 st.calib_ear.clear()
                 st.ear_open = None
                 st.ear_threshold = 0.0
+                st.ear_ready = False
                 st.current_dir = None
                 st.pending_dir = None
 
@@ -431,7 +555,19 @@ class FaceAnalyzer:
             points = face.landmarks
 
             # quality: ใบหน้าต้องใหญ่พอที่ระยะเปลือกตาจะเกินสัญญาณรบกวน
-            eye_px = lm.interocular_px(points, width)
+            #
+            # ใบหน้าที่ถูกซูมอ่าน (roi.py) ให้ landmark ที่แม่นกว่าจำนวนพิกเซลในเฟรม
+            # บ่งบอก เพราะโมเดลได้เห็นภาพที่ขยายแล้ว จึงให้เครดิตตามอัตราขยาย
+            #
+            # ⚠️ **แต่ให้ไม่เต็ม** — การขยายภาพไม่ได้สร้างข้อมูลขึ้นมาใหม่ ใบหน้า 40 px
+            # ที่ขยาย 6 เท่าไม่ได้มีรายละเอียดเท่าใบหน้า 240 px จริง ๆ · สิ่งที่การขยาย
+            # ให้จริงคือโมเดลได้ทำงานที่ความละเอียดที่มันถูกฝึกมา ซึ่งช่วยได้มากแต่มีเพดาน
+            # `zoom_credit` คือเพดานนั้น — เป็นค่าประมาณที่ตั้งไว้อย่างระมัดระวัง
+            # และเป็นตัวแรกที่ควรปรับเมื่อเอาไปใช้กับกล้องและห้องจริง
+            eye_px = lm.interocular_px(points, width) * min(
+                max(getattr(face, "detail_scale", 1.0), 1.0),
+                self.quality_cfg.get("zoom_credit", 1.0),
+            )
             min_px = self.quality_cfg["min_interocular_px"]
             good_px = self.quality_cfg["good_interocular_px"]
             quality = max(0.0, min(1.0, (eye_px - min_px) / max(good_px - min_px, 1e-6)))
@@ -457,6 +593,10 @@ class FaceAnalyzer:
                 score, blink_method = self._blink_score(face, ear, st)
             else:
                 ear, score, blink_method = 0.0, 0.0, BLINK_OFF
+
+            # ท่านิ่งจากรูปลงทะเบียน (ถ้ารู้แล้วว่าคนนี้คือใคร) — ต้องทำก่อนการ
+            # calibrate สด ไม่งั้นจะเสียเวลาสะสมค่าที่กำลังจะถูกแทนที่อยู่ดี
+            self._adopt_photo_neutral(st, track, pose_method)
 
             # ใบหน้าที่ quality ต่ำไม่ควรถูกเอาไป calibrate หรือวิเคราะห์
             progress = (
@@ -527,6 +667,11 @@ class FaceAnalyzer:
                     # analyzer ไม่รู้จัก faces.py เลย จึงทดสอบแยกกันได้
                     name=track.state.get("name"),
                     name_confident=bool(track.state.get("name_confident", True)),
+                    # ท่าทางร่างกายถูกเขียนลง track.state โดย main (โหมดติดตามกิจกรรม)
+                    # ทางเดียวกับ name เป๊ะ — analyzer แค่ยกมาใส่ reading ไม่ได้คำนวณเอง
+                    gesture=track.state.get("gesture"),
+                    posture=track.state.get("posture"),
+                    posture_confident=bool(track.state.get("posture_confident", True)),
                 )
             )
 
@@ -545,8 +690,9 @@ class FaceAnalyzer:
         total_dirs = empty_direction_counts()
         total_blinks = 0
         busiest_person, busiest_moves = None, -1
-        # ชื่อและอารมณ์ของคนที่ถูกรายงาน เก็บคู่กับ id เพื่อไม่ให้หลุดไปคนละคน
+        # ชื่อ อารมณ์ และท่าของคนที่ถูกรายงาน เก็บคู่กับ id เพื่อไม่ให้หลุดไปคนละคน
         busiest_name, busiest_emotion = None, None
+        busiest_posture, busiest_posture_sure = None, True
         people_measured = 0
 
         for track in tracks:
@@ -571,6 +717,10 @@ class FaceAnalyzer:
                 busiest_person, busiest_moves = track.person_id, moves
                 busiest_name = track.state.get("name")
                 busiest_emotion = st.emotion.label if st.emotion is not None else None
+                # อ่านจาก track.state เหมือน gesture/posture ที่ Reading ใช้ — ค่านี้
+                # ผ่าน PostureHold มาแล้ว จึงเป็นท่าที่นิ่งพอจะบันทึก ไม่ใช่ค่าดิบรายเฟรม
+                busiest_posture = track.state.get("posture")
+                busiest_posture_sure = bool(track.state.get("posture_confident", True))
             st.reset_window()
 
         summary = WindowSummary(
@@ -589,6 +739,9 @@ class FaceAnalyzer:
             # โหมดห้องรวมไม่รายงานรายบุคคล ชื่อจึงต้องเงียบไปด้วย ไม่ใช่แค่ id
             name=busiest_name if self.report_person else None,
             emotion=busiest_emotion,
+            # ท่าเป็นข้อมูลรายบุคคลเหมือนชื่อ — โหมดห้องรวมจึงต้องเงียบไปด้วย
+            posture=busiest_posture if self.report_person else None,
+            posture_confident=busiest_posture_sure,
         )
 
         self._window_start = now
