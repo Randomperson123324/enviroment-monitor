@@ -43,6 +43,21 @@ export const THRESHOLDS = {
    * is why this sensor carries a smaller score penalty than temperature.
    */
   lux: { min: 0, max: 65535, okLo: 300, okHi: 750, warnLo: 150, warnHi: 2000 },
+  /**
+   * CO2 in ppm (SCD40, real NDIR measurement). 800 ppm is where indoor-air
+   * guidance says ventilation starts to matter, 1000 ppm the usual "open a
+   * window" line — see docs/05-data-schema.md. Outdoor ambient sits ~420 ppm.
+   */
+  co2: { min: 0, max: 40000, clean: 800, warn: 1000, danger: 1500, critical: 2500 },
+  /**
+   * eCO2 in ppm (SGP30) — a VOC-derived *estimate* of CO2-equivalent, not a
+   * direct measurement (docs/05-data-schema.md). It reads on the same ppm
+   * scale as real CO2 and is judged against the same bands, but the sensor's
+   * own floor is 400 ppm rather than 0. It carries no SCORE_PENALTY of its
+   * own — see risingSensor `advise: false` below — so a proxy reading never
+   * doubles the penalty real CO2 already contributes for the same event.
+   */
+  eco2: { min: 400, max: 60000, clean: 800, warn: 1000, danger: 1500, critical: 2500 },
 };
 
 /**
@@ -60,6 +75,7 @@ export const SCORE_PENALTY = {
    * the band is not a health risk, and the high end is often just daylight.
    */
   lux: { warn: 8, danger: 18 },
+  co2: { warn: 10, danger: 25, critical: 45 },
 };
 
 /**
@@ -185,6 +201,11 @@ export const SENSORS = [
     issueKey: (v) => bandIssueKey(v, THRESHOLDS.hum, { lo: 'dry', hi: 'humid' }),
     advice: (v) => bandAdvice(v, THRESHOLDS.hum, { lo: 'dry', hi: 'humid' }),
   },
+  risingSensor({ id: 'co2', field: 'co2', unit: 'ppm', dp: 0, group: 'gas' }),
+  // eCO2 is a VOC-derived estimate, not a real CO2 measurement — reported for
+  // reference but never scored or advised on, so it cannot double-count the
+  // same ventilation issue real CO2 already flags (see THRESHOLDS.eco2).
+  risingSensor({ id: 'eco2', field: 'eco2', unit: 'ppm', dp: 0, group: 'gas', advise: false }),
   // PM2.5 leads the dust group everywhere (tiles, chart legend, stats rows): it
   // is the channel with a health standard behind it, so it should not be read
   // last just because 1 < 2.5 < 10.
@@ -233,6 +254,7 @@ export const MAIN_SENSORS = SENSORS.filter((s) => s.group !== 'pm');
 export const CLIMATE_SENSORS = SENSORS.filter((s) => s.group === 'climate');
 export const PM_SENSORS = SENSORS.filter((s) => s.group === 'pm');
 export const LIGHT_SENSORS = SENSORS.filter((s) => s.group === 'light');
+export const GAS_SENSORS = SENSORS.filter((s) => s.group === 'gas');
 
 /** Health-score display bands (highest first). `id` keys UI palettes (ring color). */
 export const SCORE_BANDS = [

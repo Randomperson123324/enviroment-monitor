@@ -21,6 +21,8 @@ const FIELD_ALIASES = {
   pm1: ['pm1', 'pm1_0'],
   pm25: ['pm25', 'pm2_5'],
   pm10: ['pm10'],
+  co2: ['co2', 'co2_ppm'],
+  eco2: ['eco2', 'co2eq'],
   sound: ['sound'],
   // ⚠️ `light` and `lux` are different columns on purpose, not a duplicate.
   // `light` is the retired LDR reading — a raw 0–1023 ADC count with no unit.

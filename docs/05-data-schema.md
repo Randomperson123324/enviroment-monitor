@@ -34,12 +34,12 @@
 
 ## 2. คอลัมน์ใหม่ที่ต้องเพิ่ม
 
-> ✅ **สถานะ (ส.ค. 2569):** `pm1` · `pm25` · `pm10` · `lux` **เดินสายในโค้ดครบแล้ว** ตั้งแต่ ingest →
-> scoring → tiles → กราฟ → สถิติ → บริบทของ AI · เหลือแค่**รัน SQL migration ด้านล่างบน Supabase**
-> แล้วให้ collector บน Pi ส่งค่ามา (ยังไม่ได้เขียน — ดูขั้นที่ 7)
-> ส่วน `co2` · `tvoc` · `eco2` · `sound_db` ยังเป็นแผน ยังไม่มีโค้ดรองรับ
+> ✅ **สถานะ (ส.ค. 2569):** `pm1` · `pm25` · `pm10` · `lux` · `co2` · `eco2` **เดินสายในโค้ดครบแล้ว**
+> ตั้งแต่ ingest → scoring → tiles → กราฟ → สถิติ → บริบทของ AI
+> ส่วน `tvoc` · `sound_db` ยังเป็นแผน ยังไม่มีโค้ดรองรับ
 >
-> ⚠️ **คอลัมน์ที่มีอยู่จริงบน Supabase ตอนนี้:** `pm1` · `pm25` · `pm10` เท่านั้น
+> ⚠️ **คอลัมน์ที่มีอยู่จริงบน Supabase ตอนนี้:** `pm1` · `pm25` · `pm10` · `co2` · `eco2` · `tvoc`
+> (ยืนยันแล้วผ่าน Supabase MCP — `tvoc` มีคอลัมน์แล้วแต่โค้ดยังไม่อ่าน)
 > **`lux` ยังไม่ถูกเพิ่ม** — ส่งค่า lux เข้ามาก่อนรัน migration แล้ว insert จะล้มทั้งแถว
 >
 > เกณฑ์ของ `lux` อยู่ใน `config/sensors.js` (ช่วงเหมาะสม 300–750 lx ตาม EN 12464-1 /
@@ -207,15 +207,13 @@ Content-Type: application/json
 ### ขั้นที่ 2 — API รับข้อมูล (`app/api/ingest/route.js`)
 
 - [x] PM — เพิ่ม `pm1` · `pm25` · `pm10` เข้า `FIELD_ALIASES` แล้ว
-- [ ] เซนเซอร์ที่เหลือ (`co2` · `tvoc` · `eco2` · `lux` · `sound_db`):
+- [x] `lux` · `co2` · `eco2` เข้า `FIELD_ALIASES` แล้ว
+- [ ] เซนเซอร์ที่เหลือ (`tvoc` · `sound_db`):
 
 ```js
 const FIELD_ALIASES = {
-  // ...ของเดิม + PM ที่ใส่ไปแล้ว
-  co2:      ['co2', 'co2_ppm'],
+  // ...ของเดิม + PM/lux/co2/eco2 ที่ใส่ไปแล้ว
   tvoc:     ['tvoc'],
-  eco2:     ['eco2', 'co2eq'],
-  lux:      ['lux', 'illuminance'],
   sound_db: ['sound_db', 'db', 'dba'],
 };
 ```
@@ -233,14 +231,16 @@ const FIELD_ALIASES = {
       ตัวคิดคะแนน/ข้อความไปแยกตาม `id` เอง เพิ่มเซนเซอร์ใหม่แบบ rising ใช้แค่
       `risingSensor({...})` หนึ่งบรรทัด + สตริงใน `config/i18n.js` และ `config/messages.th.js`
 - [x] PM — `THRESHOLDS.pm1` · `pm25` · `pm10` + `SCORE_PENALTY.pm25` · `pm10` + `PM_AVG_HOURS`
+- [x] `lux` — band shape, wired
+- [x] `co2` — rising shape, `SCORE_PENALTY.co2` set · `eco2` — rising shape, `advise: false`
+      (VOC-derived estimate, not a real measurement — reported but never scored, same
+      reasoning as PM1 not scoring against PM2.5)
 - [ ] เกณฑ์ของเซนเซอร์ที่เหลือ (ยังไม่ได้ใส่):
 
 ```js
 export const THRESHOLDS = {
-  // ...ของเดิม + PM ที่ใส่ไปแล้ว (ใช้คีย์ clean/warn/danger/critical ตามรูปทรง rising)
-  co2:  { min: 0, max: 40000, clean: 800, warn: 1000, danger: 1500, critical: 2500 },
+  // ...ของเดิม + PM/lux/co2/eco2 ที่ใส่ไปแล้ว (ใช้คีย์ clean/warn/danger/critical ตามรูปทรง rising)
   tvoc: { min: 0, max: 60000, clean: 220, warn: 660, danger: 2200, critical: 5000 },
-  lux:  { min: 0, max: 65535, okLo: 300, okHi: 1000, warnLo: 150, warnHi: 2000 },
   db:   { min: 0, max: 130, clean: 45, warn: 60, danger: 75, critical: 85 },
 };
 ```

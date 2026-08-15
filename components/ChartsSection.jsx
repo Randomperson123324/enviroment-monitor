@@ -10,6 +10,7 @@ import {
   CLIMATE_SENSORS,
   PM_SENSORS,
   LIGHT_SENSORS,
+  GAS_SENSORS,
   PM_AVG_HOURS,
   THRESHOLDS,
   AQI_LEVELS,
@@ -166,6 +167,57 @@ function LightChart({ view, smooth, colors }) {
         y: valueAxis(colors, {
           scale: { suggestedMin: 0, suggestedMax: THRESHOLDS.lux.warnHi },
         }),
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: colors.tick, boxWidth: 10, padding: 8, usePointStyle: true },
+        },
+        tooltip: { ...tooltipOptions(colors, view.timestamps), mode: 'index', intersect: false },
+      },
+    }),
+    [colors, view]
+  );
+
+  return <Line data={data} options={options} />;
+}
+
+/**
+ * CO2 and eCO2 share a chart the same way the PM channels do: both are ppm on
+ * the same practical scale, so one honest axis beats a divisor trick. Only
+ * CO2 is filled — eCO2 is a VOC-derived estimate riding along for reference,
+ * not the primary reading (config/sensors.js).
+ */
+function GasChart({ view, smooth, colors }) {
+  const { t } = useLang();
+
+  const data = useMemo(
+    () => ({
+      labels: view.labels,
+      datasets: GAS_SENSORS.map((s) => ({
+        label: t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
+        data: smoothSeries(view[s.id], smooth),
+        borderColor: colors[s.id],
+        backgroundColor: gradientFill(colors[s.id], 0.22),
+        tension: 0.42,
+        pointRadius: 0,
+        borderWidth: 2,
+        spanGaps: true,
+        fill: s.id === 'co2',
+      })),
+    }),
+    [view, smooth, colors, t]
+  );
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: timeAxis(colors, view.labels.length),
+        y: valueAxis(colors, { scale: { suggestedMin: 0 } }),
       },
       plugins: {
         legend: {
@@ -367,6 +419,18 @@ export default function ChartsSection({ dash, theme }) {
           </div>
           <div className="chart-stage-md">
             <LightChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+          </div>
+        </div>
+      )}
+
+      {hasSeriesData(view, GAS_SENSORS) && (
+        <div className="panel section-gap">
+          <div className="chart-head">
+            <div className="panel-title">{t('charts.gasTitle')}</div>
+            <div className="panel-meta">{t('charts.gasMeta')}</div>
+          </div>
+          <div className="chart-stage-md">
+            <GasChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
           </div>
         </div>
       )}
