@@ -1299,6 +1299,66 @@ textarea {
   min-height: 230px;
 }
 
+/* ═══ AQI METER ═══ */
+.aqi-meter {
+  margin-top: 12px;
+}
+
+.aqi-track {
+  display: flex;
+  gap: 3px;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.aqi-seg {
+  flex: 1;
+  border-radius: 3px;
+  opacity: 0.22;
+  transition: opacity 0.3s;
+}
+
+.aqi-seg.on {
+  opacity: 1;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.aqi-reading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 12px;
+}
+
+.aqi-value {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.aqi-value small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.aqi-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.aqi-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
 /* ═══ STATS TABLE ═══ */
 .table-wrap {
   padding: 6px 4px;
