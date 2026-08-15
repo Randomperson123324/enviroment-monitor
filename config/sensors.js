@@ -278,23 +278,6 @@ export const SCORE_BANDS = [
   { id: 'critical', min: 0, emoji: '🤢', msg: 'สภาพแวดล้อมอันตราย รีบแก้ไขทันที!' },
 ];
 
-/**
- * Air-quality bands, read from PM2.5 (order matters: first match wins).
- *
- * These used to come from the MQ-2's ppm reading — an uncalibrated proxy for
- * "some gas is present". PM2.5 is a µg/m³ measurement against a published
- * standard, so the meter now says something checkable. `status` keys the shared
- * status palette; the same cutoffs drive the PM2.5 tile.
- */
-export const AQI_SOURCE = 'pm25';
-
-export const AQI_LEVELS = [
-  { max: THRESHOLDS.pm25.clean, id: 'clean', status: 'good' },
-  { max: THRESHOLDS.pm25.warn, id: 'moderate', status: 'warning' },
-  { max: THRESHOLDS.pm25.danger, id: 'poor', status: 'serious' },
-  { max: Infinity, id: 'danger', status: 'critical' },
-];
-
 /** Webcam (webcam_json) interpretation thresholds. */
 export const WEBCAM = {
   /** Average eye-aspect-ratio below this = drowsy */
@@ -305,8 +288,4 @@ export const WEBCAM = {
 
 export function scoreBand(score) {
   return SCORE_BANDS.find((b) => score >= b.min) ?? SCORE_BANDS[SCORE_BANDS.length - 1];
-}
-
-export function aqiLevel(pm25) {
-  return AQI_LEVELS.find((l) => pm25 <= l.max) ?? AQI_LEVELS[AQI_LEVELS.length - 1];
 }

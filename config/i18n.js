@@ -138,8 +138,7 @@ const DICT = {
       avg: 'เฉลี่ย {v}',
       tempTitle: 'อุณหภูมิ (°C)',
       humTitle: 'ความชื้น (%)',
-      airQuality: 'เกณฑ์ PM2.5',
-      pmTitle: 'ฝุ่นละออง PM (µg/m³)',
+      airQuality: 'คุณภาพอากาศ (PM)',
       pmMeta: 'ค่าที่วัดได้จริง · เกณฑ์เตือนใช้ค่าเฉลี่ย {h} ชม.',
       lightTitle: 'ความสว่าง (lx)',
       lightMeta: 'ช่วงเหมาะกับการอ่านเขียน {lo}–{hi} lx · แสงแดดพุ่งเกินเพดานกราฟได้',
@@ -153,7 +152,6 @@ const DICT = {
 
     ranges: { '1': '1 ชม.', '6': '6 ชม.', '12': '12 ชม.', '24': '24 ชม.', '72': '3 วัน' },
     smooth: { raw: 'ดิบ', light: 'เบา', medium: 'กลาง', smooth: 'ลื่น' },
-    aqi: { clean: 'สะอาด', moderate: 'ปานกลาง', poor: 'เกินมาตรฐาน', danger: 'อันตราย' },
 
     stats: {
       title: 'สรุปสถิติ',
@@ -631,8 +629,7 @@ const DICT = {
       avg: 'Avg {v}',
       tempTitle: 'Temperature (°C)',
       humTitle: 'Humidity (%)',
-      airQuality: 'PM2.5 bands',
-      pmTitle: 'Particulates PM (µg/m³)',
+      airQuality: 'Air quality (PM)',
       pmMeta: 'Measured values · levels judged on the {h}h mean',
       lightTitle: 'Illuminance (lx)',
       lightMeta: 'Ideal for reading and writing {lo}–{hi} lx · daylight runs off the top',
@@ -646,7 +643,6 @@ const DICT = {
 
     ranges: { '1': '1h', '6': '6h', '12': '12h', '24': '24h', '72': '3 days' },
     smooth: { raw: 'Raw', light: 'Light', medium: 'Medium', smooth: 'Smooth' },
-    aqi: { clean: 'Clean', moderate: 'Moderate', poor: 'Over standard', danger: 'Dangerous' },
 
     stats: {
       title: 'Statistics summary',

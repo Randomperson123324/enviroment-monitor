@@ -1,12 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import { CircleCheck, TriangleAlert, CircleAlert, Siren, ChartLine } from 'lucide-react';
+import { ChartLine } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import SectionHeader from '@/components/SectionHeader';
 import {
-  SENSORS,
   CLIMATE_SENSORS,
   PM_SENSORS,
   LIGHT_SENSORS,
@@ -14,11 +13,8 @@ import {
   VOC_SENSORS,
   PM_AVG_HOURS,
   THRESHOLDS,
-  AQI_LEVELS,
-  AQI_SOURCE,
-  aqiLevel,
 } from '@/config/sensors';
-import { CHART_COLORS, CHART_RANGES, SMOOTH_OPTIONS, STATUS_COLORS } from '@/config/client';
+import { CHART_COLORS, CHART_RANGES, SMOOTH_OPTIONS } from '@/config/client';
 import {
   buildHistView,
   smoothSeries,
@@ -337,54 +333,6 @@ function ScoreChart({ view, smooth, colors }) {
   return <Line data={data} options={options} />;
 }
 
-/** Whichever sensor the AQI bands are defined against (config/sensors.js). */
-const AQI_SENSOR = SENSORS.find((s) => s.id === AQI_SOURCE);
-
-const AQI_STATUS_ICON = {
-  good: CircleCheck,
-  warning: TriangleAlert,
-  serious: CircleAlert,
-  critical: Siren,
-};
-
-/**
- * Air-quality meter, read from PM2.5 against the published bands.
- * Status segments carry an icon + label so the level never rests on colour.
- */
-function AqiMeter({ value, unit }) {
-  const { t } = useLang();
-  const level = value != null ? aqiLevel(value) : null;
-  const StatusIcon = level ? AQI_STATUS_ICON[level.status] : null;
-  return (
-    <div className="aqi-meter">
-      <div className="aqi-track">
-        {AQI_LEVELS.map((l) => (
-          <div
-            key={l.id}
-            className={`aqi-seg ${level?.id === l.id ? 'on' : ''}`}
-            style={{ background: STATUS_COLORS[l.status] }}
-          />
-        ))}
-      </div>
-      <div className="aqi-scale">
-        {AQI_LEVELS.map((l) => (
-          <span key={l.id}>{t(`aqi.${l.id}`)}</span>
-        ))}
-      </div>
-      <div className="aqi-reading">
-        <div className="aqi-value">
-          {value != null ? Number(value).toFixed(0) : '--'}
-          <small> {unit}</small>
-        </div>
-        <div className="aqi-cat" style={{ color: level ? STATUS_COLORS[level.status] : 'var(--muted)' }}>
-          {StatusIcon ? <StatusIcon size={16} strokeWidth={2.2} aria-hidden /> : <span>—</span>}
-          <span>{level ? t(`aqi.${level.id}`) : t('sensor.tile.waiting')}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function ChartsSection({ dash, theme }) {
   const { t } = useLang();
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
@@ -447,11 +395,13 @@ export default function ChartsSection({ dash, theme }) {
           </div>
         </div>
         <div className="panel">
-          <div className="panel-title">{t('charts.airQuality')}</div>
-          <AqiMeter
-            value={dash.latest?.[AQI_SENSOR.field] != null ? Number(dash.latest[AQI_SENSOR.field]) : null}
-            unit={AQI_SENSOR.unit}
-          />
+          <div className="chart-head">
+            <div className="panel-title">{t('charts.airQuality')}</div>
+            <div className="panel-meta">{t('charts.pmMeta', { h: PM_AVG_HOURS })}</div>
+          </div>
+          <div className="chart-stage-md">
+            <PmChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+          </div>
         </div>
       </div>
 
@@ -492,18 +442,6 @@ export default function ChartsSection({ dash, theme }) {
           </div>
         )}
       </div>
-
-      {hasSeriesData(view, PM_SENSORS) && (
-        <div className="panel section-gap">
-          <div className="chart-head">
-            <div className="panel-title">{t('charts.pmTitle')}</div>
-            <div className="panel-meta">{t('charts.pmMeta', { h: PM_AVG_HOURS })}</div>
-          </div>
-          <div className="chart-stage-md">
-            <PmChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
-          </div>
-        </div>
-      )}
 
       {hasSeriesData(view, LIGHT_SENSORS) && (
         <div className="panel section-gap">
