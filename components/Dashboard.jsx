@@ -226,6 +226,7 @@ function DashboardInner({ initialPanel }) {
               smooth={dash.smooth}
               theme={theme}
               loading={!dash.loaded && !dash.latest}
+              onSetHours={dash.setHours}
             />
           </section>
           <ChartsSection dash={dash} theme={theme} />

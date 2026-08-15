@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Maximize2 } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
-import { MAIN_SENSORS, PM_SENSORS } from '@/config/sensors';
+import { MAIN_SENSORS, PM_SENSORS, SENSORS } from '@/config/sensors';
 import { CHART_COLORS, AIR_ROTATE_MS } from '@/config/client';
 import {
   buildHistView,
@@ -13,6 +14,7 @@ import {
   trailingMean,
 } from '@/lib/chart-utils';
 import { useLang } from '@/hooks/useLang';
+import SensorDetail from '@/components/SensorDetail';
 
 // Mini sparklines read as a trend, not a data table — smooth harder than the
 // main chart so raw sensor jitter doesn't look ragged (flows like the flood card).
@@ -165,18 +167,46 @@ function TileBody({ sensor, state, view, smooth, color, colors }) {
   );
 }
 
+/**
+ * Props that turn a whole card into the control that expands it.
+ *
+ * The card is the button rather than a corner icon: the tile is what the reader
+ * is already pointing at, and a 14px target in the corner of a 270px card is a
+ * worse version of the same affordance. The icon stays as a visual hint only.
+ */
+function expandProps(onExpand, label, t) {
+  return {
+    role: 'button',
+    tabIndex: 0,
+    'aria-label': t('sensor.tile.expand', { label }),
+    onClick: onExpand,
+    onKeyDown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onExpand();
+      }
+    },
+  };
+}
+
 /** One measurement, one card (temperature, humidity). */
-function SensorTile({ sensor, latest, view, smooth, colors }) {
+function SensorTile({ sensor, latest, view, smooth, colors, onExpand }) {
   const { t } = useLang();
   const color = colors[sensor.id];
   const state = tileState(sensor, latest, view);
+  const label = t(`sensor.${sensor.id}.label`);
 
   return (
-    <div className="panel tile" style={{ '--tile-accent': color }}>
+    <div
+      className="panel tile tile-open"
+      style={{ '--tile-accent': color }}
+      {...expandProps(() => onExpand(sensor), label, t)}
+    >
       <div className="tile-head">
         <span className="tile-label">
           <span className="tile-dot" />
-          {t(`sensor.${sensor.id}.label`)}
+          {label}
+          <Maximize2 className="tile-grow" size={13} strokeWidth={2.4} aria-hidden />
         </span>
         <TileValue sensor={sensor} value={state.value} />
       </div>
@@ -198,7 +228,7 @@ function SensorTile({ sensor, latest, view, smooth, colors }) {
  * pointer is over the card or focus is inside it, the dots select a channel
  * directly, and a reduced-motion preference stops the rotation altogether.
  */
-function AirQualityTile({ latest, view, smooth, colors }) {
+function AirQualityTile({ latest, view, smooth, colors, onExpand }) {
   const { t } = useLang();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -219,18 +249,22 @@ function AirQualityTile({ latest, view, smooth, colors }) {
 
   return (
     <div
-      className="panel tile air-tile"
+      className="panel tile air-tile tile-open"
       style={{ '--tile-accent': color }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocusCapture={() => setPaused(true)}
       onBlurCapture={() => setPaused(false)}
+      /* Expands whichever channel is showing — the card is a view of one
+         particulate at a time, so that is the one being pointed at. */
+      {...expandProps(() => onExpand(active), t(`sensor.${active.id}.label`), t)}
     >
       <div className="tile-head">
         <span className="tile-label">
           <span className="tile-dot" />
           {t('sensor.air.label')}
           <span className="air-chan">{t(`sensor.${active.id}.stat`)}</span>
+          <Maximize2 className="tile-grow" size={13} strokeWidth={2.4} aria-hidden />
         </span>
         <TileValue sensor={active} value={activeState.value} />
       </div>
@@ -268,7 +302,13 @@ function AirQualityTile({ latest, view, smooth, colors }) {
             style={{ '--dot-color': colors[s.id] }}
             aria-selected={i === index}
             aria-label={t('sensor.air.show', { label: t(`sensor.${s.id}.label`) })}
-            onClick={() => setIndex(i)}
+            /* The dots pick a channel; only the card around them expands. Both
+               events are stopped or Enter on a dot would also open the modal. */
+            onClick={(e) => {
+              e.stopPropagation();
+              setIndex(i);
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
           >
             <span>{t(`sensor.${s.id}.stat`)}</span>
           </button>
@@ -297,9 +337,25 @@ function SkeletonTile() {
 const [TEMP_TILE, HUM_TILE] = MAIN_SENSORS;
 const SECONDARY_SENSORS = MAIN_SENSORS.slice(2);
 
-export default function SensorTiles({ latest, histRows, hours, smooth, theme, loading }) {
+export default function SensorTiles({
+  latest,
+  histRows,
+  hours,
+  smooth,
+  theme,
+  loading,
+  onSetHours,
+}) {
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
   const view = useMemo(() => buildHistView(histRows, hours), [histRows, hours]);
+
+  // The id, not the sensor object: the expanded view has to keep re-reading the
+  // live `view`/`latest` as polls land, and holding the object would pin it to
+  // the frame it was opened on.
+  const [openId, setOpenId] = useState(null);
+  const expand = useCallback((sensor) => setOpenId(sensor.id), []);
+  const close = useCallback(() => setOpenId(null), []);
+  const openSensor = openId ? SENSORS.find((s) => s.id === openId) : null;
 
   if (loading) {
     return (
@@ -318,7 +374,7 @@ export default function SensorTiles({ latest, histRows, hours, smooth, theme, lo
     );
   }
 
-  const tileProps = { latest, view, smooth, colors };
+  const tileProps = { latest, view, smooth, colors, onExpand: expand };
 
   return (
     <>
@@ -337,6 +393,19 @@ export default function SensorTiles({ latest, histRows, hours, smooth, theme, lo
           <SensorTile key={`${s.id}-${theme}`} sensor={s} {...tileProps} />
         ))}
       </div>
+
+      {openSensor && (
+        <SensorDetail
+          sensor={openSensor}
+          state={tileState(openSensor, latest, view)}
+          view={view}
+          smooth={smooth}
+          theme={theme}
+          hours={hours}
+          onSetHours={onSetHours}
+          onClose={close}
+        />
+      )}
     </>
   );
 }

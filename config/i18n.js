@@ -126,6 +126,12 @@ const DICT = {
         comfort: 'เหมาะสม {lo}–{hi}',
         waiting: 'รอข้อมูล',
         avgWindow: 'ระดับตัดสินจากค่าเฉลี่ย {h} ชม. (มาตรฐานฝุ่นเป็นค่าเฉลี่ย ไม่ใช่ค่าชั่วขณะ)',
+        expand: 'เปิดดูประวัติ{label}แบบเต็มจอ',
+      },
+      detail: {
+        close: 'ปิดหน้าต่าง',
+        noData: 'ยังไม่มีข้อมูลในช่วงเวลานี้',
+        band: 'แถบเงา = ช่วงที่เหมาะสม {lo}–{hi} {unit}',
       },
     },
 
@@ -617,6 +623,12 @@ const DICT = {
         comfort: 'Ideal {lo}–{hi}',
         waiting: 'Waiting',
         avgWindow: 'Level judged on the {h}h rolling mean (dust standards are averages, not instant readings)',
+        expand: 'Open full-screen history for {label}',
+      },
+      detail: {
+        close: 'Close',
+        noData: 'No readings in this range yet',
+        band: 'Shaded band = ideal range {lo}–{hi} {unit}',
       },
     },
 
