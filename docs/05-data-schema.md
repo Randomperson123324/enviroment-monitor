@@ -34,12 +34,14 @@
 
 ## 2. คอลัมน์ใหม่ที่ต้องเพิ่ม
 
-> ✅ **สถานะ (ส.ค. 2569):** `pm1` · `pm25` · `pm10` · `lux` · `co2` · `eco2` **เดินสายในโค้ดครบแล้ว**
-> ตั้งแต่ ingest → scoring → tiles → กราฟ → สถิติ → บริบทของ AI
-> ส่วน `tvoc` · `sound_db` ยังเป็นแผน ยังไม่มีโค้ดรองรับ
+> ✅ **สถานะ (ส.ค. 2569):** `pm1` · `pm25` · `pm10` · `lux` · `co2` · `eco2` · `tvoc`
+> **เดินสายในโค้ดครบแล้ว** ตั้งแต่ ingest → scoring → tiles → กราฟ → สถิติ → บริบทของ AI ·
+> `eco2`/`tvoc` มาจากสัญญาณ VOC เดียวกันของ SGP30 จึงรายงานแต่ไม่คิดคะแนนทั้งคู่
+> (คนละแกนกราฟด้วย: `co2`/`eco2` เป็น ppm ส่วน `tvoc` เป็น ppb)
+> ส่วน `sound_db` ยังเป็นแผน ยังไม่มีโค้ดรองรับ
 >
 > ⚠️ **คอลัมน์ที่มีอยู่จริงบน Supabase ตอนนี้:** `pm1` · `pm25` · `pm10` · `co2` · `eco2` · `tvoc`
-> (ยืนยันแล้วผ่าน Supabase MCP — `tvoc` มีคอลัมน์แล้วแต่โค้ดยังไม่อ่าน)
+> (ยืนยันแล้วผ่าน Supabase MCP)
 > **`lux` ยังไม่ถูกเพิ่ม** — ส่งค่า lux เข้ามาก่อนรัน migration แล้ว insert จะล้มทั้งแถว
 >
 > เกณฑ์ของ `lux` อยู่ใน `config/sensors.js` (ช่วงเหมาะสม 300–750 lx ตาม EN 12464-1 /
@@ -207,13 +209,12 @@ Content-Type: application/json
 ### ขั้นที่ 2 — API รับข้อมูล (`app/api/ingest/route.js`)
 
 - [x] PM — เพิ่ม `pm1` · `pm25` · `pm10` เข้า `FIELD_ALIASES` แล้ว
-- [x] `lux` · `co2` · `eco2` เข้า `FIELD_ALIASES` แล้ว
-- [ ] เซนเซอร์ที่เหลือ (`tvoc` · `sound_db`):
+- [x] `lux` · `co2` · `eco2` · `tvoc` เข้า `FIELD_ALIASES` แล้ว
+- [ ] เซนเซอร์ที่เหลือ (`sound_db`):
 
 ```js
 const FIELD_ALIASES = {
-  // ...ของเดิม + PM/lux/co2/eco2 ที่ใส่ไปแล้ว
-  tvoc:     ['tvoc'],
+  // ...ของเดิม + PM/lux/co2/eco2/tvoc ที่ใส่ไปแล้ว
   sound_db: ['sound_db', 'db', 'dba'],
 };
 ```
@@ -232,16 +233,17 @@ const FIELD_ALIASES = {
       `risingSensor({...})` หนึ่งบรรทัด + สตริงใน `config/i18n.js` และ `config/messages.th.js`
 - [x] PM — `THRESHOLDS.pm1` · `pm25` · `pm10` + `SCORE_PENALTY.pm25` · `pm10` + `PM_AVG_HOURS`
 - [x] `lux` — band shape, wired
-- [x] `co2` — rising shape, `SCORE_PENALTY.co2` set · `eco2` — rising shape, `advise: false`
-      (VOC-derived estimate, not a real measurement — reported but never scored, same
-      reasoning as PM1 not scoring against PM2.5)
+- [x] `co2` — rising shape, `SCORE_PENALTY.co2` set · `eco2`/`tvoc` — rising shape,
+      `advise: false` both (both come off the SGP30's one raw VOC signal — Sensirion
+      derives eCO2 and TVOC from the same measurement, so scoring either would
+      penalize that signal twice; same reasoning as PM1 not scoring against PM2.5)
+      · `tvoc` gets its own chart group (`'voc'`, not `'gas'`) since it's ppb, not ppm
 - [ ] เกณฑ์ของเซนเซอร์ที่เหลือ (ยังไม่ได้ใส่):
 
 ```js
 export const THRESHOLDS = {
-  // ...ของเดิม + PM/lux/co2/eco2 ที่ใส่ไปแล้ว (ใช้คีย์ clean/warn/danger/critical ตามรูปทรง rising)
-  tvoc: { min: 0, max: 60000, clean: 220, warn: 660, danger: 2200, critical: 5000 },
-  db:   { min: 0, max: 130, clean: 45, warn: 60, danger: 75, critical: 85 },
+  // ...ของเดิม + PM/lux/co2/eco2/tvoc ที่ใส่ไปแล้ว (คีย์ clean/warn/danger/critical ตามรูปทรง rising)
+  db: { min: 0, max: 130, clean: 45, warn: 60, danger: 75, critical: 85 },
 };
 ```
 

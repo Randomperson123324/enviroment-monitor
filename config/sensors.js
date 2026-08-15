@@ -58,6 +58,14 @@ export const THRESHOLDS = {
    * doubles the penalty real CO2 already contributes for the same event.
    */
   eco2: { min: 400, max: 60000, clean: 800, warn: 1000, danger: 1500, critical: 2500 },
+  /**
+   * TVOC in ppb (SGP30) — total volatile organic compounds, the German
+   * Federal Environment Agency (UBA) indoor-air guideline bands. Like eCO2 it
+   * comes off the SGP30's one raw VOC signal (Sensirion derives both eCO2 and
+   * TVOC from the same measurement), so scoring it too would penalize that
+   * single signal twice — see `advise: false` below, same reasoning as eCO2.
+   */
+  tvoc: { min: 0, max: 60000, clean: 220, warn: 660, danger: 2200, critical: 5000 },
 };
 
 /**
@@ -206,6 +214,10 @@ export const SENSORS = [
   // reference but never scored or advised on, so it cannot double-count the
   // same ventilation issue real CO2 already flags (see THRESHOLDS.eco2).
   risingSensor({ id: 'eco2', field: 'eco2', unit: 'ppm', dp: 0, group: 'gas', advise: false }),
+  // Own group, not 'gas': TVOC is ppb, not ppm — sharing CO2's axis would repeat
+  // the old MQ-2 divisor mistake (docs/05-data-schema.md). Unscored for the same
+  // reason eCO2 is: one SGP30 signal, already covered by eCO2's report.
+  risingSensor({ id: 'tvoc', field: 'tvoc', unit: 'ppb', dp: 0, group: 'voc', advise: false }),
   // PM2.5 leads the dust group everywhere (tiles, chart legend, stats rows): it
   // is the channel with a health standard behind it, so it should not be read
   // last just because 1 < 2.5 < 10.
@@ -255,6 +267,7 @@ export const CLIMATE_SENSORS = SENSORS.filter((s) => s.group === 'climate');
 export const PM_SENSORS = SENSORS.filter((s) => s.group === 'pm');
 export const LIGHT_SENSORS = SENSORS.filter((s) => s.group === 'light');
 export const GAS_SENSORS = SENSORS.filter((s) => s.group === 'gas');
+export const VOC_SENSORS = SENSORS.filter((s) => s.group === 'voc');
 
 /** Health-score display bands (highest first). `id` keys UI palettes (ring color). */
 export const SCORE_BANDS = [

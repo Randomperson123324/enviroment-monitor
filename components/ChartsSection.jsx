@@ -11,6 +11,7 @@ import {
   PM_SENSORS,
   LIGHT_SENSORS,
   GAS_SENSORS,
+  VOC_SENSORS,
   PM_AVG_HOURS,
   THRESHOLDS,
   AQI_LEVELS,
@@ -234,6 +235,55 @@ function GasChart({ view, smooth, colors }) {
   return <Line data={data} options={options} />;
 }
 
+/**
+ * TVOC gets its own chart rather than joining CO2/eCO2: it reports in ppb,
+ * not ppm, and stacking a four-digit ppb series onto a low-hundreds ppm axis
+ * would be the same divisor mistake the old MQ-2 chart made (see GasChart).
+ */
+function TvocChart({ view, smooth, colors }) {
+  const { t } = useLang();
+  const s = VOC_SENSORS[0];
+
+  const data = useMemo(
+    () => ({
+      labels: view.labels,
+      datasets: [
+        {
+          label: t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
+          data: smoothSeries(view[s.id], smooth),
+          borderColor: colors[s.id],
+          backgroundColor: gradientFill(colors[s.id], 0.22),
+          tension: 0.42,
+          pointRadius: 0,
+          borderWidth: 2,
+          spanGaps: true,
+          fill: true,
+        },
+      ],
+    }),
+    [view, smooth, colors, t, s]
+  );
+
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: timeAxis(colors, view.labels.length),
+        y: valueAxis(colors, { scale: { suggestedMin: 0 } }),
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...tooltipOptions(colors, view.timestamps), mode: 'index', intersect: false },
+      },
+    }),
+    [colors, view]
+  );
+
+  return <Line data={data} options={options} />;
+}
+
 function ScoreChart({ view, smooth, colors }) {
   const data = useMemo(
     () => ({
@@ -431,6 +481,18 @@ export default function ChartsSection({ dash, theme }) {
           </div>
           <div className="chart-stage-md">
             <GasChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+          </div>
+        </div>
+      )}
+
+      {hasSeriesData(view, VOC_SENSORS) && (
+        <div className="panel section-gap">
+          <div className="chart-head">
+            <div className="panel-title">{t('charts.tvocTitle')}</div>
+            <div className="panel-meta">{t('charts.tvocMeta')}</div>
+          </div>
+          <div className="chart-stage-md">
+            <TvocChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
           </div>
         </div>
       )}

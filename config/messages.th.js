@@ -49,6 +49,11 @@ export const MSG = {
       danger: 'eCO2 สูง',
       ok: 'ปกติ',
     },
+    tvoc: {
+      warn: 'TVOC เริ่มสูง',
+      danger: 'TVOC สูง',
+      ok: 'ปกติ',
+    },
   },
 
   /** Same shape as `issues`, keyed by what each sensor's `advice(v)` returns. */

@@ -301,10 +301,12 @@ export const CLIENT_FALLBACK = {
  * so they stay separable from each other and from temp/hum under CVD.
  * `lux` takes the amber slot — the one colour that reads as "light" without
  * borrowing the temperature red or the humidity blue.
- * `co2`/`eco2` (cyan/plum) are outside ID_SERIES_PALETTE's fixed 8 — re-run
- * scripts in the `dataviz` skill's palette validator against the full set
- * before touching either hex; CVD separation against the other seven is
- * already tight (worst adjacent pair among the originals fails on its own).
+ * `co2`/`eco2`/`tvoc` (cyan/plum/green) are outside ID_SERIES_PALETTE's fixed
+ * 8 — re-run the `dataviz` skill's palette validator against the full set
+ * before touching any of the three hexes; CVD separation is already tight
+ * (worst adjacent pair among the original eight fails on its own), and no
+ * green was left that also clears `score`'s green, so `tvoc` repeats it —
+ * acceptable only because the two are never legend-adjacent in one chart.
  */
 export const CHART_COLORS = {
   light: {
@@ -316,6 +318,7 @@ export const CHART_COLORS = {
     lux: '#eda100',
     co2: '#18b4ec',
     eco2: '#892a6f',
+    tvoc: '#10d579',
     score: '#1baf7a',
     focus: '#4a3aa7',
     focusOver: '#d03b3b',
@@ -334,6 +337,7 @@ export const CHART_COLORS = {
     lux: '#c98500',
     co2: '#203cee',
     eco2: '#843ea8',
+    tvoc: '#14a9a9',
     score: '#199e70',
     focus: '#9085e9',
     focusOver: '#d03b3b',
