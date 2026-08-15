@@ -219,16 +219,14 @@ function DashboardInner({ initialPanel }) {
               summaryLoading={envAi.loading}
               onRefreshSummary={envAi.refresh}
             />
-            <div className="tiles section-gap">
-              <SensorTiles
-                latest={dash.latest}
-                histRows={dash.histRows}
-                hours={dash.hours}
-                smooth={dash.smooth}
-                theme={theme}
-                loading={!dash.loaded && !dash.latest}
-              />
-            </div>
+            <SensorTiles
+              latest={dash.latest}
+              histRows={dash.histRows}
+              hours={dash.hours}
+              smooth={dash.smooth}
+              theme={theme}
+              loading={!dash.loaded && !dash.latest}
+            />
           </section>
           <ChartsSection dash={dash} theme={theme} />
           <StatsTable

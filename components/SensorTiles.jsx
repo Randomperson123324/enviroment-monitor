@@ -292,25 +292,51 @@ function SkeletonTile() {
   );
 }
 
+// Temperature and humidity lead every climate/gas sensor list (config/sensors.js),
+// so slicing the first two off MAIN_SENSORS gets them without a per-id lookup.
+const [TEMP_TILE, HUM_TILE] = MAIN_SENSORS;
+const SECONDARY_SENSORS = MAIN_SENSORS.slice(2);
+
 export default function SensorTiles({ latest, histRows, hours, smooth, theme, loading }) {
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
   const view = useMemo(() => buildHistView(histRows, hours), [histRows, hours]);
 
-  if (loading) return [...MAIN_SENSORS, { id: 'air' }].map((s) => <SkeletonTile key={s.id} />);
+  if (loading) {
+    return (
+      <>
+        <div className="tiles section-gap">
+          <SkeletonTile />
+          <SkeletonTile />
+          <SkeletonTile />
+        </div>
+        <div className="tiles section-gap">
+          {SECONDARY_SENSORS.map((s) => (
+            <SkeletonTile key={s.id} />
+          ))}
+        </div>
+      </>
+    );
+  }
+
+  const tileProps = { latest, view, smooth, colors };
 
   return (
     <>
-      {MAIN_SENSORS.map((s) => (
-        <SensorTile
-          key={`${s.id}-${theme}`}
-          sensor={s}
-          latest={latest}
-          view={view}
-          smooth={smooth}
-          colors={colors}
-        />
-      ))}
-      <AirQualityTile key={`air-${theme}`} latest={latest} view={view} smooth={smooth} colors={colors} />
+      {/* Headline row: temperature, humidity, and air quality — the three
+          readings worth seeing before anything else. */}
+      <div className="tiles section-gap">
+        <SensorTile key={`${TEMP_TILE.id}-${theme}`} sensor={TEMP_TILE} {...tileProps} />
+        <SensorTile key={`${HUM_TILE.id}-${theme}`} sensor={HUM_TILE} {...tileProps} />
+        <AirQualityTile key={`air-${theme}`} {...tileProps} />
+      </div>
+
+      {/* Everything else in its own row, so it fills the width on its own
+          terms instead of leaving a gap where the headline row broke off. */}
+      <div className="tiles section-gap">
+        {SECONDARY_SENSORS.map((s) => (
+          <SensorTile key={`${s.id}-${theme}`} sensor={s} {...tileProps} />
+        ))}
+      </div>
     </>
   );
 }
