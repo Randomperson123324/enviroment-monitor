@@ -1233,14 +1233,16 @@ textarea {
 }
 
 /* ═══ CHARTS ═══ */
-/* Two even three-up rows (temp/humidity/AQI, then score/CO2/TVOC) so every
-   panel fills its share of the width instead of a wide chart next to a
-   narrow leftover column. */
-.charts-row {
+.charts {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2.2fr) minmax(250px, 1fr);
   gap: 14px;
   align-items: stretch;
+}
+
+.chart-main {
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-head {
@@ -1292,8 +1294,25 @@ textarea {
   outline: none;
 }
 
-/* Shared stage height across every charts-row panel and the full-width
-   secondary charts (PM, light) below them, so the grid reads as one system. */
+.chart-stage {
+  position: relative;
+  flex: 1;
+  min-height: 300px;
+}
+
+.chart-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.chart-stage-sm {
+  position: relative;
+  min-height: 150px;
+}
+
+/* Full-width secondary chart (PM) — taller than the side panels, shorter than
+   the main stage, since it carries three nested series plus a legend. */
 .chart-stage-md {
   position: relative;
   min-height: 230px;
@@ -3913,7 +3932,7 @@ span.ai-tab {
 
 /* ═══ RESPONSIVE ═══ */
 @media (max-width: 1100px) {
-  .charts-row,
+  .charts,
   .focus-grid,
   .bottom {
     grid-template-columns: 1fr;
@@ -5008,7 +5027,7 @@ span.ai-tab {
    signal switches the two-column sections to one — the viewport media queries
    below cannot see this, since the window never changed size. */
 @media (min-width: 1024px) {
-  :root[data-rail-peek] .charts-row,
+  :root[data-rail-peek] .charts,
   :root[data-rail-peek] .focus-grid,
   :root[data-rail-peek] .bottom,
   :root[data-rail-peek] .gov-grid,

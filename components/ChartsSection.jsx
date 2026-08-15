@@ -30,34 +30,29 @@ import {
 } from '@/lib/chart-utils';
 import { useLang } from '@/hooks/useLang';
 
-/**
- * Temperature and humidity used to share one chart — °C 12–38 and % 10–95
- * happen to fit the same visual height — but they're different units on
- * different axes, so each now gets its own honest scale, same reasoning as
- * the PM/light/gas splits below.
- */
-function SingleSeriesChart({ sensor, view, smooth, colors }) {
+function HistoryChart({ view, smooth, colors }) {
   const { t } = useLang();
 
-  const data = useMemo(
-    () => ({
+  // Both series share one axis honestly (°C 12–38, % 10–95), so the divisor
+  // trick the MQ-2's ppm needed — a line labelled "ก๊าซ ÷10" — is gone. Light
+  // is kept off this chart for the same reason: lux runs to four digits indoors
+  // and five in daylight, which would press both of these flat against zero.
+  const data = useMemo(() => {
+    return {
       labels: view.labels,
-      datasets: [
-        {
-          label: t('charts.series', { label: t(`sensor.${sensor.id}.label`), unit: sensor.unit }),
-          data: smoothSeries(view[sensor.id], smooth),
-          borderColor: colors[sensor.id],
-          backgroundColor: gradientFill(colors[sensor.id], 0.22),
-          tension: 0.42,
-          pointRadius: 0,
-          borderWidth: 2,
-          spanGaps: true,
-          fill: true,
-        },
-      ],
-    }),
-    [view, smooth, colors, t, sensor]
-  );
+      datasets: CLIMATE_SENSORS.map((s) => ({
+        label: t('charts.series', { label: t(`sensor.${s.id}.label`), unit: s.unit }),
+        data: smoothSeries(view[s.id], smooth),
+        borderColor: colors[s.id],
+        backgroundColor: gradientFill(colors[s.id], 0.22),
+        tension: 0.42,
+        pointRadius: 0,
+        borderWidth: 2,
+        spanGaps: true,
+        fill: true,
+      })),
+    };
+  }, [view, smooth, colors, t]);
 
   const options = useMemo(
     () => ({
@@ -69,7 +64,11 @@ function SingleSeriesChart({ sensor, view, smooth, colors }) {
         y: valueAxis(colors, { scale: { suggestedMin: 0 } }),
       },
       plugins: {
-        legend: { display: false },
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: colors.tick, boxWidth: 10, padding: 8, usePointStyle: true },
+        },
         tooltip: { ...tooltipOptions(colors, view.timestamps), mode: 'index', intersect: false },
       },
     }),
@@ -77,17 +76,6 @@ function SingleSeriesChart({ sensor, view, smooth, colors }) {
   );
 
   return <Line data={data} options={options} />;
-}
-
-const TEMP_SENSOR = CLIMATE_SENSORS.find((s) => s.id === 'temp');
-const HUM_SENSOR = CLIMATE_SENSORS.find((s) => s.id === 'hum');
-
-function TempChart({ view, smooth, colors }) {
-  return <SingleSeriesChart sensor={TEMP_SENSOR} view={view} smooth={smooth} colors={colors} />;
-}
-
-function HumChart({ view, smooth, colors }) {
-  return <SingleSeriesChart sensor={HUM_SENSOR} view={view} smooth={smooth} colors={colors} />;
 }
 
 /**
@@ -431,66 +419,32 @@ export default function ChartsSection({ dash, theme }) {
         </div>
       </SectionHeader>
 
-      {/* Row 1 — the three headline reads: temperature, humidity, air quality. */}
-      <div className="charts-row">
-        <div className="panel">
-          <div className="panel-title">{t('charts.tempTitle')}</div>
-          <div className="chart-stage-md">
+      <div className="charts">
+        <div className="panel chart-main">
+          <div className="chart-stage">
             {/* key remounts on theme switch — Chart.js must not animate across palettes */}
-            <TempChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
-          </div>
-        </div>
-        <div className="panel">
-          <div className="panel-title">{t('charts.humTitle')}</div>
-          <div className="chart-stage-md">
-            <HumChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
-          </div>
-        </div>
-        <div className="panel">
-          <div className="panel-title">{t('charts.airQuality')}</div>
-          <AqiMeter
-            value={dash.latest?.[AQI_SENSOR.field] != null ? Number(dash.latest[AQI_SENSOR.field]) : null}
-            unit={AQI_SENSOR.unit}
-          />
-        </div>
-      </div>
-
-      {/* Row 2 — health score plus whichever gas readings are live, filling the
-          same three-up grid instead of stacking full-width one under another. */}
-      <div className="charts-row section-gap">
-        <div className="panel">
-          <div className="chart-head">
-            <div className="panel-title">{t('charts.scoreTitle')}</div>
-            <div className="panel-meta">{t('charts.avg', { v: scoreAvg })}</div>
-          </div>
-          <div className="chart-stage-md">
-            <ScoreChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+            <HistoryChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
           </div>
         </div>
 
-        {hasSeriesData(view, GAS_SENSORS) && (
+        <div className="chart-side">
           <div className="panel">
             <div className="chart-head">
-              <div className="panel-title">{t('charts.gasTitle')}</div>
-              <div className="panel-meta">{t('charts.gasMeta')}</div>
+              <div className="panel-title">{t('charts.scoreTitle')}</div>
+              <div className="panel-meta">{t('charts.avg', { v: scoreAvg })}</div>
             </div>
-            <div className="chart-stage-md">
-              <GasChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+            <div className="chart-stage-sm">
+              <ScoreChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
             </div>
           </div>
-        )}
-
-        {hasSeriesData(view, VOC_SENSORS) && (
           <div className="panel">
-            <div className="chart-head">
-              <div className="panel-title">{t('charts.tvocTitle')}</div>
-              <div className="panel-meta">{t('charts.tvocMeta')}</div>
-            </div>
-            <div className="chart-stage-md">
-              <TvocChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
-            </div>
+            <div className="panel-title">{t('charts.airQuality')}</div>
+            <AqiMeter
+              value={dash.latest?.[AQI_SENSOR.field] != null ? Number(dash.latest[AQI_SENSOR.field]) : null}
+              unit={AQI_SENSOR.unit}
+            />
           </div>
-        )}
+        </div>
       </div>
 
       {hasSeriesData(view, PM_SENSORS) && (
@@ -515,6 +469,30 @@ export default function ChartsSection({ dash, theme }) {
           </div>
           <div className="chart-stage-md">
             <LightChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+          </div>
+        </div>
+      )}
+
+      {hasSeriesData(view, GAS_SENSORS) && (
+        <div className="panel section-gap">
+          <div className="chart-head">
+            <div className="panel-title">{t('charts.gasTitle')}</div>
+            <div className="panel-meta">{t('charts.gasMeta')}</div>
+          </div>
+          <div className="chart-stage-md">
+            <GasChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
+          </div>
+        </div>
+      )}
+
+      {hasSeriesData(view, VOC_SENSORS) && (
+        <div className="panel section-gap">
+          <div className="chart-head">
+            <div className="panel-title">{t('charts.tvocTitle')}</div>
+            <div className="panel-meta">{t('charts.tvocMeta')}</div>
+          </div>
+          <div className="chart-stage-md">
+            <TvocChart key={theme} view={view} smooth={dash.smooth} colors={colors} />
           </div>
         </div>
       )}
