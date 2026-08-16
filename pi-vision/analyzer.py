@@ -104,6 +104,13 @@ class FaceReading:
     # แต่บางครั้งเป็นการเดาจากหลักฐานอ้อม ๆ (เช่นมองไม่เห็นขา) ไม่ใช่การวัด
     # ⚠️ อย่าเอาไปนับสถิติโดยไม่ดูค่านี้ — จะได้ตัวเลขที่ดูดีแต่เชื่อไม่ได้
     posture_confident: bool = True
+    # ── ใช้โทรศัพท์อยู่ไหม (phone.py) ──
+    # None = ไม่ได้ตรวจ (ปิดไว้ · โหมดอื่น · โมเดลโหลดไม่ขึ้น) ซึ่งต่างจาก False
+    # ที่แปลว่า "ตรวจแล้วไม่มี" — ปลายทางที่รวมสองอย่างนี้เป็นค่าเดียวจะรายงานว่า
+    # "ไม่มีใครเล่นโทรศัพท์" ทั้งที่ความจริงคือไม่มีใครดูเลย
+    phone: bool | None = None
+    # False = จับคู่ได้จากตำแหน่งใบหน้าเพราะมองไม่เห็นข้อมือ (ดูหัวไฟล์ phone.py)
+    phone_confident: bool = True
 
 
 @dataclass
@@ -141,6 +148,9 @@ class WindowSummary:
     # และคำตอบตอนนั้นเป็นการเดาจากหลักฐานอ้อม ไม่ใช่การวัด ปลายทางที่นับสถิติรวม
     # โดยไม่ดูค่านี้จะได้ตัวเลขที่ดูดีแต่เชื่อไม่ได้ (ดูหัวข้อ posture ใน body.py)
     posture_confident: bool = True
+    # คนที่รายงานกำลังใช้โทรศัพท์อยู่ไหมตอนปิดหน้าต่าง · None = ไม่ได้ตรวจ
+    phone: bool | None = None
+    phone_confident: bool = True
 
     @property
     def duration(self) -> float:
@@ -175,6 +185,10 @@ class WindowSummary:
             "emotion": self.emotion,
             "posture": self.posture,
             "posture_confident": self.posture_confident if self.posture else None,
+            "phone": self.phone,
+            # เหตุผลเดียวกับ posture_confident: ไม่มีค่า phone ก็ไม่ควรมี "ความมั่นใจ"
+            # ของค่าที่ไม่มี · และ phone=False ที่มั่นใจก็ยังต่างจาก phone=None
+            "phone_confident": self.phone_confident if self.phone is not None else None,
         }
 
     def to_room_row(self) -> dict:
@@ -672,6 +686,10 @@ class FaceAnalyzer:
                     gesture=track.state.get("gesture"),
                     posture=track.state.get("posture"),
                     posture_confident=bool(track.state.get("posture_confident", True)),
+                    # `.get()` เฉย ๆ ไม่ใส่ bool() — ค่า None ต้องรอดมาถึงปลายทาง
+                    # เพราะ "ไม่ได้ตรวจ" กับ "ตรวจแล้วไม่มี" เป็นคนละคำตอบ
+                    phone=track.state.get("phone"),
+                    phone_confident=bool(track.state.get("phone_confident", True)),
                 )
             )
 
@@ -693,6 +711,7 @@ class FaceAnalyzer:
         # ชื่อ อารมณ์ และท่าของคนที่ถูกรายงาน เก็บคู่กับ id เพื่อไม่ให้หลุดไปคนละคน
         busiest_name, busiest_emotion = None, None
         busiest_posture, busiest_posture_sure = None, True
+        busiest_phone, busiest_phone_sure = None, True
         people_measured = 0
 
         for track in tracks:
@@ -721,6 +740,8 @@ class FaceAnalyzer:
                 # ผ่าน PostureHold มาแล้ว จึงเป็นท่าที่นิ่งพอจะบันทึก ไม่ใช่ค่าดิบรายเฟรม
                 busiest_posture = track.state.get("posture")
                 busiest_posture_sure = bool(track.state.get("posture_confident", True))
+                busiest_phone = track.state.get("phone")
+                busiest_phone_sure = bool(track.state.get("phone_confident", True))
             st.reset_window()
 
         summary = WindowSummary(
@@ -742,6 +763,9 @@ class FaceAnalyzer:
             # ท่าเป็นข้อมูลรายบุคคลเหมือนชื่อ — โหมดห้องรวมจึงต้องเงียบไปด้วย
             posture=busiest_posture if self.report_person else None,
             posture_confident=busiest_posture_sure,
+            # การใช้โทรศัพท์เป็นข้อมูลรายบุคคลเหมือนท่าและชื่อ — โหมดห้องรวมต้องเงียบ
+            phone=busiest_phone if self.report_person else None,
+            phone_confident=busiest_phone_sure,
         )
 
         self._window_start = now

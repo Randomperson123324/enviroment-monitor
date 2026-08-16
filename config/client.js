@@ -42,8 +42,18 @@ export const STORAGE = {
  * Dashboard sections, grouped by the top-level menu. Names live in
  * config/i18n.js under `tabs.<id>` so both languages get them — they used to be
  * English literals here and stayed English with the UI switched to Thai.
+ *
+ * ⚠️ **This array is the only place the order lives**, and it decides three
+ * things at once: the order of the nav buttons, which tab opens on a first
+ * visit (`TABS[0]`), and where the `1` `2` `3` shortcuts land — those are
+ * positional, not by id (see `shortcutHandlers` in Dashboard.jsx). Reordering
+ * here moves all three together, which is the point; nothing else to keep in step.
+ *
+ * Focus leads because the camera is the part of the room that changes minute to
+ * minute, and the reason someone opens the dashboard mid-class. Air moves slowly
+ * enough that the alert bar carries it from whichever tab is open.
  */
-export const TABS = [{ id: 'environment' }, { id: 'focus' }, { id: 'hydro' }];
+export const TABS = [{ id: 'focus' }, { id: 'environment' }, { id: 'hydro' }];
 
 /**
  * The safety tab covers two unrelated questions — the water/weather situation

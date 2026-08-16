@@ -14,6 +14,9 @@ import types
 
 import numpy as np
 
+import body as bd
+import phone as ph
+
 # คอนโซล Windows ใช้ cp1252 เป็นค่าเริ่มต้น ซึ่งพิมพ์ภาษาไทยไม่ได้ — ถ้าไม่บังคับ utf-8
 # เทสจะตายตอน print แล้วดูเหมือน "โค้ดพัง" ทั้งที่ตรรกะยังถูก ซึ่งชวนวินิจฉัยผิดทาง
 if hasattr(sys.stdout, "reconfigure"):
@@ -105,6 +108,82 @@ class FakeLandmarker:
         pass
 
 
+class _Joint:
+    """landmark ของ pose — มี visibility ด้วย ต่างจากของใบหน้า"""
+
+    __slots__ = ("x", "y", "z", "visibility")
+
+    def __init__(self, x, y, visibility=1.0):
+        self.x, self.y, self.z, self.visibility = x, y, 0.0, visibility
+
+
+def _body(cx=0.5, cy=0.5, size=0.09):
+    """
+    โครงร่าง 33 จุดของคนที่หน้าอยู่ที่ (cx, cy) — จมูกต้องตกในกรอบใบหน้าของ `_face()`
+    ไม่งั้น attach_bodies จับคู่ไม่ติดและทั้งเส้นทางท่าทาง/โทรศัพท์จะไม่ถูกเดินเลย
+    """
+    pts = [_Joint(cx, cy + size * 3) for _ in range(33)]
+    pts[bd.NOSE] = _Joint(cx, cy)
+    pts[bd.L_SHOULDER] = _Joint(cx - size, cy + size * 2)
+    pts[bd.R_SHOULDER] = _Joint(cx + size, cy + size * 2)
+    pts[bd.L_ELBOW] = _Joint(cx - size * 1.1, cy + size * 3)
+    pts[bd.R_ELBOW] = _Joint(cx + size * 1.1, cy + size * 3)
+    pts[bd.L_WRIST] = _Joint(cx - size * 1.2, cy + size * 4)
+    pts[bd.R_WRIST] = _Joint(cx + size * 1.2, cy + size * 4)
+    pts[bd.L_HIP] = _Joint(cx - size * 0.6, cy + size * 5)
+    pts[bd.R_HIP] = _Joint(cx + size * 0.6, cy + size * 5)
+    # ขามองไม่เห็น (โต๊ะบัง) — เหมือนกล้องตั้งโต๊ะจริง
+    for i in (bd.L_KNEE, bd.R_KNEE, bd.L_ANKLE, bd.R_ANKLE):
+        pts[i] = _Joint(cx, cy + size * 6, 0.1)
+    return pts
+
+
+class FakePose:
+    """PoseLandmarker ปลอม — คนกลางเฟรมหนึ่งคน (ตรงกับใบหน้าที่ x=0.5)"""
+
+    def __init__(self):
+        self.calls = 0
+
+    def detect_for_video(self, image, timestamp_ms):
+        self.calls += 1
+        return types.SimpleNamespace(pose_landmarks=[_body()], pose_world_landmarks=[])
+
+    def close(self):
+        pass
+
+
+class _Box:
+    def __init__(self, x, y, w, h):
+        self.origin_x, self.origin_y, self.width, self.height = x, y, w, h
+
+
+class FakePhoneDetector:
+    """
+    ObjectDetector ปลอม — วางโทรศัพท์ไว้ที่ข้อมือขวาของคนกลางเฟรมพอดี
+
+    ข้อมือขวาอยู่ที่ (0.5 + 0.108, 0.5 + 0.36) ในพิกัด normalized ของ `_body()`
+    บนเฟรม 640×480 จึงเป็นราว (389, 553) — แต่เฟรมสูงแค่ 480 ข้อมือจึงตกนอกภาพ
+    วางโทรศัพท์ที่ขอบล่างใต้แขนแทน ซึ่งยังอยู่ในระยะ PHONE_HAND_REACH
+    """
+
+    def __init__(self):
+        self.calls = 0
+
+    def detect_for_video(self, image, timestamp_ms):
+        self.calls += 1
+        return types.SimpleNamespace(
+            detections=[
+                types.SimpleNamespace(
+                    bounding_box=_Box(370, 420, 26, 46),
+                    categories=[types.SimpleNamespace(score=0.9, category_name=ph.PHONE_LABEL)],
+                )
+            ]
+        )
+
+    def close(self):
+        pass
+
+
 def install_fakes(monkey_state, only_face=None, photo_face=None,
                   faces_dir=None, window_seconds=None, guess=None):
     import cv2
@@ -139,6 +218,21 @@ def install_fakes(monkey_state, only_face=None, photo_face=None,
     landmarker = FakeLandmarker(only=only_face)
     monkey_state["landmarker"] = landmarker
     main.build_landmarker = lambda cfg: landmarker
+
+    # โมเดลของโหมดติดตามกิจกรรม — โหมดอื่นไม่เรียกฟังก์ชันพวกนี้เลย จึงแทนไว้เฉย ๆ ได้
+    # ตัวตรวจ full-range คืนลิสต์ว่าง: เส้นทางการซูมถูกเดินจริงแต่ไม่มีใครให้ซูม
+    # (การซูมมีเทสของตัวเองใน test_roi.py — ที่นี่สนใจว่าลูปไม่พังเมื่อเปิดโหมดนี้)
+    main.build_detector = lambda cfg: types.SimpleNamespace(
+        detect_for_video=lambda img, ts: types.SimpleNamespace(detections=[]),
+        close=lambda: None,
+    )
+    main.build_zoom_reader = lambda cfg: types.SimpleNamespace(close=lambda: None)
+    pose = FakePose()
+    monkey_state["pose"] = pose
+    main.build_body_landmarker = lambda cfg: pose
+    phone_det = FakePhoneDetector()
+    monkey_state["phone_detector"] = phone_det
+    main.build_phone_detector = lambda cfg: phone_det
 
     # ตัวอ่านรูปปลอม — คืน landmark ของคนคนหนึ่ง เพื่อให้เส้นทาง "จำชื่อจากรูป"
     # ถูกเดินจริงในลูป ไม่ใช่ข้ามไปเพราะสร้างตัวอ่านไม่ได้
@@ -350,6 +444,41 @@ check("track ไม่มีลายเซ็นสะสมเลย",
       all(getattr(tr, "signature", None) is None for tr in tracks))
 check("ไม่มีใครถูกเก็บไว้ในกลุ่มที่จำได้", room_tracker.lost_count == 0)
 check("ตัวนับ re-ID เป็นศูนย์เสมอ", room_tracker.reid_hits == 0)
+
+# ── โหมดติดตามกิจกรรม — ท่าทางร่างกาย + โทรศัพท์ ────────
+# บล็อกนี้ในลูปหลักไม่เคยถูกเดินเลยในเทสข้างบน เพราะโหมด room/person/known
+# ไม่โหลดโมเดลท่าทาง · บั๊กอย่างชื่อตัวแปรผิดในบล็อกนั้นจึงหลุดไปโผล่ตอนผู้ใช้กดข้อ 1
+print("\nโหมดติดตามกิจกรรม — รันลูปจริงพร้อมท่าทางและโทรศัพท์")
+with tempfile.TemporaryDirectory() as gallery_dir:
+    (_Path(gallery_dir) / "Ann.jpg").write_bytes(b"")
+    code4, state4 = run("activity", only_face=ME, photo_face=ME,
+                        faces_dir=gallery_dir, window_seconds=0.5)
+    drawn4, sent4 = state4["drawn"], state4["sent"]
+    check("[activity] ลูปจบด้วยสถานะปกติ", code4 == 0, f"(ได้ {code4})")
+    check("[activity] เรียกโมเดลท่าทางจริง", state4["pose"].calls > 0,
+          f"(เรียก {state4['pose'].calls} ครั้ง)")
+    check("[activity] เรียกตัวตรวจโทรศัพท์จริง", state4["phone_detector"].calls > 0,
+          f"(เรียก {state4['phone_detector'].calls} ครั้ง)")
+    # ตัวตรวจถูกเรียกน้อยกว่าโมเดลท่าทาง เพราะ PHONE_EVERY_N_FRAMES เป็นทวีคูณของ body
+    check("[activity] ตัวตรวจโทรศัพท์ถูกเรียกถี่น้อยกว่าโมเดลท่าทาง (ประหยัด CPU)",
+          state4["phone_detector"].calls <= state4["pose"].calls,
+          f"(phone {state4['phone_detector'].calls} · pose {state4['pose'].calls})")
+    check("[activity] ป้าย PHONE ขึ้นบนจอ",
+          any("PHONE" in t for t in drawn4),
+          f"({[t for t in drawn4 if 'phone' in t.lower()][:2]})")
+    check("[activity] คอลัมน์ phone เดินทางไปถึงแถวที่ส่งขึ้นฐานข้อมูล",
+          bool(sent4) and all("phone" in r for r in sent4),
+          f"({list(sent4[0]) if sent4 else 'ไม่มีแถว'})")
+    check("[activity] และค่าที่ส่งคือ true (ไม่ใช่ None ที่แปลว่าไม่ได้ตรวจ)",
+          bool(sent4) and any(r["phone"] is True for r in sent4),
+          f"({[r.get('phone') for r in sent4[:3]]})")
+    # โทรศัพท์อยู่ที่ข้อมือซึ่งมองเห็นชัด — ต้องเป็นการวัด ไม่ใช่การเดา
+    check("[activity] จับคู่จากข้อมือที่มองเห็น → ไม่ใช่การเดา",
+          bool(sent4) and any(r["phone"] is True and r["phone_confident"] is True
+                              for r in sent4),
+          f"({[(r.get('phone'), r.get('phone_confident')) for r in sent4[:3]]})")
+    thai4 = [t for t in drawn4 if any("฀" <= c <= "๿" for c in t)]
+    check("[activity] ไม่มีอักษรไทยถูกส่งไปวาดบนภาพ", not thai4, f"(พบ {thai4[:2]})")
 
 print("\n" + "─" * 56)
 if FAILURES:

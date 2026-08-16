@@ -401,6 +401,18 @@ const DICT = {
       posture: 'ท่าทาง', emotion: 'อารมณ์',
       postureUnsure: 'เดาจากหลักฐานอ้อม (เช่น ขาถูกโต๊ะบัง) ไม่ใช่การวัดจริง',
       poseStanding: 'ยืน', poseSitting: 'นั่ง', poseLying: 'นอน',
+      // ── การใช้โทรศัพท์ ──
+      phone: 'โทรศัพท์',
+      phoneOn: 'ใช้โทรศัพท์', phoneOff: 'ไม่ได้ใช้',
+      phoneYes: 'ใช้อยู่', phoneNo: 'ไม่ได้ใช้', phoneUnknown: 'ไม่ได้ตรวจ',
+      phoneUnsure: 'เดาจากตำแหน่ง (โทรศัพท์อยู่ในระยะใต้ใบหน้า) เพราะมองไม่เห็นข้อมือ ไม่ใช่การวัดจากมือจริง',
+      phoneUnsureCount: 'ใน {n} ครั้งเป็นการเดาเพราะมองไม่เห็นข้อมือ',
+      phoneNow: 'กำลังใช้โทรศัพท์',
+      phoneNowNone: 'ไม่มีใครใช้โทรศัพท์อยู่',
+      phoneNowSome: '{n} คนกำลังใช้โทรศัพท์',
+      // ⚠️ ต่างจาก "ไม่มีใครใช้" โดยสิ้นเชิง — ต้องแยกให้ผู้ใช้เห็น ไม่งั้นห้องที่ยังไม่ได้
+      // เปิดฟีเจอร์นี้จะดูเหมือนห้องที่ทุกคนตั้งใจเรียน
+      phoneNowUnknown: 'ยังไม่ได้ตรวจ — ต้องใช้ pi-vision โหมดติดตามกิจกรรมที่เปิด PHONE_ENABLED',
       emoHappy: 'ยิ้ม', emoSad: 'เศร้า', emoSurprised: 'ตกใจ',
       emoAngry: 'หงุดหงิด', emoNeutral: 'เฉย ๆ',
       totalMove: 'การเคลื่อนไหวรวม / นาที',
@@ -417,6 +429,7 @@ const DICT = {
       gName: 'ชื่อคน เมื่อใบหน้าตรงกับรูปในโฟลเดอร์ faces/ ของ pi-vision — ว่าง = ยังไม่รู้ว่าเป็นใคร',
       gPosture: 'ท่าของคนนั้น: ยืน / นั่ง / นอน — มี ? ต่อท้าย = เดาเพราะมองไม่เห็นขา ไม่ได้วัดจริง',
       gEmotion: 'การแสดงออกบนใบหน้า: ยิ้ม / เศร้า / ตกใจ / หงุดหงิด / เฉย ๆ',
+      gPhone: 'กำลังใช้โทรศัพท์ไหม — นับเฉพาะเครื่องที่อยู่ในระยะมือของคนนั้น โทรศัพท์ที่วางบนโต๊ะไม่นับ · มี ? ต่อท้าย = เดาจากตำแหน่งเพราะมองไม่เห็นข้อมือ · ว่าง = ไม่ได้ตรวจ (ไม่ใช่แปลว่าไม่ได้ใช้)',
       gMovement: 'จำนวนครั้งที่หัวหัน/ขยับภายใน 15 วินาที — ค่าสูง = เสียสมาธิ',
       gDirection: 'ทิศทางที่หัน: Left / Right / Up / Down — ตัวเลขคือจำนวนครั้งต่อ 15s',
       gFaceCount: 'จำนวนใบหน้าที่ตรวจพบในกล้องขณะนั้น — >1 คน = มีคนอื่นในห้อง',
@@ -886,6 +899,18 @@ const DICT = {
       posture: 'Posture', emotion: 'Expression',
       postureUnsure: 'Inferred from indirect evidence (e.g. legs hidden by a desk), not measured',
       poseStanding: 'Standing', poseSitting: 'Sitting', poseLying: 'Lying down',
+      // ── Phone use ──
+      phone: 'Phone',
+      phoneOn: 'On phone', phoneOff: 'Not on phone',
+      phoneYes: 'In use', phoneNo: 'Not in use', phoneUnknown: 'Not checked',
+      phoneUnsure: 'Inferred from position (phone within reach below the face) because the wrists were not visible, not measured from the hand',
+      phoneUnsureCount: '{n} of these were inferred with the wrists out of view',
+      phoneNow: 'On their phone',
+      phoneNowNone: 'Nobody is on their phone',
+      phoneNowSome: '{n} people on their phone',
+      // ⚠️ Not the same claim as "nobody is on their phone" — a room that never
+      // ran the check would otherwise read as a room where everyone is focused.
+      phoneNowUnknown: 'Not being checked — needs pi-vision activity mode with PHONE_ENABLED',
       emoHappy: 'Happy', emoSad: 'Sad', emoSurprised: 'Surprised',
       emoAngry: 'Annoyed', emoNeutral: 'Neutral',
       totalMove: 'Total movement / min',
@@ -902,6 +927,7 @@ const DICT = {
       gName: 'Their name, when the face matches a photo in pi-vision’s faces/ folder — blank = not identified yet',
       gPosture: 'Their posture: standing / sitting / lying — a trailing ? means it was inferred with the legs out of view, not measured',
       gEmotion: 'Facial expression: happy / sad / surprised / annoyed / neutral',
+      gPhone: 'Whether they are using a phone — only one within their reach counts, a phone left on the desk does not · a trailing ? means it was inferred from position with the wrists out of view · blank = not checked (which is not the same as not using one)',
       gMovement: 'Head turns/movements within 15 seconds — high = distracted',
       gDirection: 'Facing direction: Left / Right / Up / Down — count per 15s',
       gFaceCount: 'Faces detected on camera at that moment — >1 = others in the room',

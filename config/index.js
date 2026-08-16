@@ -232,6 +232,49 @@ const config = {
     },
 
     /**
+     * Correlating the room's air against the camera's attention signal
+     * (lib/correlate.js). Camera-derived, so it rides the same focusProviders
+     * gate as every other focus read.
+     *
+     * `targetBuckets` sets the resolution: the analysis aims for this many time
+     * buckets whatever the window length, so three hours and three days come
+     * back at comparable detail. The min/max clamp keeps a short window from
+     * correlating one env reading against one camera window (that measures
+     * sampling noise) and a long one from flattening a week into a few points.
+     *
+     * `minBuckets` is the refusal line. Below it the tool reports that it cannot
+     * say — an r over four points is arithmetic, not evidence, and a model handed
+     * one will quote it with the same confidence as an r over forty.
+     */
+    correlate: {
+      defaultHours: num('AI_CORRELATE_HOURS', 24),
+      targetBuckets: num('AI_CORRELATE_TARGET_BUCKETS', 24),
+      minMinutes: num('AI_CORRELATE_MIN_BUCKET_MINUTES', 5),
+      maxMinutes: num('AI_CORRELATE_MAX_BUCKET_MINUTES', 120),
+      minBuckets: num('AI_CORRELATE_MIN_BUCKETS', 6),
+      /** Rows pulled per side; the camera writes far more rows than the sensors. */
+      envLimit: num('AI_CORRELATE_ENV_LIMIT', 2000),
+      focusLimit: num('AI_CORRELATE_FOCUS_LIMIT', 5000),
+      /**
+       * Length of one pi-vision summary window, in seconds — must match
+       * WINDOW_SECONDS on the Pi (pi-vision/config.py), which pairs with
+       * client.focus.thresholdDefault the same way.
+       *
+       * Used to turn a row count into observed person-minutes. If it drifts from
+       * the Pi, every bucket scales by the same factor: the correlations and the
+       * high/low comparison are unaffected, only the absolute turns-per-minute
+       * figure moves — which is why it is worth stating rather than deriving.
+       */
+      windowSeconds: num('FOCUS_WINDOW_SECONDS', 15),
+      /** |r| bands → the words the model is given instead of a bare number. */
+      strength: {
+        strong: num('AI_CORRELATE_STRONG', 0.6),
+        moderate: num('AI_CORRELATE_MODERATE', 0.35),
+        weak: num('AI_CORRELATE_WEAK', 0.15),
+      },
+    },
+
+    /**
      * Web search (Tavily), reachable only through the assistant's search toggle.
      * Without a key the tool is never offered, so the model cannot promise a
      * search it has no way to run.

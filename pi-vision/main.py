@@ -26,6 +26,8 @@ pi-vision — ตรวจจับใบหน้า วัดการหั�
     f         ลืมทุก id และลายเซ็นทันที (ความเป็นส่วนตัว)
     e         สลับการโชว์คะแนนอารมณ์ดิบทั้งสี่ค่า (ใช้ปรับ EMOTION_THRESHOLD)
     v         เปิดเมนูเลือกกล้อง แล้วกดเลข 1–9 เพื่อสลับกล้อง
+    n         ถ่ายรูปลงทะเบียนคนใหม่จากกล้องสด — พิมพ์ชื่อ แล้วเคาะ space ถ่าย (Esc = จบ)
+              (เฉพาะโหมดที่ใช้รูปใน faces/ · ขณะเปิดอยู่ ทุกปุ่มเป็นตัวอักษรของชื่อ)
     space     พิมพ์สรุปหน้าต่างปัจจุบันทันทีโดยไม่ต้องรอครบเวลา
 
 หมายเหตุ: id ที่ขึ้นเป็น `#5?` คือ id ชั่วคราว — ระบบยังตัดสินไม่ได้ว่าเป็นคนใหม่
@@ -51,6 +53,7 @@ import faces as fc
 import landmarks as lm
 import modes
 import overlay as ov
+import phone as ph
 import roi
 import uploader as up_mod
 from camera import Camera, CameraError, list_cameras
@@ -66,6 +69,7 @@ KEY_FORGET = ord("f")               # ลืมทุก id และลาย�
 KEY_CAMERA_MENU = ord("v")          # เปิด/ปิดเมนูเลือกกล้อง (v = video source)
 KEY_RESOLUTION = ord("r")           # เปิด/ปิดเมนูเลือกความละเอียด (r = resolution)
 KEY_EMOTION = ord("e")              # โชว์คะแนนอารมณ์ดิบ เพื่อดูว่า threshold เหมาะไหม
+KEY_ENROLL = ord("n")               # ถ่ายรูปลงทะเบียนคนใหม่จากกล้องสด (n = new face)
 WAIT_KEY_MS = 1
 FPS_SMOOTHING = 0.9                 # ยิ่งใกล้ 1 ยิ่งนิ่ง
 DOWNLOAD_CHUNK = 1 << 16
@@ -343,6 +347,39 @@ def build_body_landmarker(body_cfg: dict):
         min_tracking_confidence=body_cfg["min_tracking_confidence"],
     )
     return vision.PoseLandmarker.create_from_options(options)
+
+
+def build_phone_detector(phone_cfg: dict):
+    """สร้าง ObjectDetector ที่ตรวจ**เฉพาะโทรศัพท์** — โหมดติดตามกิจกรรมเท่านั้น
+
+    `category_allowlist` ตัดอีก 89 คลาสของ COCO ทิ้งตั้งแต่ในตัวโมเดล ไม่ใช่มากรอง
+    ทีหลัง — เราไม่ได้อยากรู้ว่ามีเก้าอี้กี่ตัวในห้อง และการปล่อยให้มันคืนมาทั้งหมด
+    คือการเก็บรายการสิ่งของในห้องของคนอื่นไว้ในหน่วยความจำโดยไม่มีใครใช้
+    """
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision
+
+    options = vision.ObjectDetectorOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=str(ensure_model(phone_cfg))),
+        running_mode=vision.RunningMode.VIDEO,
+        category_allowlist=[ph.PHONE_LABEL],
+        score_threshold=phone_cfg["min_score"],
+        max_results=phone_cfg["max_results"],
+    )
+    return vision.ObjectDetector.create_from_options(options)
+
+
+def read_phone(track, held, phone_cfg: dict, now: float):
+    """สถานะ "ใช้โทรศัพท์อยู่ไหม" ของคนนี้ — คืน `(using, confident)`
+
+    ตัวจับเวลาถือค้างอยู่ใน `track.state` เหมือน gesture/posture จึงรอดการหลุดสั้น ๆ
+    ของ track ไปด้วยกัน และหายไปพร้อมกันเมื่อคนนั้นออกจากเฟรมจริง
+    """
+    hold = track.state.get("phone_hold")
+    if hold is None:
+        hold = ph.PhoneHold(phone_cfg)
+        track.state["phone_hold"] = hold
+    return hold.update(held, now)
 
 
 def attach_bodies(tracks, poses) -> dict[int, int]:
@@ -651,8 +688,11 @@ def print_summary(summary: az.WindowSummary, threshold_per_min: float, mode: mod
         if summary.posture
         else ""
     )
+    # ขึ้นเฉพาะตอนใช้อยู่ ด้วยเหตุผลเดียวกับบน HUD — บรรทัดนี้ยาวอยู่แล้ว
+    # และ "phone=False" ทุกบรรทัดตลอดวันไม่ได้บอกอะไรที่ไม่รู้อยู่แล้ว
+    on_phone = f" phone{'' if summary.phone_confident else '?'}" if summary.phone else ""
     print(
-        f"[{stamp}] person={summary.person}{who}{mood}{pose} faces={summary.face_count} "
+        f"[{stamp}] person={summary.person}{who}{mood}{pose}{on_phone} faces={summary.face_count} "
         f"(usable {summary.usable_faces}) movement={summary.movement} ({per_min:.1f}/min) "
         f"blinks={summary.blinks} avgEAR={ear} | {dirs}{flag}"
     )
@@ -875,6 +915,281 @@ class ResolutionMenu:
         ov.draw_menu(frame, "choose resolution", items, footer)
 
 
+class EnrollMenu:
+    """
+    ถ่ายรูปลงทะเบียนจากกล้องสด — กด n · พิมพ์ชื่อ · เคาะ space ถ่าย · Esc จบ
+
+    ทำไมต้องมี: การเพิ่มคนใหม่เคยต้องหารูปจากที่อื่นมาวางใน faces/ ซึ่งบนเครื่องที่
+    รันจริง (Pi ที่ต่อแค่กล้องกับจอ) แปลว่าต้องต่อคีย์บอร์ด ต่อ USB หรือ ssh เข้าไป
+    ทั้งที่กล้องตัวที่จะใช้จำหน้าคนนั้นเสียบอยู่ตรงหน้าแล้ว · และรูปจากกล้องตัวนั้นเอง
+    เป็นรูปลงทะเบียนที่ดีที่สุดอยู่แล้ว เพราะมุมกล้อง แสง และเลนส์ตรงกับตอนใช้งานจริง
+    (faces/README.txt แนะนำข้อนี้ไว้ตั้งแต่ต้น)
+
+    ⚠️ **บันทึกเป็นภาพครอปรอบใบหน้าที่ใหญ่ที่สุดในเฟรม ไม่ใช่เฟรมทั้งใบ**
+    ตัวอ่านรูปลงทะเบียนตั้ง num_faces=1 (ดู build_photo_reader) ถ้ามีคนอื่นติดอยู่ใน
+    เฟรมด้วย มันจะเลือกหน้าเองหนึ่งหน้าโดยไม่บอกใคร — ชื่อที่เพิ่งพิมพ์ก็ไปผูกกับหน้า
+    ของคนอื่นเงียบ ๆ · การครอปเองที่นี่ทำให้ "คนที่ยืนใกล้กล้องที่สุด" เป็นกฎที่ผู้ใช้
+    มองเห็นได้จากมุมเล็งบนจอ แทนที่จะเป็นการเดาของโมเดล
+
+    กรอบครอปมีอัตราส่วนเท่าเฟรมเสมอ (roi.crop_rect) ลายเซ็นที่ถอดจากรูปนี้จึงเทียบ
+    กับภาพสดของกล้องตัวเดียวกันได้ตรง ๆ — เหตุผลเต็มอยู่ที่หัวไฟล์ roi.py
+    """
+
+    # ตัวอักษรที่พิมพ์ลงชื่อได้ — ชื่อนี้กลายเป็น**ชื่อโฟลเดอร์** จึงกันอักขระที่ทำให้
+    # ได้ path แปลก ๆ ออกทั้งหมด · cv2.waitKey คืนได้แค่ ASCII อยู่แล้ว จึงพิมพ์ไทยไม่ได้
+    ALLOWED = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+    BACKSPACE = {8, 127}          # 8 บนวินโดวส์/GTK · 127 บน backend อื่นบางตัว
+    NAME_MAX = 24
+    # ส่วนเผื่อรอบใบหน้าตอนครอป เรียงจากที่อยากได้ไปหาที่แคบที่สุดที่ยอมรับได้
+    # เลือกตัวแรกที่**ไม่มีหน้าคนอื่นติดมาด้วย** (ดู _isolated_crop)
+    #
+    # วัดกับรูปในโฟลเดอร์ 6 คน: ครอปแคบไม่ได้ทำให้หาใบหน้าไม่เจอเลย — ที่ margin 0.10
+    # ยังเจอ 6/6 เท่ากับที่ 0.60 · สิ่งที่ทำให้หาไม่เจอคือ**ใบหน้าเล็กเกินไปตั้งแต่ในเฟรม**
+    # ซึ่ง min_size กันไว้อีกชั้นแล้ว · การไล่ลงมาจึงไม่ได้แลกความเสี่ยงกับอะไร
+    MARGINS = (0.6, 0.5, 0.4, 0.3, 0.2, 0.15)
+
+    def __init__(self, directory, min_size: float, enabled: bool = True):
+        self.directory = Path(directory)
+        # ใบหน้าต้องกินพื้นที่อย่างน้อยเท่านี้ของความกว้างเฟรมถึงจะถ่ายได้ — ใช้เกณฑ์
+        # เดียวกับที่แกลเลอรีใช้ตัดสินว่าใบหน้าใหญ่พอจะเชื่อลายเซ็นไหม (FACES_MIN_SIZE)
+        # ⚠️ ต้องเป็นค่าดิบจาก config ไม่ใช่ค่าที่โหมดซูมลดให้ (modes.ZOOMED_MIN_SIZE)
+        # เกณฑ์ที่ลดแล้วมีไว้สำหรับภาพครอปที่ถูกขยายก่อนอ่าน ส่วนรูปที่บันทึกลงดิสก์
+        # ไม่มีใครขยายให้ — ครอปหน้ากว้าง 26 px มาเก็บไว้คือเก็บรูปที่หาหน้าไม่เจอ
+        self.min_size = min_size
+        self.enabled = enabled
+        self.open = False
+        self.name = ""
+        self.message = ""
+        self.shots = 0                # ถ่ายไปกี่ใบตั้งแต่เปิดเมนูรอบนี้
+        self.saved = False            # มีรูปใหม่ลงดิสก์ไหม — main เอาไปสั่งอ่านแกลเลอรีใหม่
+        self._counted_name = None     # แคชผลนับไฟล์ กัน iterdir ทุกเฟรม
+        self._counted = 0
+
+    # ── การเลือกเป้า ─────────────────────────────────────
+    @staticmethod
+    def target(readings):
+        """คนที่จะถูกถ่าย = ใบหน้าที่ใหญ่ที่สุดในเฟรม (= อยู่ใกล้กล้องที่สุด)
+
+        เลือกด้วยขนาด ไม่ใช่ด้วย id หรือชื่อ เพราะคนที่กำลังลงทะเบียนคือคนที่ระบบ
+        **ยังไม่รู้จัก** ตามนิยาม · กฎ "เดินเข้ามาใกล้ที่สุด" ผู้ใช้ทำตามได้ทันที
+        และเห็นผลของมันบนจอก่อนกดถ่าย
+        """
+        best = None
+        for r in readings or ():
+            if best is None or (r.box[2] - r.box[0]) > (best.box[2] - best.box[0]):
+                best = r
+        return best
+
+    def _isolated_crop(self, box, others, w: int, h: int):
+        """
+        กรอบครอปที่กว้างที่สุดที่ยัง**ไม่มีใบหน้าคนอื่นติดมาด้วย** · None = ไม่มีเลย
+
+        ⚠️ นี่คือหัวใจของการถ่ายในห้องที่มีหลายคน ซึ่งวัดแล้วว่าพังจริงถ้าไม่มี:
+        วางคนสองคนไว้ในเฟรมเดียว เล็งที่คนซ้ายซึ่งใหญ่กว่า แล้วบันทึกด้วยส่วนเผื่อ 0.6
+        ภาพที่ได้ยังมีหน้าคนขวาติดมา · ตอนอ่านแกลเลอรี ตัวอ่าน (num_faces=1) เลือก
+        หน้าคนขวา — ชื่อที่พิมพ์จึงไปผูกกับหน้าของอีกคนหนึ่ง **โดยไม่มี error ใด ๆ**
+        ที่ margin 0.4 กรอบหดจนคนขวาหลุดออกไป แล้วได้ลายเซ็นของคนที่เล็งจริง ๆ
+
+        ห้าม "แค่หดให้พอดีหน้า" แล้วจบ เพราะระยะห่างของคนสองคนต่างกันทุกครั้ง
+        การไล่ลงมาทีละขั้นจึงให้ภาพที่กว้างที่สุดเท่าที่สถานการณ์นั้นยอมให้
+        """
+        for margin in self.MARGINS:
+            x1, y1, x2, y2 = roi.crop_rect(box, w, h, margin)
+            clash = False
+            for other in others:
+                ox1, oy1 = other[0] * w, other[1] * h
+                ox2, oy2 = other[2] * w, other[3] * h
+                # ซ้อนกันแม้แต่นิดเดียวก็ตัดทิ้ง — หน้าที่โผล่มาครึ่งใบยังถูกตัวตรวจ
+                # เลือกได้อยู่ดี และเราไม่มีทางรู้ล่วงหน้าว่ามันจะเลือกใบไหน
+                if ox1 < x2 and ox2 > x1 and oy1 < y2 and oy2 > y1:
+                    clash = True
+                    break
+            if not clash:
+                return (x1, y1, x2, y2)
+        return None
+
+    def _plan(self, readings, w: int, h: int):
+        """คืน (เป้า, กรอบที่จะบันทึก, ปัญหาที่ขวางอยู่)
+
+        ตัวเดียวกันนี้ถูกเรียกทั้งตอนวาดและตอนกด space — สิ่งที่ผู้ใช้เห็นบนจอจึงเป็น
+        สิ่งที่จะได้จริง ไม่ใช่คำสัญญาที่คำนวณคนละรอบกับของจริง
+        """
+        target = self.target(readings)
+        if target is None:
+            return None, None, "no face in frame"
+        width = target.box[2] - target.box[0]
+        if width < self.min_size:
+            # บอกเป็นตัวเลขว่าตอนนี้เท่าไรและต้องการเท่าไร ไม่ใช่แค่ "ใกล้อีก" —
+            # คนที่ยืนอยู่หน้ากล้องต้องรู้ว่าเหลืออีกแค่ไหน ไม่งั้นได้แต่ขยับสุ่ม ๆ
+            return target, None, (f"face {width * 100:.0f}% of frame — "
+                                  f"need {self.min_size * 100:.0f}%, step closer")
+        others = [r.box for r in readings if r is not target]
+        rect = self._isolated_crop(target.box, others, w, h)
+        if rect is None:
+            return target, None, "another face is too close — capture one person at a time"
+        return target, rect, None
+
+    # ── ปุ่ม ─────────────────────────────────────────────
+    def handle(self, key, frame, readings, busy: bool = False) -> bool:
+        """คืน True ถ้าเมนู "กิน" ปุ่มนี้ไปแล้ว
+
+        ขณะเปิด **ทุกปุ่มเป็นของช่องพิมพ์ชื่อ** รวมทั้ง q v r c ที่ปกติเป็นปุ่มลัด
+        ไม่งั้นชื่ออย่าง "Nicha" จะสั่งเปลี่ยนความละเอียดกลางคัน · ทางออกจึงมีทางเดียว
+        คือ Esc ซึ่งเป็นปุ่มเดียวที่ไม่ใช่ตัวอักษร
+
+        `busy` = มีเมนูอื่นเปิดค้างอยู่ · ตอนนั้น n เป็นปุ่มของเมนูนั้น ไม่ใช่ปุ่มเปิด
+        การลงทะเบียน — สองแผงที่วาดทับกันพร้อมกันไม่มีทางอ่านออกว่าพิมพ์อยู่ที่ไหน
+        """
+        if not self.enabled:
+            return False
+        if not self.open:
+            if key == KEY_ENROLL and not busy:
+                self._start()
+                return True
+            return False
+
+        if key == 27:                      # Esc — จบการลงทะเบียน
+            self._finish()
+        elif key in self.BACKSPACE:
+            self.name = self.name[:-1]
+            self.message = ""
+        elif key == KEY_FLUSH:             # space — ถ่าย
+            self._capture(frame, readings)
+        elif 0 <= key < 128 and chr(key) in self.ALLOWED and len(self.name) < self.NAME_MAX:
+            self.name += chr(key)
+            self.message = ""
+        return True
+
+    def _start(self) -> None:
+        self.open = True
+        self.name = ""
+        self.message = ""
+        self.shots = 0
+        print("[pi-vision] ลงทะเบียนใบหน้า: พิมพ์ชื่อ แล้วเคาะ space เพื่อถ่าย (Esc = จบ)")
+
+    def _finish(self) -> None:
+        self.open = False
+        if self.shots:
+            print(f"[pi-vision] ถ่ายรูปของ {self.name} ไป {self.shots} ใบ")
+        self.name = ""
+        self.message = ""
+
+    def take_saved(self) -> bool:
+        """คืน True ครั้งเดียวหลังมีรูปใหม่ลงดิสก์ — main ใช้สั่งอ่านแกลเลอรีใหม่
+
+        แยกจาก shots เพราะ shots ถูกล้างทุกครั้งที่เปิดเมนูใหม่ ส่วนคำถามที่ main ถาม
+        คือ "มีอะไรเปลี่ยนบนดิสก์ตั้งแต่ครั้งที่แล้วไหม" ซึ่งเป็นคนละคำถาม
+        """
+        saved, self.saved = self.saved, False
+        return saved
+
+    # ── การถ่าย ──────────────────────────────────────────
+    def _capture(self, frame, readings) -> None:
+        if not self.name:
+            self.message = "type a name first"
+            return
+        if frame is None:
+            self.message = "no frame yet — try again"
+            return
+
+        h, w = frame.shape[:2]
+        _target, rect, problem = self._plan(readings, w, h)
+        if problem:
+            self.message = problem
+            return
+        x1, y1, x2, y2 = rect
+        patch = frame[y1:y2, x1:x2]
+        if patch.size == 0:
+            self.message = "crop landed outside the frame — move to the middle"
+            return
+
+        folder = self.directory / self.name
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            path = _free_path(folder, f"cam_{time.strftime('%Y%m%d_%H%M%S')}")
+            ok = cv2.imwrite(str(path), patch)
+        except OSError as exc:
+            self.message = "cannot write the file"
+            print(f"[pi-vision] เขียนรูปไม่ได้: {exc}", file=sys.stderr)
+            return
+        if not ok:
+            self.message = "cannot write the file"
+            return
+
+        self.shots += 1
+        self.saved = True
+        self._counted_name = None          # จำนวนรูปของคนนี้เปลี่ยนแล้ว
+        self.message = f"saved {path.name}  ({patch.shape[1]}x{patch.shape[0]})"
+        print(f"[pi-vision] บันทึก {path}")
+
+    def _existing(self) -> int:
+        """มีรูปของชื่อนี้อยู่แล้วกี่ใบ — บอกให้รู้ว่ากำลังเพิ่มให้คนเดิมหรือสร้างคนใหม่
+
+        สำคัญกว่าที่คิด เพราะ "donut" กับ "Donut" เป็นคนละคนในสายตาแกลเลอรี
+        (ชื่อ = ชื่อโฟลเดอร์) การพิมพ์ผิดตัวเดียวจึงสร้างคนใหม่ที่มีรูปใบเดียวเงียบ ๆ
+        """
+        if self._counted_name != self.name:
+            folder = self.directory / self.name
+            self._counted = 0
+            if self.name and folder.is_dir():
+                self._counted = sum(
+                    1 for p in folder.iterdir() if p.suffix.lower() in fc.IMAGE_SUFFIXES
+                )
+            self._counted_name = self.name
+        return self._counted
+
+    # ── การวาด ───────────────────────────────────────────
+    def draw(self, frame, readings) -> None:
+        if not self.open:
+            return
+        h, w = frame.shape[:2]
+        target, rect, problem = self._plan(readings, w, h)
+        if target is not None:
+            ov.draw_aim(frame, target.box, "eye" if rect else "danger")
+        # กรอบที่จะถูกบันทึกจริง — เห็นก่อนกด ว่าใครติดมาในรูปบ้างและตัดตรงไหน
+        if rect:
+            cv2.rectangle(frame, (rect[0], rect[1]), (rect[2], rect[3]),
+                          ov.COLORS["eye"], 1, ov.LINE)
+
+        # เคอร์เซอร์กะพริบ — ช่องพิมพ์ที่ไม่มีเคอร์เซอร์ดูเหมือนป้ายข้อความเฉย ๆ
+        cursor = "_" if int(time.monotonic() * 2) % 2 == 0 else " "
+        lines = [(f"name: {self.name}{cursor}", "ink" if self.name else "muted")]
+
+        if not self.name:
+            lines.append(("type the name first  (a-z 0-9 - _)", "muted"))
+        else:
+            already = self._existing()
+            lines.append(
+                (f"adding to {self.name} — {already} photo(s) already" if already
+                 else f"new person: {self.name}", "ok" if already else "warn")
+            )
+
+        if problem:
+            lines.append((problem, "danger"))
+        else:
+            lines.append((f"ready — the box is what gets saved  ·  {self.shots} shot(s)"
+                          + ("" if self.shots >= 2 else "  ·  take 2-3 from slightly different angles"),
+                          "ok"))
+        # ข้อความจากการกดครั้งล่าสุด — ไม่ซ้ำกับบรรทัดปัญหาข้างบนซึ่งเป็นสถานะ "ตอนนี้"
+        if self.message and self.message != problem:
+            lines.append((self.message, "muted"))
+        ov.draw_prompt(frame, "capture face", lines,
+                       "space = capture  ·  backspace = erase  ·  Esc = done")
+
+
+def _free_path(folder: Path, stem: str, suffix: str = ".jpg") -> Path:
+    """path ที่ยังไม่มีไฟล์อยู่ — กันการถ่ายรัว ๆ ในวินาทีเดียวกันทับกันเอง
+
+    ชื่อไฟล์เป็นเวลาระดับวินาที ซึ่งเคาะ space สองครั้งติดกันก็ชนแล้ว
+    """
+    path = folder / f"{stem}{suffix}"
+    n = 2
+    while path.exists():
+        path = folder / f"{stem}-{n}{suffix}"
+        n += 1
+    return path
+
+
 def main() -> int:
     args = parse_args()
     cfg = CONFIG
@@ -928,6 +1243,27 @@ def main() -> int:
     if body_landmarker is not None:
         print("[pi-vision]   ยืน/นั่ง ต้องเห็นขา ไม่เห็นก็ไม่ตอบ · นอนใช้แค่ลำตัว จึงตอบได้เสมอ")
         print("[pi-vision]   ป้ายที่ขึ้นคือ**ท่า** ไม่ใช่เจตนา — 'hand up' รวมการยืดเส้นด้วย")
+
+    # ตัวตรวจโทรศัพท์ต้องมีโมเดลท่าทางอยู่ด้วย — ไม่มีข้อมือก็บอกไม่ได้ว่าใครถือ
+    # (ยังมีชั้นเดาจากใบหน้าอยู่ แต่ชั้นนั้นมีไว้เสริมตอนมองไม่เห็นข้อมือ ไม่ใช่แทนทั้งหมด)
+    phone_detector = None
+    phone_every = 1
+    if body_landmarker is not None and cfg["phone"]["enabled"]:
+        try:
+            phone_detector = build_phone_detector(cfg["phone"])
+        except Exception as exc:
+            # ของเสริม — โหลดไม่ได้ก็เดินต่อโดยไม่มีป้ายโทรศัพท์ ไม่ใช่ล้มทั้งโปรแกรม
+            print(f"[pi-vision] โหลดตัวตรวจโทรศัพท์ไม่ได้ ({exc}) — ข้ามฟีเจอร์นี้", file=sys.stderr)
+    if phone_detector is not None:
+        every = max(1, cfg["phone"]["every_n_frames"])
+        # ปัดขึ้นให้ตรงกับจังหวะของโมเดลท่าทาง: ถ้าไม่ตรง ตัวตรวจจะทำงานในเฟรมที่
+        # ไม่มี pose ให้จับคู่ ผลคือจ่าย CPU ไปแล้วทิ้งผลทั้งหมด
+        body_n = max(1, cfg["body"]["every_n_frames"])
+        phone_every = ((every + body_n - 1) // body_n) * body_n
+        print(f"[pi-vision] ตรวจการใช้โทรศัพท์อยู่ (ทุก {phone_every} เฟรม)"
+              " — นับเฉพาะเครื่องที่อยู่ในระยะมือของคนในเฟรม")
+        print("[pi-vision]   โทรศัพท์ที่วางบนโต๊ะไม่ถูกนับ · ป้ายที่มี `?` = เดาจากตำแหน่ง"
+              "เพราะมองไม่เห็นข้อมือ")
     tracker = PersonTracker(tracker_cfg)
     an = az.FaceAnalyzer(cfg, mirror=cam_cfg["mirror"],
                          report_person=mode.report_person, track_eyes=mode.eyes,
@@ -1032,12 +1368,17 @@ def main() -> int:
         )
     if display_cfg["enabled"]:
         print("[pi-vision] ปุ่มลัด: q=ออก · c=calibrate ใหม่ · m=mesh · f=ลืม id · "
-              "e=คะแนนอารมณ์ · v=เลือกกล้อง · r=ความละเอียด · space=สรุปทันที")
+              "e=คะแนนอารมณ์ · v=เลือกกล้อง · r=ความละเอียด · space=สรุปทันที"
+              + (" · n=ถ่ายรูปลงทะเบียน" if mode.gallery else ""))
 
     fps = 0.0
     last_t = time.monotonic()
     cam_menu = CameraMenu()
     res_menu = ResolutionMenu()
+    # ถ่ายรูปลงทะเบียนได้เฉพาะโหมดที่อ่านรูปใน faces/ — โหมดห้องรวมสัญญาว่าจะไม่แยก
+    # รายบุคคลเลย การเก็บรูปหน้าคนลงดิสก์จากในโหมดนั้นจึงขัดกับสิ่งที่โหมดบอกผู้ใช้ไว้
+    enroll = EnrollMenu(cfg["faces"]["dir"], cfg["faces"]["min_size"],
+                        enabled=mode.gallery and display_cfg["enabled"])
     threshold = cfg["window"]["movement_threshold_per_min"]
     reid_on = tracker_cfg["reid_enabled"]
 
@@ -1052,6 +1393,9 @@ def main() -> int:
     zoom_seen: dict[tuple[int, int], float] = {}
     zoom_rects: dict[tuple[int, int], tuple] = {}
     ZOOM_MEMORY = 10.0                 # ลืมช่องที่ไม่มีใครอยู่แล้ว กันโตไม่จำกัด
+    # กรอบโทรศัพท์ล่าสุด — คงไว้ระหว่างเฟรมที่ไม่ได้ตรวจ ไม่งั้นกรอบบนจอกระพริบ
+    # ตามจังหวะ phone_every ทั้งที่โทรศัพท์ไม่ได้ไปไหน
+    phone_boxes: list = []
 
     try:
         while True:
@@ -1065,6 +1409,12 @@ def main() -> int:
             except CameraError as exc:
                 print(f"[pi-vision] {exc}", file=sys.stderr)
                 return 1
+
+            # สำเนาเฟรม**ก่อนวาดอะไรลงไป** — ไว้ให้การถ่ายรูปลงทะเบียนใช้
+            # การถ่ายเกิดตอนจัดการปุ่ม ซึ่งอยู่ท้ายลูป หลัง HUD กับกรอบถูกวาดทับ frame
+            # ไปแล้ว · ถ่ายจากตัวนั้นคือได้รูปที่มีตัวหนังสือ HUD ติดอยู่บนหน้าคน
+            # คัดลอกเฉพาะตอนเมนูเปิดอยู่ ไม่งั้นจ่ายค่า copy ทุกเฟรมเพื่อสิ่งที่แทบไม่ใช้
+            clean = frame.copy() if enroll.open else None
 
             now = time.monotonic()
             frame_no += 1
@@ -1151,6 +1501,39 @@ def main() -> int:
                 # landmark หน่วยเมตรสามแกน เรียงตรงกับ poses — ใช้วัดมุมต้นขา/ลำตัว
                 worlds = body_result.pose_world_landmarks or []
                 bodies = attach_bodies(tracks, poses)
+
+                # ── โทรศัพท์ ──────────────────────────────────
+                # อยู่ในบล็อกเดียวกับท่าทางเพราะการจับคู่ต้องใช้ข้อมือของ**เฟรมนี้**
+                # (phone_every ถูกปัดขึ้นเป็นจำนวนเท่าของ body_every ตอนเริ่มแล้ว)
+                # เฟรมที่ข้ามยังคงป้ายเดิมไว้ เพราะ PhoneHold อยู่ใน track.state
+                held = {}
+                if phone_detector is not None and (frame_no - 1) % phone_every == 0:
+                    seen_phones = ph.to_boxes(
+                        phone_detector.detect_for_video(mp_image, int(now * 1000)).detections,
+                        frame.shape[1], frame.shape[0], cfg["phone"]["min_score"],
+                    )
+                    phone_boxes = [p.box for p in seen_phones]      # ไว้วาดบนจอ
+                    held = ph.assign(
+                        seen_phones,
+                        [
+                            ph.Person(
+                                key=t.person_id,
+                                face_box=t.box,
+                                points=_nth(poses, bodies.get(t.person_id)),
+                            )
+                            for t in tracks
+                        ],
+                        {**cfg["phone"], "min_visibility": cfg["body"]["min_visibility"]},
+                        aspect=frame.shape[1] / max(frame.shape[0], 1),
+                    )
+                    # ป้อนผลให้ทุก track รวมทั้งคนที่ไม่มีโทรศัพท์ — ตัวถือค้างต้องได้
+                    # เห็นเฟรมที่ "ไม่เจอ" ด้วย ไม่งั้นป้ายที่ขึ้นแล้วจะไม่มีวันหายไป
+                    for track in tracks:
+                        using, sure = read_phone(track, held.get(track.person_id),
+                                                 cfg["phone"], now)
+                        track.state["phone"] = using
+                        track.state["phone_confident"] = sure
+
                 for track in tracks:
                     pi = bodies.get(track.person_id)
                     if pi is None:
@@ -1241,6 +1624,7 @@ def main() -> int:
             for reading, (_track, face) in zip(readings, faces):
                 ov.draw_face(frame, reading, display_cfg, cfg["blink"], face.landmarks)
             ov.draw_zoom_rects(frame, zoom_boxes)
+            ov.draw_phones(frame, phone_boxes)
 
             usable = sum(1 for r in readings if r.usable)
             methods = ""
@@ -1287,12 +1671,17 @@ def main() -> int:
                 ov.draw_hud(frame, hud)
                 cam_menu.draw(frame)
                 res_menu.draw(frame, camera)
+                enroll.draw(frame, readings)
                 cv2.imshow(display_cfg["window_name"], frame)
                 key = cv2.waitKey(WAIT_KEY_MS) & 0xFF
-                if not cam_menu.handle(key, camera) and not res_menu.handle(key, camera):
-                    if not handle_key(key, an, tracker, tracks, display_cfg, cfg, readings,
-                                      faces, now, threshold, mode):
-                        break
+                busy = cam_menu.open or res_menu.open
+                if not enroll.handle(key, clean, readings, busy):
+                    if not cam_menu.handle(key, camera) and not res_menu.handle(key, camera):
+                        if not handle_key(key, an, tracker, tracks, display_cfg, cfg, readings,
+                                          faces, now, threshold, mode):
+                            break
+                if enroll.take_saved() and gallery is not None:
+                    gallery.refresh_soon()
                 continue
 
             for i, r in enumerate(readings[: display_cfg["hud_max_faces"]]):
@@ -1314,11 +1703,16 @@ def main() -> int:
                     # ท่าทางกับท่ายืน/นั่งเป็นคนละแกนกับการหันหน้า — คนยกมือขณะมองซ้ายได้
                     # จึงต่อท้ายเป็นช่องของตัวเอง ไม่ใช่ไปทับ state
                     body_bits = ""
-                    if r.gesture or r.posture:
+                    if r.gesture or r.posture or r.phone:
                         pose = r.posture or ""
                         if pose and not r.posture_confident:
                             pose += "?"          # เดา ไม่ได้วัด — ดู az.FaceReading
-                        body_bits = f"{(r.gesture or ''):<12}{pose:<9}"
+                        # ช่องของตัวเองเหมือน gesture/posture — คนเล่นโทรศัพท์ขณะนั่ง
+                        # และขณะยกมือได้ทั้งคู่ สามอย่างนี้ไม่ได้แทนที่กัน
+                        on_phone = ""
+                        if r.phone:
+                            on_phone = "PHONE" if r.phone_confident else "PHONE?"
+                        body_bits = f"{(r.gesture or ''):<12}{pose:<9}{on_phone:<7}"
                     hud.append(
                         (
                             f"{who}{tag} {state:<7} {body_bits}{_mood(r)}{eye_bits}"
@@ -1333,20 +1727,27 @@ def main() -> int:
             ov.draw_hud(frame, hud)
             cam_menu.draw(frame)
             res_menu.draw(frame, camera)
+            enroll.draw(frame, readings)
             cv2.imshow(display_cfg["window_name"], frame)
 
             key = cv2.waitKey(WAIT_KEY_MS) & 0xFF
-            if not cam_menu.handle(key, camera) and not res_menu.handle(key, camera):
-                if not handle_key(key, an, tracker, tracks, display_cfg, cfg, readings,
-                                  faces, now, threshold, mode):
-                    break
+            # ลงทะเบียนได้สิทธิ์ก่อนเมนูอื่น — ขณะพิมพ์ชื่อ ตัวอักษร v กับ r ต้องเป็น
+            # ตัวอักษรในชื่อ ไม่ใช่คำสั่งเปิดเมนูกล้อง/ความละเอียด
+            if not enroll.handle(key, clean, readings, cam_menu.open or res_menu.open):
+                if not cam_menu.handle(key, camera) and not res_menu.handle(key, camera):
+                    if not handle_key(key, an, tracker, tracks, display_cfg, cfg, readings,
+                                      faces, now, threshold, mode):
+                        break
+            # รูปใหม่ลงดิสก์แล้ว — สั่งให้แกลเลอรีตรวจโฟลเดอร์รอบหน้าเลย ไม่ต้องรอครบรอบ
+            if enroll.take_saved() and gallery is not None:
+                gallery.refresh_soon()
 
     except KeyboardInterrupt:
         print("\n[pi-vision] หยุดการทำงาน")
     finally:
         camera.close()
         landmarker.close()
-        for extra in (detector, zoom_reader, body_landmarker):
+        for extra in (detector, zoom_reader, body_landmarker, phone_detector):
             if extra is not None:
                 extra.close()
         uploader.close()

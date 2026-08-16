@@ -407,6 +407,8 @@ class FaceGallery:
         self.skipped: list[str] = []          # รูปที่หาใบหน้าไม่เจอ — ควรบอกผู้ใช้
         self._fingerprint: tuple = ()
         self._checked_at = 0.0
+        # ผู้ใช้เพิ่งเพิ่มรูปด้วยตัวเอง (ถ่ายจากกล้องสด) — ไม่ต้องรอรอบตรวจถัดไป
+        self._forced = False
 
     # ── การโหลดแกลเลอรี ───────────────────────────────────
     def scan(self) -> int:
@@ -444,6 +446,20 @@ class FaceGallery:
         self._fingerprint = _fingerprint(self.directory)
         return len(self.people)
 
+    def refresh_soon(self) -> None:
+        """
+        ให้ maybe_rescan() รอบถัดไปตรวจโฟลเดอร์ทันที ไม่ต้องรอครบ rescan_seconds
+
+        มีไว้ให้ตอนที่**โปรแกรมเองเป็นคนเพิ่มรูป** (ถ่ายลงทะเบียนจากกล้องสด) ซึ่ง
+        ต่างจากการที่ผู้ใช้ไปวางไฟล์เอง — ตรงนั้นระบบไม่มีทางรู้ จึงต้องคอยตรวจเป็นรอบ
+        ส่วนตรงนี้รู้แน่ ๆ ว่ามีของใหม่ การให้รอไปอีก 20 วินาทีจึงเป็นการรอเปล่า
+
+        ยังผ่านการเทียบลายนิ้วมือใน maybe_rescan อยู่ดี — บังคับให้ "ตรวจ" ไม่ใช่
+        บังคับให้ "อ่านรูปใหม่ทุกใบ" · และใช้ได้แม้ตั้ง FACES_RESCAN_SECONDS=0
+        (ปิดการตรวจเป็นรอบ) เพราะคนที่ปิดมันไม่ได้ตั้งใจปิดผลของปุ่มที่ตัวเองเพิ่งกด
+        """
+        self._forced = True
+
     def maybe_rescan(self, now: float) -> bool:
         """
         อ่านใหม่ถ้าโฟลเดอร์เปลี่ยน — เรียกได้ทุกเฟรม ราคาถูก
@@ -451,8 +467,11 @@ class FaceGallery:
         เช็คแค่ทุก rescan_seconds และเทียบลายนิ้วมือของโฟลเดอร์ก่อน จะได้ไม่ไปถอด
         ลายเซ็นจากรูปทุกใบใหม่ทั้งที่ไม่มีอะไรเปลี่ยน
         """
-        if self.rescan_seconds <= 0 or now - self._checked_at < self.rescan_seconds:
+        if not self._forced and (
+            self.rescan_seconds <= 0 or now - self._checked_at < self.rescan_seconds
+        ):
             return False
+        self._forced = False
         self._checked_at = now
         if _fingerprint(self.directory) == self._fingerprint:
             return False

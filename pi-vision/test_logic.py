@@ -700,7 +700,7 @@ if summary:
     check("to_focus_row มีคอลัมน์ครบตามตาราง focus",
           set(summary.to_focus_row())
           == {"person", "movement", "direction", "face_count", "name", "emotion",
-              "posture", "posture_confident"})
+              "posture", "posture_confident", "phone", "phone_confident"})
     # None = "ไม่รู้" ไม่ใช่ "ไม่มี" — ไม่มีรูปในแกลเลอรีและยังไม่เห็นการแสดงออก
     # ปลายทางต้องแยกสองอย่างนี้ออกจากกันได้
     check("ยังไม่รู้ชื่อ/อารมณ์ → คอลัมน์เป็น None ไม่ใช่ค่าว่าง",
@@ -711,6 +711,11 @@ if summary:
     check("ไม่เห็นร่างกาย → posture เป็น None และไม่มีธงความมั่นใจ",
           summary.to_focus_row()["posture"] is None
           and summary.to_focus_row()["posture_confident"] is None)
+    # ⚠️ phone=None (ไม่ได้ตรวจ) ต้องไม่ถูกกลืนเป็น false (ตรวจแล้วไม่มี)
+    # ปลายทางที่รวมสองอย่างนี้จะรายงานว่า "ไม่มีใครเล่นโทรศัพท์" ทั้งที่ไม่มีใครดูเลย
+    check("ไม่ได้ตรวจโทรศัพท์ → phone เป็น None ไม่ใช่ false",
+          summary.to_focus_row()["phone"] is None
+          and summary.to_focus_row()["phone_confident"] is None)
     check("ตัวนับถูกรีเซ็ต", sum(tk7.state["analyzer"].window_dirs.values()) == 0)
 
 # ท่าที่ main.py เก็บไว้ใน track.state ต้องไปโผล่ในแถวที่ส่งขึ้นตาราง
@@ -728,6 +733,27 @@ check("ท่าจาก track.state ไปถึงแถวที่ส่ง
 # หายไปเมื่อไร ปลายทางจะนับท่าที่เดาไว้รวมกับท่าที่วัดได้โดยไม่รู้ตัว
 check("ท่าที่ยังไม่มั่นใจถูกทำเครื่องหมายไว้ ไม่ใช่ส่งไปเหมือนท่าที่วัดได้",
       row8 is not None and row8.to_focus_row()["posture_confident"] is False)
+
+# การใช้โทรศัพท์เดินทางเส้นเดียวกับท่าเป๊ะ — main เขียนลง track.state, analyzer ยกมาใส่แถว
+a9 = az.FaceAnalyzer(CFG, mirror=True)
+tk9 = FakeTrack(pid=9)
+tk9.state["phone"] = True
+tk9.state["phone_confident"] = False
+t9 = feed(a9, tk9, lambda _t: fi(make_face()), 1.0, 1100.0)
+feed(a9, tk9, lambda _t: fi(make_face(yaw=0.5)), 1.0, t9)
+row9 = a9.pop_window([tk9], 1100.0 + CFG["window"]["seconds"] + 1)
+check("การใช้โทรศัพท์จาก track.state ไปถึงแถวที่ส่ง",
+      row9 is not None and row9.to_focus_row()["phone"] is True)
+check("การเดา (มองไม่เห็นข้อมือ) ถูกทำเครื่องหมายไว้ ไม่ใช่ส่งไปเหมือนที่วัดได้",
+      row9 is not None and row9.to_focus_row()["phone_confident"] is False)
+
+# โหมดห้องรวมสัญญาว่าไม่มีข้อมูลรายบุคคลหลุดออกไป — โทรศัพท์ก็เป็นข้อมูลรายบุคคล
+a10 = az.FaceAnalyzer(CFG, mirror=True, report_person=False)
+tk10 = FakeTrack(pid=10)
+tk10.state["phone"] = True
+t10 = feed(a10, tk10, lambda _t: fi(make_face()), 1.0, 1300.0)
+row10 = a10.pop_window([tk10], 1300.0 + CFG["window"]["seconds"] + 1)
+check("โหมดห้องรวมไม่รายงานว่าใครใช้โทรศัพท์", row10 is not None and row10.phone is None)
 
 # ── 12. โหมดการทำงาน ────────────────────────────────────
 print("\n12. โหมดการทำงาน")
@@ -1178,6 +1204,218 @@ else:
     m7 = opened_menu(FakeCam(sizes=[]))
     check("กล้องที่บอกรายการโหมดไม่ได้ → ขึ้นข้อความ ไม่ใช่เมนูเปล่า",
           m7.sizes == [] and m7.message)
+
+# ── 12e. ถ่ายรูปลงทะเบียนจากกล้องสด ─────────────────────
+print("\n12e. ถ่ายรูปลงทะเบียนจากกล้องสด")
+if main is None:
+    print("  skip — ไม่มี cv2/mediapipe ในเครื่องนี้")
+else:
+    import shutil
+    import tempfile
+    from pathlib import Path as _Path
+
+    import cv2 as _cv2
+    import numpy as _np
+
+    FRAME_W, FRAME_H = 640, 480
+
+    class _Reading:
+        """FaceReading เท่าที่ EnrollMenu ใช้ — มันอ่านแค่ `box`"""
+
+        def __init__(self, box):
+            self.box = box
+
+    def _frame():
+        # ภาพไล่เฉดตามแกน x เพื่อให้ตรวจได้ว่า**ครอปถูกที่** ไม่ใช่แค่ครอปถูกขนาด
+        img = _np.zeros((FRAME_H, FRAME_W, 3), _np.uint8)
+        img[:, :, 1] = _np.linspace(0, 255, FRAME_W, dtype=_np.uint8)
+        return img
+
+    def _menu(tmp, **kw):
+        m = main.EnrollMenu(tmp, min_size=0.12, **kw)
+        m.handle(main.KEY_ENROLL, None, [])
+        return m
+
+    def _type(menu, text, frame=None, readings=()):
+        for ch in text:
+            menu.handle(ord(ch), frame, readings)
+
+    SPACE = main.KEY_FLUSH
+    ESC = 27
+    BIG = _Reading((0.40, 0.30, 0.60, 0.50))        # กว้าง 20% ของเฟรม — ผ่านเกณฑ์
+    SMALL = _Reading((0.45, 0.35, 0.50, 0.40))      # กว้าง 5% — ไม่ผ่าน
+    tmp = _Path(tempfile.mkdtemp(prefix="pi-vision-enroll-"))
+    try:
+        m = _menu(tmp)
+        check("กด n แล้วเมนูเปิด", m.open)
+        _type(m, "Nicha")
+        check("พิมพ์ชื่อได้", m.name == "Nicha", f"({m.name})")
+        m.handle(8, None, [])
+        check("backspace ลบทีละตัว", m.name == "Nich", f"({m.name})")
+
+        # ⚠️ ข้อที่สำคัญที่สุดของทั้งหมวด: ตัวอักษรในชื่อคนต้องไม่หลุดไปเป็นปุ่มลัด
+        m2 = _menu(tmp)
+        consumed = [m2.handle(ord(ch), None, []) for ch in "qvrcmfe"]
+        check("ขณะพิมพ์ชื่อ ปุ่มลัดทุกตัวกลายเป็นตัวอักษร ไม่ใช่คำสั่ง",
+              all(consumed) and m2.name == "qvrcmfe", f"({m2.name})")
+        check("ปุ่มที่พิมพ์ไม่ได้ (เช่นไม่มีปุ่มกด = 255) ไม่ถูกนับเป็นตัวอักษร",
+              m2.handle(255, None, []) and m2.name == "qvrcmfe")
+        m2.handle(ESC, None, [])
+        check("Esc = ทางออกทางเดียว", not m2.open)
+
+        # ── กติกาก่อนถ่าย ──
+        m3 = _menu(tmp)
+        m3.handle(SPACE, _frame(), [BIG])
+        check("ยังไม่พิมพ์ชื่อ → ไม่ถ่าย และบอกว่าทำไม",
+              not m3.saved and m3.message and not any(tmp.iterdir()))
+        _type(m3, "Ghost")
+        m3.handle(SPACE, _frame(), [])
+        check("ไม่มีหน้าในเฟรม → ไม่ถ่าย", not m3.saved and "no face" in m3.message)
+        m3.handle(SPACE, _frame(), [SMALL])
+        check("หน้าเล็กเกินเกณฑ์ → ไม่ถ่าย และบอกตัวเลขให้เดินเข้ามาใกล้",
+              not m3.saved and "closer" in m3.message, f"({m3.message})")
+        check("ทั้งสามกรณีไม่มีไฟล์/โฟลเดอร์ตกค้าง", not any(tmp.iterdir()))
+
+        # ── ถ่ายจริง ──
+        m4 = _menu(tmp)
+        _type(m4, "Pun")
+        m4.handle(SPACE, _frame(), [BIG])
+        shots = sorted((tmp / "Pun").glob("*.jpg"))
+        check("ถ่ายแล้วได้ไฟล์ใน faces/<ชื่อ>/", len(shots) == 1, f"({shots})")
+        check("บอกผลบนจอว่าบันทึกอะไรไป", "saved" in m4.message and m4.shots == 1)
+
+        saved = _cv2.imread(str(shots[0]))
+        check("บันทึกเป็นภาพครอปรอบใบหน้า ไม่ใช่เฟรมทั้งใบ",
+              saved is not None and saved.shape[:2] != (FRAME_H, FRAME_W),
+              f"({None if saved is None else saved.shape})")
+        got_aspect = saved.shape[1] / saved.shape[0]
+        check("ครอปแล้วอัตราส่วนยังเท่าเฟรม (ไม่งั้นลายเซ็นเพี้ยนเงียบ ๆ)",
+              abs(got_aspect - FRAME_W / FRAME_H) < 0.02, f"({got_aspect:.3f})")
+        # ใบหน้าอยู่กลางเฟรมพอดี ค่าเฉลี่ยของช่องเขียวในภาพครอปจึงต้องใกล้กลางไล่เฉด
+        check("ครอปตรงตำแหน่งใบหน้า ไม่ได้ครอปมั่ว",
+              abs(float(saved[:, :, 1].mean()) - 127) < 20,
+              f"({saved[:, :, 1].mean():.0f})")
+
+        m4.handle(SPACE, _frame(), [BIG])
+        check("ถ่ายรัวในวินาทีเดียวกันต้องไม่ทับไฟล์เดิม",
+              len(list((tmp / "Pun").glob("*.jpg"))) == 2)
+
+        # ── ห้ามให้หน้าคนอื่นติดมาในรูป ──
+        # วัดกับรูปจริงแล้วว่าถ้าปล่อยให้ติดมา ตัวอ่านแกลเลอรี (num_faces=1) เลือกหน้า
+        # ของคนข้าง ๆ แล้วชื่อที่พิมพ์ไปผูกกับคนผิดโดยไม่มี error — ดู _isolated_crop
+        NEXT_TO = _Reading((0.66, 0.32, 0.78, 0.48))     # ยืนข้าง ๆ ห่างพอให้หดกรอบหนีได้
+        m6 = _menu(tmp)
+        _type(m6, "Solo")
+        m6.handle(SPACE, _frame(), [BIG, NEXT_TO])
+        shot = next((tmp / "Solo").glob("*.jpg"), None)
+        saved2 = _cv2.imread(str(shot)) if shot else None
+        _t, rect, problem = m6._plan([BIG, NEXT_TO], FRAME_W, FRAME_H)
+        check("มีคนอื่นในเฟรม → ยังถ่ายได้ แต่หดกรอบจนคนนั้นหลุดออกไป",
+              shot is not None and problem is None
+              and rect[2] <= NEXT_TO.box[0] * FRAME_W, f"({rect})")
+        check("กรอบที่หดแล้วยังรักษาอัตราส่วนของเฟรมไว้",
+              saved2 is not None
+              and abs(saved2.shape[1] / saved2.shape[0] - FRAME_W / FRAME_H) < 0.02)
+
+        CROWD = _Reading((0.58, 0.30, 0.72, 0.50))       # ประชิดจนหดยังไงก็ไม่พ้น
+        m7 = _menu(tmp)
+        _type(m7, "Crowd")
+        m7.handle(SPACE, _frame(), [BIG, CROWD])
+        check("ประชิดจนแยกไม่ออก → ไม่ถ่ายมั่ว แต่บอกให้ถ่ายทีละคน",
+              not (tmp / "Crowd").exists() and "one person at a time" in m7.message,
+              f"({m7.message})")
+        check("บนจอบอกปัญหาเดียวกันตั้งแต่ก่อนกด ไม่ใช่รู้ตอนกดแล้ว",
+              m7._plan([BIG, CROWD], FRAME_W, FRAME_H)[1] is None)
+
+        check("มีรูปใหม่ลงดิสก์ → บอก main ให้อ่านแกลเลอรีใหม่", m4.take_saved() is True)
+        check("ถามซ้ำโดยไม่มีอะไรเปลี่ยน → ไม่สั่งอ่านซ้ำ", m4.take_saved() is False)
+
+        # ── เพิ่มรูปให้คนเดิม vs สร้างคนใหม่ ──
+        m5 = _menu(tmp)
+        _type(m5, "Pun")
+        check("ชื่อที่มีอยู่แล้ว → นับรูปเดิมได้ (จะได้รู้ว่ากำลังเพิ่มให้คนเดิม)",
+              m5._existing() == 2, f"({m5._existing()})")
+        _type(m5, "x")
+        check("พิมพ์ผิดไปตัวเดียว → เป็นคนใหม่ที่ยังไม่มีรูป", m5._existing() == 0)
+
+        # ── การเลือกเป้า ──
+        near, far = _Reading((0.1, 0.1, 0.4, 0.4)), _Reading((0.7, 0.7, 0.8, 0.8))
+        check("เล็งที่ใบหน้าที่ใหญ่ที่สุด = คนที่ยืนใกล้กล้องที่สุด",
+              main.EnrollMenu.target([far, near]) is near)
+        check("ไม่มีใครในเฟรม → ไม่มีเป้า", main.EnrollMenu.target([]) is None)
+
+        # ── ขอบเขตการเปิด ──
+        blocked = main.EnrollMenu(tmp, min_size=0.12)
+        check("มีเมนูอื่นเปิดค้างอยู่ → n เป็นปุ่มของเมนูนั้น ไม่แย่งมาเปิดซ้อน",
+              blocked.handle(main.KEY_ENROLL, None, [], True) is False and not blocked.open)
+        off = main.EnrollMenu(tmp, min_size=0.12, enabled=False)
+        check("โหมดที่ไม่ใช้รูปใน faces/ → ปิดฟีเจอร์นี้ทั้งอัน",
+              off.handle(main.KEY_ENROLL, None, []) is False and not off.open)
+        check("เมนูปิดอยู่ → ไม่กินปุ่มอื่น",
+              main.EnrollMenu(tmp, min_size=0.12).handle(ord("c"), None, []) is False)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+# ── 12f. สั่งให้แกลเลอรีอ่านรูปใหม่ทันทีหลังถ่าย ─────────
+print("\n12f. สั่งให้แกลเลอรีอ่านรูปใหม่ทันทีหลังถ่าย")
+import faces as fc_mod
+
+
+class _Gal(fc_mod.FaceGallery):
+    """นับจำนวนครั้งที่ scan() ถูกเรียก โดยไม่ต้องมีรูปจริงให้ถอดลายเซ็น
+
+    ยังจดลายนิ้วมือโฟลเดอร์เหมือนของจริง ไม่งั้นการเทียบ "เปลี่ยนไหม" จะกลายเป็น
+    การเทียบกับค่าคงที่ ซึ่งเป็นคนละกลไกกับที่ใช้จริง
+    """
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.scans = 0
+
+    def scan(self):
+        self.scans += 1
+        self._fingerprint = fc_mod._fingerprint(self.directory)
+        return 0
+
+
+import shutil as _shutil
+import tempfile as _tempfile
+from pathlib import Path as _P
+
+GAL_CFG = {"threshold": 0.05, "ratio": 0.75, "min_size": 0.12, "rescan_seconds": 20.0,
+           "guess": True, "min_samples": 2, "margin": 0.5}
+gtmp = _P(_tempfile.mkdtemp(prefix="pi-vision-gallery-"))
+try:
+    def _shoot(name="Ann", stem="cam_1"):
+        """เลียนแบบผลของการกด space — ไฟล์รูปใหม่โผล่ในโฟลเดอร์ของคนคนหนึ่ง"""
+        folder = gtmp / name
+        folder.mkdir(exist_ok=True)
+        (folder / f"{stem}.jpg").write_bytes(b"")
+
+    g = _Gal(gtmp, GAL_CFG, lambda p: None)
+    check("ยังไม่ถึงรอบตรวจ → ไม่อ่านซ้ำ", g.maybe_rescan(1.0) is False and g.scans == 0)
+    _shoot()
+    check("รูปใหม่แต่ยังไม่ถึงรอบ → ยังไม่เห็น (นี่คือสาเหตุที่ต้องมี refresh_soon)",
+          g.maybe_rescan(2.0) is False and g.scans == 0)
+    g.refresh_soon()
+    check("ถ่ายรูปเสร็จ → ตรวจทันทีโดยไม่ต้องรอครบรอบ",
+          g.maybe_rescan(2.0) is True and g.scans == 1)
+    check("สั่งครั้งเดียวมีผลครั้งเดียว ไม่ค้างเป็นอ่านทุกเฟรม",
+          g.maybe_rescan(2.1) is False and g.scans == 1)
+
+    g2 = _Gal(gtmp, {**GAL_CFG, "rescan_seconds": 0}, lambda p: None)
+    _shoot(stem="cam_2")
+    g2.refresh_soon()
+    check("ปิดการตรวจเป็นรอบไว้ (=0) ปุ่มที่ผู้ใช้เพิ่งกดก็ยังต้องมีผล",
+          g2.maybe_rescan(5.0) is True and g2.scans == 1)
+
+    g3 = _Gal(gtmp, GAL_CFG, lambda p: None)
+    g3.scan()                       # จดสถานะปัจจุบันไว้ก่อน แล้วไม่แตะโฟลเดอร์อีก
+    g3.refresh_soon()
+    check("สั่งตรวจแล้วแต่โฟลเดอร์ไม่ได้เปลี่ยนจริง → ไม่เสียเวลาอ่านรูปใหม่ทุกใบ",
+          g3.maybe_rescan(1.0) is False and g3.scans == 1)
+finally:
+    _shutil.rmtree(gtmp, ignore_errors=True)
 
 # ── 13. ค่าระดับห้อง ────────────────────────────────────
 print("\n13. ค่าระดับห้อง")

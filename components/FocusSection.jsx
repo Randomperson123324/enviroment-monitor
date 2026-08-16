@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Eye, BookOpen, X, TriangleAlert, VideoOff } from 'lucide-react';
+import { Eye, BookOpen, X, TriangleAlert, VideoOff, Smartphone } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import useFocus, { movementCount } from '@/hooks/useFocus';
@@ -24,6 +24,7 @@ const GLOSSARY = [
   ['direction', 'focus.gDirection'],
   ['posture', 'focus.gPosture'],
   ['emotion', 'focus.gEmotion'],
+  ['phone', 'focus.gPhone'],
   ['face_count', 'focus.gFaceCount'],
   ['created_at', 'focus.gCreatedAt'],
 ];
@@ -41,6 +42,17 @@ const EMOTION_KEYS = {
   angry: 'focus.emoAngry',
   neutral: 'focus.emoNeutral',
 };
+/**
+ * Phone use is a boolean in the database, but the share-of-time breakdown needs
+ * labels like every other mix — so the two verdicts get names here and travel
+ * through the same `mixOf` / `PersonOverview` path as posture and expression.
+ *
+ * Rows where the column is null never become either label: "not checked" is not
+ * a third kind of behaviour, it is the absence of a measurement, and folding it
+ * into `off` would report a room nobody watched as a room where nobody was on
+ * their phone.
+ */
+const PHONE_KEYS = { on: 'focus.phoneOn', off: 'focus.phoneOff' };
 
 /**
  * Translate a value the Pi wrote, falling back to the raw string.
@@ -170,6 +182,11 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
         postures: new Map(),
         emotions: new Map(),
         unsurePostures: 0,
+        // null = ไม่มีแถวไหนในช่วงนี้ที่ตรวจโทรศัพท์เลย (ต่างจาก false)
+        phone: null,
+        phoneSure: true,
+        phones: new Map(),
+        unsurePhone: 0,
       });
     }
     const b = slotMap.get(ts);
@@ -190,6 +207,18 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
       b.postureSure = r.posture_confident === true;
       b.postures.set(r.posture, (b.postures.get(r.posture) ?? 0) + 1);
       if (!b.postureSure) b.unsurePostures++;
+    }
+    // `!= null` on purpose: `false` is a verdict and must be tallied, while null
+    // (older rows, or a Pi with PHONE_ENABLED off) must not become one.
+    if (r.phone != null) {
+      b.phone = r.phone;
+      // Only a "yes" can be a guess. pi-vision clears the confidence flag when it
+      // releases the label, so reading `phone_confident` on a "no" would mark every
+      // ordinary not-on-their-phone window as uncertain.
+      b.phoneSure = r.phone ? r.phone_confident === true : true;
+      const verdict = r.phone ? 'on' : 'off';
+      b.phones.set(verdict, (b.phones.get(verdict) ?? 0) + 1);
+      if (r.phone && !b.phoneSure) b.unsurePhone++;
     }
   }
 
@@ -234,12 +263,18 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
     // Posture and emotion are states, not identity: the newest reading wins, and the
     // bucket that carried it also carries whether it was measured or inferred.
     const posed = pts.reduce((found, p) => (p.posture ? p : found), null);
+    const phoned = pts.reduce((found, p) => (p.phone != null ? p : found), null);
     return {
       person,
       name,
       ids,
       posture: posed?.posture ?? null,
       postureSure: posed?.postureSure ?? true,
+      // null ตลอดทั้งหน้าต่าง = ไม่ได้ตรวจ · การ์ดต้องขึ้นว่า "ไม่ได้ตรวจ" ไม่ใช่ "ไม่ได้ใช้"
+      phone: phoned?.phone ?? null,
+      phoneSure: phoned?.phoneSure ?? true,
+      phoneMix: mixOf(pts, 'phones'),
+      unsurePhone: pts.reduce((a, p) => a + p.unsurePhone, 0),
       emotion: pts.reduce((found, p) => p.emotion ?? found, null),
       // How the whole window broke down, not just where it ended — one glance at
       // "sat 80% of the time" says more about a session than the final reading does.
@@ -351,7 +386,12 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
               }
               const pose = vocab(POSTURE_KEYS, b?.posture, t);
               const mood = vocab(EMOTION_KEYS, b?.emotion, t);
-              const state = [pose && `${pose}${b.postureSure ? '' : '?'}`, mood].filter(Boolean);
+              // Only shown while they were on it — a "not on their phone" note on
+              // every point of every line would crowd out what the tooltip is for.
+              const onPhone = b?.phone ? `📱 ${t('focus.phoneOn')}${b.phoneSure ? '' : '?'}` : null;
+              const state = [pose && `${pose}${b.postureSure ? '' : '?'}`, mood, onPhone].filter(
+                Boolean
+              );
               if (state.length) lines.push(`   ${state.join(' · ')}`);
               return lines;
             },
@@ -425,6 +465,23 @@ function IdDetail({ series, palette, colors, threshold, onClose, t }) {
         <div>
           <div className="dir-label">{t('focus.emotion')}</div>
           <div className="dir-val">{vocab(EMOTION_KEYS, series.emotion, t) ?? '--'}</div>
+        </div>
+        <div>
+          <div className="dir-label">{t('focus.phone')}</div>
+          {/* Three states, not two: in use / not in use / never checked. The last
+              one shows as "--" like any other missing reading rather than as "no",
+              because a Pi that is not looking is not evidence of a quiet room. */}
+          <div
+            className="dir-val"
+            style={series.phone ? { color: 'var(--lv-warning)' } : undefined}
+          >
+            {series.phone == null ? '--' : t(series.phone ? 'focus.phoneYes' : 'focus.phoneNo')}
+            {series.phone && !series.phoneSure && (
+              <span className="pose-unsure" title={t('focus.phoneUnsure')}>
+                ?
+              </span>
+            )}
+          </div>
         </div>
         {/* Only worth the space once a person has been issued more than one number —
             for a single track it just repeats the title. */}
@@ -528,6 +585,29 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
   const mvPerMin = lastBucket?.movement ?? null;
   const overThreshold = mvPerMin != null && mvPerMin > threshold;
   const faceCount = latest?.face_count ?? null;
+
+  /**
+   * How many people are on a phone in the newest bucket the chart draws.
+   *
+   * Counted from the same series the chart uses, at its last label, so the number
+   * and the lines can never disagree — and counted per *person* rather than per
+   * row, since one person writes several rows a minute.
+   *
+   * `checked` is tracked separately: with nobody's verdict known the answer is
+   * "not being checked", which is a different statement from "nobody is on their
+   * phone" and the one a room without the feature must show.
+   */
+  const phoneNow = useMemo(() => {
+    let people = 0;
+    let checked = false;
+    for (const s of series) {
+      const now = s.points[s.points.length - 1];
+      if (!now || now.phone == null) continue;
+      checked = true;
+      if (now.phone) people++;
+    }
+    return { people, checked };
+  }, [series]);
 
   return (
     <section className="section-gap">
@@ -667,6 +747,21 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                   titleKey="focus.emotion"
                   t={t}
                 />
+                <PersonOverview
+                  series={selectedSeries}
+                  hue={palette[selectedSeries.slot] ?? colors.tick}
+                  keys={{ mix: 'phoneMix', vocab: PHONE_KEYS }}
+                  titleKey="focus.phone"
+                  t={t}
+                />
+                {/* Same reasoning as the posture note above: how much of the split
+                    rests on the wrists being visible is a separate fact from what
+                    the split says. */}
+                {selectedSeries.unsurePhone > 0 && (
+                  <div className="overview-note">
+                    {t('focus.phoneUnsureCount', { n: selectedSeries.unsurePhone })}
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -726,6 +821,38 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                   : faceCount === 1
                     ? t('focus.faceOne')
                     : t('focus.faceMany', { n: faceCount })}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="fcard-label">
+              <span>
+                <Smartphone size={14} strokeWidth={2.2} aria-hidden /> {t('focus.phoneNow')}
+              </span>
+              {phoneNow.checked && phoneNow.people > 0 && (
+                <span className="badge warning">{t('focus.phoneYes')}</span>
+              )}
+            </div>
+            {/* Warning colour only when someone actually is — nobody on a phone is
+                the ordinary state of a room, not a success worth painting green. */}
+            <div
+              className="fcard-val"
+              style={{
+                color: !phoneNow.checked
+                  ? 'var(--muted)'
+                  : phoneNow.people > 0
+                    ? 'var(--lv-warning)'
+                    : 'var(--muted)',
+              }}
+            >
+              {phoneNow.checked ? phoneNow.people : '--'}
+            </div>
+            <div className="fcard-sub">
+              {!phoneNow.checked
+                ? t('focus.phoneNowUnknown')
+                : phoneNow.people === 0
+                  ? t('focus.phoneNowNone')
+                  : t('focus.phoneNowSome', { n: phoneNow.people })}
             </div>
           </div>
         </div>

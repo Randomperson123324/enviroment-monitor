@@ -136,6 +136,10 @@ def draw_face(img, reading, display_cfg, blink_cfg, points=None):
             # ความหมายเดียวกับ `?` ท้ายชื่อคนที่ยังไม่ผ่านเกณฑ์ (ดู faces.py)
             bits.append(posture if getattr(reading, "posture_confident", True)
                         else f"{posture}?")
+        # ขึ้นเฉพาะตอนใช้อยู่จริง — ป้าย "no phone" ติดอยู่ทุกคนตลอดเวลาไม่ได้บอกอะไร
+        # และจะเบียดป้ายอื่นที่เปลี่ยนแปลงจริงออกจากบรรทัด
+        if getattr(reading, "phone", None):
+            bits.append("PHONE" if getattr(reading, "phone_confident", True) else "PHONE?")
         if display_cfg.get("show_eyes", True):
             bits.append(f"eye {reading.blink_score:.2f}")
         if reading.direction:
@@ -178,6 +182,21 @@ def draw_zoom_rects(img, rects):
         cv2.rectangle(img, (x1, y1), (x2, y2), COLORS["eye"], 1, LINE)
 
 
+def draw_phones(img, boxes):
+    """
+    กรอบรอบโทรศัพท์ที่ตัวตรวจเห็น — **ทุกเครื่อง ไม่ใช่เฉพาะเครื่องที่จับคู่กับคนได้**
+
+    วาดของที่ถูกตัดทิ้งไปด้วยโดยตั้งใจ: เมื่อป้าย `PHONE` ไม่ขึ้นทั้งที่คนกำลังเล่น
+    อยู่ชัด ๆ กรอบนี้แยกสองสาเหตุออกจากกันได้ทันที — ตรวจไม่เจอเครื่องเลย (ไม่มีกรอบ)
+    กับ ตรวจเจอแต่จับคู่กับคนไม่ได้ (มีกรอบแต่ไม่มีป้าย) ซึ่งแก้คนละทาง:
+    อย่างแรกลด PHONE_MIN_SCORE อย่างหลังเพิ่ม PHONE_HAND_REACH / PHONE_FACE_REACH
+    """
+    h, w = img.shape[:2]
+    for x1, y1, x2, y2 in boxes or ():
+        cv2.rectangle(img, (int(x1 * w), int(y1 * h)), (int(x2 * w), int(y2 * h)),
+                      COLORS["warn"], 1, LINE)
+
+
 def draw_menu(img, title, items, footer=None):
     """เมนูกึ่งกลางจอ วาดทับเฟรมปัจจุบัน — ใช้เลือกกล้อง ฯลฯ
 
@@ -210,6 +229,58 @@ def draw_menu(img, title, items, footer=None):
             img,
             text,
             (x1 + pad, y),
+            COLORS.get(color_key, COLORS["ink"]),
+            scale=scale,
+            thickness=2 if i == 0 else None,
+        )
+
+
+def draw_aim(img, box, color_key: str = "eye"):
+    """
+    มุมสี่มุมรอบคนที่กำลังถูกเล็ง — ใช้ตอนถ่ายรูปลงทะเบียน
+
+    วาดเป็นมุมไม่ใช่กรอบเต็ม เพราะกรอบวิเคราะห์ปกติของคนคนนั้นวาดอยู่ตรงนั้นแล้ว
+    สองกรอบทับกันสนิทแยกไม่ออกว่าอันไหนคืออันไหน · มุมอ่านออกทันทีว่า "เล็งอยู่ที่นี่"
+    """
+    h, w = img.shape[:2]
+    x1, y1, x2, y2 = box
+    p1 = (int(x1 * w), int(y1 * h))
+    p2 = (int(x2 * w), int(y2 * h))
+    # ความยาวขาของมุม = 1 ใน 4 ของด้านที่สั้นกว่า — มุมจึงไม่ยาวจนบรรจบกันเป็นกรอบ
+    leg = max(6, min(p2[0] - p1[0], p2[1] - p1[1]) // 4)
+    color = COLORS.get(color_key, COLORS["eye"])
+    for cx, sx in ((p1[0], 1), (p2[0], -1)):
+        for cy, sy in ((p1[1], 1), (p2[1], -1)):
+            cv2.line(img, (cx, cy), (cx + sx * leg, cy), color, 2, LINE)
+            cv2.line(img, (cx, cy), (cx, cy + sy * leg), color, 2, LINE)
+
+
+def draw_prompt(img, title, lines, footer=None):
+    """
+    แผงคำสั่งที่ขอบล่างจอ — รูปแบบเดียวกับ draw_menu แต่ไม่บังกลางภาพ
+
+    ใช้กับโหมดที่ผู้ใช้ต้อง**เห็นภาพจากกล้องไปด้วยขณะกด** เช่นการถ่ายรูปลงทะเบียน
+    ซึ่งคนที่กำลังจะถูกถ่ายต้องเห็นว่าตัวเองอยู่ในเฟรมพอดีไหม และเห็นมุมเล็งว่ากล้อง
+    กำลังเล็งใครอยู่ · เมนูกลางจอบังทั้งสองอย่างพอดี
+    """
+    h, w = img.shape[:2]
+    scale, lh, pad = LAYOUT["hud_scale"], LAYOUT["hud_line_height"], LAYOUT["hud_pad"]
+    m = LAYOUT["hud_margin"]
+
+    rows = [(title, "ink"), *lines]
+    if footer:
+        rows.append((footer, "muted"))
+
+    box_h = lh * len(rows) + pad * 2
+    y1 = h - m - box_h
+    _panel(img, m, y1, w - m, y1 + box_h)
+    _panel(img, m, y1, w - m, y1 + box_h)
+
+    for i, (text, color_key) in enumerate(rows):
+        _text(
+            img,
+            text,
+            (m + pad, y1 + pad + lh * (i + 1) - 5),
             COLORS.get(color_key, COLORS["ink"]),
             scale=scale,
             thickness=2 if i == 0 else None,

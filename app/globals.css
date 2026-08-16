@@ -2329,6 +2329,15 @@ textarea {
   margin-bottom: 6px;
 }
 
+/* A card title that carries an icon. The label itself is a space-between flex
+   row (title vs badge), so the icon has to pair with the text inside its own
+   box — dropping it in as a third child would push the two apart. */
+.fcard-label > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .fcard-val {
   font-weight: 600;
   line-height: 1.1;
