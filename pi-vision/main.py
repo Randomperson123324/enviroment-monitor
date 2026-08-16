@@ -1260,10 +1260,16 @@ def main() -> int:
         # ไม่มี pose ให้จับคู่ ผลคือจ่าย CPU ไปแล้วทิ้งผลทั้งหมด
         body_n = max(1, cfg["body"]["every_n_frames"])
         phone_every = ((every + body_n - 1) // body_n) * body_n
-        print(f"[pi-vision] ตรวจการใช้โทรศัพท์อยู่ (ทุก {phone_every} เฟรม)"
-              " — นับเฉพาะเครื่องที่อยู่ในระยะมือของคนในเฟรม")
-        print("[pi-vision]   โทรศัพท์ที่วางบนโต๊ะไม่ถูกนับ · ป้ายที่มี `?` = เดาจากตำแหน่ง"
-              "เพราะมองไม่เห็นข้อมือ")
+        if cfg["phone"]["nearest_always"]:
+            print(f"[pi-vision] ตรวจการใช้โทรศัพท์อยู่ (ทุก {phone_every} เฟรม)"
+                  " — ยกทุกเครื่องที่เห็นให้คนที่อยู่ใกล้ที่สุด")
+            print("[pi-vision]   ⚠️ โทรศัพท์ที่วางบนโต๊ะก็ถูกนับด้วย · ป้ายที่มี `?` ="
+                  " แค่ใกล้ที่สุด ไม่ได้เห็นอยู่ในมือ (คอลัมน์ phone_confident=false)")
+        else:
+            print(f"[pi-vision] ตรวจการใช้โทรศัพท์อยู่ (ทุก {phone_every} เฟรม)"
+                  " — โหมดเข้ม: นับเฉพาะเครื่องที่มีหลักฐานว่าถืออยู่")
+            print("[pi-vision]   โทรศัพท์ที่วางบนโต๊ะไม่ถูกนับ · ป้ายที่มี `?` = เดาจากตำแหน่ง"
+                  "เพราะมองไม่เห็นข้อมือ")
     tracker = PersonTracker(tracker_cfg)
     an = az.FaceAnalyzer(cfg, mirror=cam_cfg["mirror"],
                          report_person=mode.report_person, track_eyes=mode.eyes,

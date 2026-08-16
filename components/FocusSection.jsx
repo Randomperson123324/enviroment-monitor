@@ -754,9 +754,11 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                   titleKey="focus.phone"
                   t={t}
                 />
-                {/* Same reasoning as the posture note above: how much of the split
-                    rests on the wrists being visible is a separate fact from what
-                    the split says. */}
+                {/* Same reasoning as the posture note above, and it carries more
+                    weight here: the Pi credits every phone it sees to whoever is
+                    nearest, so a count of how many of these were distance matches
+                    rather than seen-in-hand is what separates "they were on their
+                    phone" from "a phone was lying next to them". */}
                 {selectedSeries.unsurePhone > 0 && (
                   <div className="overview-note">
                     {t('focus.phoneUnsureCount', { n: selectedSeries.unsurePhone })}

@@ -78,16 +78,26 @@ def person(key=1, cx=0.5, cy=0.5, size=0.10, wrists_visible=True, with_pose=True
     )
 
 
-# ── 1. โทรศัพท์ที่ไม่มีใครถือ ────────────────────────────
-print("\n1. โทรศัพท์ที่ไม่มีใครถือ")
+# ── 1. ทุกเครื่องต้องมีเจ้าของ ───────────────────────────
+print("\n1. ทุกเครื่องต้องมีเจ้าของ (นโยบายใกล้ที่สุด)")
 alone = person(cx=0.25)
 # วางอยู่มุมขวาล่างของเฟรม ห่างจากทั้งมือและใบหน้าของคนเดียวในห้อง
 desk = ph.assign([phone_at(0.90, 0.90)], [alone], CFG)
-check("โทรศัพท์วางบนโต๊ะไกล ๆ → ไม่มีใครถูกนับว่าใช้อยู่", desk == {}, f"({desk})")
+check("โทรศัพท์วางบนโต๊ะไกล ๆ → ยังยกให้คนที่ใกล้ที่สุด", 1 in desk, f"({desk})")
+# ⚠️ ราคาของนโยบายนี้ ต้องอ่านออกจากข้อมูลได้ ไม่ใช่ซ่อนไว้
+check("แต่ต้องบอกว่าไม่ใช่การวัด (แค่ใกล้ที่สุด)", desk[1].confident is False)
 
 check("ไม่มีโทรศัพท์ในเฟรมเลย → ไม่มีใครถูกนับ", ph.assign([], [alone], CFG) == {})
 check("มีโทรศัพท์แต่ไม่มีคน → ไม่ระเบิด และไม่มีใครถูกนับ",
       ph.assign([phone_at(0.5, 0.5)], [], CFG) == {})
+
+# โหมดเข้ม — ยังต้องกลับไปเป็นแบบเดิมได้ด้วยค่าตั้งค่าเดียว
+STRICT = {**CFG, "nearest_always": False}
+check("PHONE_NEAREST_ALWAYS=false → ของบนโต๊ะไม่ถูกนับให้ใครเหมือนเดิม",
+      ph.assign([phone_at(0.90, 0.90)], [alone], STRICT) == {})
+check("โหมดเข้มยังนับเครื่องที่อยู่ในมือตามปกติ",
+      1 in ph.assign([phone_at(0.25 - 0.10 * 1.2, 0.5 + 0.10 * 2.0)],
+                     [person(cx=0.25, cy=0.5, size=0.10)], STRICT))
 
 # ── 2. โทรศัพท์ในมือ ─────────────────────────────────────
 print("\n2. โทรศัพท์ในมือ")
@@ -97,14 +107,14 @@ in_hand = ph.assign([phone_at(0.62, 0.70)], [p], CFG)
 check("โทรศัพท์อยู่ที่ข้อมือ → ถูกนับว่าใช้อยู่", 1 in in_hand, f"({in_hand})")
 check("และเป็นการ**วัด** ไม่ใช่การเดา", in_hand[1].confident is True)
 
-far = ph.assign([phone_at(0.62, 0.70)], [person(cx=0.5, cy=0.5, size=0.04)], CFG)
-check("คนตัวเล็ก (นั่งไกล) กับโทรศัพท์ที่ห่างเท่าเดิมบนภาพ → ไกลเกินมือ ไม่ถูกนับ",
+far = ph.assign([phone_at(0.62, 0.70)], [person(cx=0.5, cy=0.5, size=0.04)], STRICT)
+check("คนตัวเล็ก (นั่งไกล) กับโทรศัพท์ที่ห่างเท่าเดิมบนภาพ → ไกลเกินมือ ไม่ใช่การวัด",
       far == {}, f"({far})")
 # ระยะที่ "เท่ากันเมื่อวัดเป็นสัดส่วนของตัว" ต้องให้คำตอบเดียวกันทุกขนาด
 small = person(cx=0.5, cy=0.5, size=0.04)
 near_small = ph.assign([phone_at(0.5 + 0.04 * 1.2, 0.5 + 0.04 * 2.0)], [small], CFG,)
 check("คนตัวเล็กที่ถือโทรศัพท์อยู่ในมือจริง → ถูกนับเหมือนคนตัวใหญ่",
-      1 in near_small, f"({near_small})")
+      1 in near_small and near_small[1].confident is True, f"({near_small})")
 
 # ── 3. หลายคนในเฟรม ─────────────────────────────────────
 print("\n3. หลายคนในเฟรม")
@@ -118,6 +128,24 @@ check("และเป็นคนที่มืออยู่ใกล้ท�
 two = ph.assign([phone_at(0.396, 0.66), phone_at(0.604, 0.66)], [left, right], CFG)
 check("สองเครื่องสองคน → ได้ทั้งคู่ ไม่สลับกัน", set(two) == {1, 2}, f"({two})")
 
+# ── หัวใจของนโยบาย: ไม่มีใครถือ ก็ยกให้คนที่ใกล้ที่สุด ──
+blind_l = person(key=1, cx=0.30, cy=0.50, size=0.08, wrists_visible=False)
+blind_r = person(key=2, cx=0.70, cy=0.50, size=0.08, wrists_visible=False)
+# วางไว้บนโต๊ะกลางห้องแต่ค่อนไปทางขวา — ไม่อยู่ในช่องใต้หน้าใครเลย
+mid = ph.assign([phone_at(0.60, 0.95)], [blind_l, blind_r], CFG)
+check("ไม่มีใครถือ → คนที่ใกล้ที่สุดได้ไป", set(mid) == {2}, f"({mid})")
+check("และเป็นคนเดียว ไม่ใช่ทั้งห้อง", len(mid) == 1)
+mirrored = ph.assign([phone_at(0.40, 0.95)], [blind_l, blind_r], CFG)
+check("ย้ายเครื่องไปอีกฝั่ง → เจ้าของเปลี่ยนตาม", set(mirrored) == {1}, f"({mirrored})")
+
+# คนที่ถืออยู่จริงต้องชนะคนที่บังเอิญนั่งใกล้กว่า
+holder_far = person(key=1, cx=0.20, cy=0.50, size=0.08)
+bystander = person(key=2, cx=0.55, cy=0.50, size=0.08, wrists_visible=False)
+# อยู่ที่ข้อมือขวาของคนซ้าย (0.20 + 0.096, 0.50 + 0.16) แต่ใกล้ตัวคนขวามากกว่า
+wins = ph.assign([phone_at(0.296, 0.66)], [holder_far, bystander], CFG)
+check("เห็นอยู่ในมือใคร คนนั้นชนะคนที่แค่นั่งใกล้กว่า", set(wins) == {1}, f"({wins})")
+check("และนับเป็นการวัด", wins[1].confident is True)
+
 # ── 4. เมื่อมองไม่เห็นข้อมือ (กล้องตั้งโต๊ะ) ──────────────
 print("\n4. เมื่อมองไม่เห็นข้อมือ")
 blind = person(cx=0.5, cy=0.5, size=0.10, wrists_visible=False)
@@ -125,7 +153,7 @@ guessed = ph.assign([phone_at(0.55, 0.55)], [blind], CFG)
 check("โทรศัพท์ใต้ใบหน้า แม้ไม่เห็นข้อมือ → ยังตอบได้", 1 in guessed, f"({guessed})")
 check("แต่ต้องบอกว่าเป็นการเดา ไม่ใช่การวัด", guessed[1].confident is False)
 
-above = ph.assign([phone_at(0.5, 0.05)], [blind], CFG)
+above = ph.assign([phone_at(0.5, 0.05)], [blind], STRICT)
 check("ของที่อยู่**เหนือ**ศีรษะ (เช่นจอบนผนัง) → ไม่ใช่ท่าถือโทรศัพท์",
       above == {}, f"({above})")
 
@@ -135,16 +163,19 @@ check("ไม่มี pose เลย (โมเดลท่าทางไม�
 
 # ── กรณีจริงจากรูปใน faces/ ──
 # ตัวตรวจเห็นของสี่เหลี่ยมมืดบนโต๊ะที่มุมขวาล่าง (คะแนน 0.40) ส่วนคนอยู่กลางภาพ
-# มองไม่เห็นข้อมือทั้งสองข้าง (visibility 0.09 / 0.05) จึงเข้าชั้นเดาเต็ม ๆ
-# ⚠️ เคยนับผิดว่าเธอกำลังใช้โทรศัพท์ ตอนที่ชั้นเดาวัดเป็นรัศมีอันเดียว — ดู _face_gap
+# มองไม่เห็นข้อมือทั้งสองข้าง (visibility 0.09 / 0.05) จึงไม่มีหลักฐานว่าถืออยู่เลย
+# ⚠️ นี่คือ**ราคาของนโยบายใกล้ที่สุด**ที่วัดได้จากรูปจริง ไม่ใช่กรณีสมมติ
 REAL_PHONE = ph.Seen(box=(0.890, 0.797, 0.995, 0.870), score=0.40)
 REAL_FACE = (0.190, 0.323, 0.642, 0.734)
 REAL_ASPECT = 864 / 1152
-on_desk = ph.assign([REAL_PHONE],
-                    [ph.Person(key=1, face_box=REAL_FACE, points=None)],
-                    CFG, aspect=REAL_ASPECT)
-check("ของบนโต๊ะข้าง ๆ ในรูปจริง → ไม่ถูกนับว่าเธอกำลังใช้โทรศัพท์",
-      on_desk == {}, f"({on_desk})")
+REAL_PERSON = [ph.Person(key=1, face_box=REAL_FACE, points=None)]
+on_desk = ph.assign([REAL_PHONE], REAL_PERSON, CFG, aspect=REAL_ASPECT)
+check("ของบนโต๊ะข้าง ๆ ในรูปจริง → ถูกยกให้เธอเพราะเป็นคนที่ใกล้ที่สุด",
+      1 in on_desk, f"({on_desk})")
+check("แต่ติดธงไว้ว่าไม่ได้วัด — ปลายทางกรองออกได้",
+      on_desk[1].confident is False)
+check("โหมดเข้มยังปฏิเสธกรณีนี้ได้เหมือนเดิม",
+      ph.assign([REAL_PHONE], REAL_PERSON, STRICT, aspect=REAL_ASPECT) == {})
 # ของชิ้นเดียวกันแต่ย้ายมาอยู่ใต้คางในระยะที่มือถืออยู่ ต้องยังตอบว่าใช่
 fx1, fy1, fx2, fy2 = REAL_FACE
 cx, below = (fx1 + fx2) / 2, fy2 + 0.05
