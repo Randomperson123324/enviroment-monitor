@@ -4,6 +4,7 @@ import { Sigma } from 'lucide-react';
 import SectionHeader from '@/components/SectionHeader';
 import { SENSORS } from '@/config/sensors';
 import { CHART_COLORS } from '@/config/client';
+import SlidingNumber from '@/components/SlidingNumber';
 import { useLang } from '@/hooks/useLang';
 
 /** Metric rows: the three sensors plus the computed health score. */
@@ -71,10 +72,18 @@ export default function StatsTable({ stats, latest, theme, loading }) {
                         {label}
                       </span>
                     </td>
-                    <td className="num strong">{fmt(latest?.[m.key], m.dp)}</td>
-                    <td className="num">{fmt(block?.min, m.dp)}</td>
-                    <td className="num">{fmt(block?.avg, m.dp)}</td>
-                    <td className="num">{fmt(block?.max, m.dp)}</td>
+                    <td className="num strong">
+                      <SlidingNumber value={fmt(latest?.[m.key], m.dp)} />
+                    </td>
+                    <td className="num">
+                      <SlidingNumber value={fmt(block?.min, m.dp)} />
+                    </td>
+                    <td className="num">
+                      <SlidingNumber value={fmt(block?.avg, m.dp)} />
+                    </td>
+                    <td className="num">
+                      <SlidingNumber value={fmt(block?.max, m.dp)} />
+                    </td>
                   </tr>
                 );
               })}

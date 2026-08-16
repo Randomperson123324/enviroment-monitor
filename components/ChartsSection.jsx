@@ -28,6 +28,7 @@ import {
   tooltipOptions,
   hasSeriesData,
 } from '@/lib/chart-utils';
+import SlidingNumber from '@/components/SlidingNumber';
 import { useLang } from '@/hooks/useLang';
 
 function HistoryChart({ view, smooth, colors }) {
@@ -361,7 +362,7 @@ function AqiMeter({ value, unit }) {
       </div>
       <div className="aqi-reading">
         <div className="aqi-value">
-          {value != null ? Number(value).toFixed(0) : '--'}
+          <SlidingNumber value={value != null ? Number(value).toFixed(0) : '--'} />
           <small> {unit}</small>
         </div>
         <div className="aqi-cat" style={{ color: level ? STATUS_COLORS[level.status] : 'var(--muted)' }}>

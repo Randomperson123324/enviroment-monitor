@@ -4736,6 +4736,79 @@ span.ai-tab {
   margin-left: 4px;
 }
 
+/* A changed reading hands off between two figures instead of blinking to the
+   new one: the old digit rises out of frame while shrinking and blurring, the
+   new one arrives from below doing the reverse. Only the characters that
+   actually changed move — see components/SlidingNumber.jsx.
+
+   The two figures share one grid cell so the outgoing one is out of flow and
+   the column keeps its width. Tabular figures (above) are the reason a digit
+   can be swapped without the rest of the number shifting. */
+.num-slide {
+  display: inline-flex;
+}
+
+.num-cell {
+  display: inline-grid;
+}
+
+.num-cell > span {
+  grid-area: 1 / 1;
+}
+
+@keyframes num-out {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    opacity: 1;
+  }
+  60% {
+    opacity: 0.25;
+  }
+  100% {
+    transform: translateY(-115%) scale(0.7);
+    filter: blur(6px);
+    opacity: 0;
+  }
+}
+
+/* The arriving figure rises past its resting line, then eases back down onto
+   it — one overshoot, no rocking. Percentages are against a 0.5s run: the
+   climb takes the first 0.2s, the return the remaining 0.3s. */
+@keyframes num-in {
+  0% {
+    transform: translateY(115%) scale(0.7);
+    filter: blur(6px);
+    opacity: 0;
+  }
+  27% {
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-14%) scale(1.05);
+    filter: blur(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+.num-out {
+  animation: num-out 0.3s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+/* ease-out per segment, so the overshoot and the settle each decelerate rather
+   than the whole arc easing once and crawling at the end. Longer than num-out
+   on purpose — the old figure is gone by 0.3s while the new one is still
+   rocking into place. The reduced-motion rule at the top of this file collapses
+   both to nothing; `forwards` keeps each at its final frame when it does. */
+.num-in {
+  animation: num-in 0.5s ease-out forwards;
+}
+
 /* "พอใช้" — above the clean mark but below the warning one — was drawn in the
    same green as "สะอาด", which reads as an all-clear. Neutral instead: it is
    information, not reassurance and not a warning. */

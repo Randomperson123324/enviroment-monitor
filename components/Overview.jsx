@@ -4,6 +4,7 @@ import { RotateCw, TriangleAlert } from 'lucide-react';
 import { scoreBand } from '@/config/sensors';
 import { SCORE_BAND_COLORS } from '@/config/client';
 import SummaryBody from '@/components/SummaryBody';
+import SlidingNumber from '@/components/SlidingNumber';
 import { useLang } from '@/hooks/useLang';
 
 /** "18:40" in the active locale — summaries are hours apart, so time is enough. */
@@ -71,7 +72,7 @@ export default function Overview({
         </svg>
         <div className="ring-inner">
           <div className="ring-num" style={{ color }}>
-            {score ?? '--'}
+            <SlidingNumber value={String(score ?? '--')} />
           </div>
         </div>
       </div>

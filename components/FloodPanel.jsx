@@ -16,6 +16,7 @@ import {
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import SectionHeader from '@/components/SectionHeader';
+import SlidingNumber from '@/components/SlidingNumber';
 import { CHART_COLORS, STATUS_COLORS } from '@/config/client';
 import { gradientFill } from '@/lib/chart-utils';
 import { agoTh, timeTh } from '@/lib/format';
@@ -113,7 +114,7 @@ function StationCard({ st, colors }) {
 
       <div className="flood-reading">
         <div className={`flood-level ${st.stale ? 'stale' : ''}`}>
-          {noData ? '--' : st.level.toFixed(1)}
+          <SlidingNumber value={noData ? '--' : st.level.toFixed(1)} />
           <small> {t('flood.cm')}</small>
         </div>
         <div className="flood-meta">

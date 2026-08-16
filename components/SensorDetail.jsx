@@ -13,6 +13,7 @@ import {
   tooltipOptions,
 } from '@/lib/chart-utils';
 import { useLang } from '@/hooks/useLang';
+import SlidingNumber from '@/components/SlidingNumber';
 
 /**
  * Shades the sensor's ideal range straight onto the plot, so "was it ever out
@@ -182,7 +183,7 @@ export default function SensorDetail({
             </span>
           </div>
           <span className="sensor-modal-value">
-            {fmt(value)}
+            <SlidingNumber value={fmt(value)} />
             <small>{sensor.unit}</small>
           </span>
           <button

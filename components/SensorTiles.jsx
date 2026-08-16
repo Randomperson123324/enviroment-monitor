@@ -15,6 +15,7 @@ import {
 } from '@/lib/chart-utils';
 import { useLang } from '@/hooks/useLang';
 import SensorDetail from '@/components/SensorDetail';
+import SlidingNumber from '@/components/SlidingNumber';
 
 // Mini sparklines read as a trend, not a data table — smooth harder than the
 // main chart so raw sensor jitter doesn't look ragged (flows like the flood card).
@@ -53,7 +54,8 @@ function tileState(sensor, latest, view) {
 function TileValue({ sensor, value }) {
   return (
     <span className="tile-value">
-      {value != null ? value.toFixed(sensor.dp) : '--'}
+      {/* Only the figure slides — the unit sits still beside it. */}
+      <SlidingNumber value={value != null ? value.toFixed(sensor.dp) : '--'} />
       <small>{sensor.unit}</small>
     </span>
   );
