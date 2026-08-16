@@ -2204,6 +2204,13 @@ textarea {
   margin-top: 12px;
 }
 
+/* The names on the "on their phone" card reuse the chart legend's chips so the
+   swatches read as the same language, but they sit inside a stat card rather
+   than under a chart — the legend's 12px top margin is too much there. */
+.id-legend.phone-who {
+  margin-top: 6px;
+}
+
 .id-legend-item {
   display: inline-flex;
   align-items: center;

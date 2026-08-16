@@ -154,10 +154,23 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
     if (!Number.isFinite(t)) continue;
     const ts = Math.floor(t / bucketMs) * bucketMs;
     const track = r.person == null ? '—' : String(r.person);
-    // Resolved per track, not per row: a track's first rows are nameless while the
-    // face signature settles, and keying those on the number would split the very
-    // person this grouping exists to keep whole.
-    const name = trackNames.get(track) ?? null;
+    /**
+     * A row that names someone is believed. Only a nameless row falls back to
+     * whatever name its track settled on.
+     *
+     * ⚠️ It used to be the track's majority name for every row, which quietly
+     * relabelled people. In the activity mode this Pi runs, re-ID is off by
+     * design and track numbers are reissued constantly — real rows minutes apart
+     * read `person: 1` for Nicha, then Donut, then Pun. Voting on the track meant
+     * all three collapsed into whichever name held the majority, so the card
+     * naming who was on a phone answered "Pun" for a row that said Donut.
+     *
+     * The vote still earns its place for nameless rows: a track's first windows
+     * are unnamed while the face signature settles, and keying those on the
+     * number alone would split the very person this grouping exists to keep
+     * whole. What it must not do is overrule a row that already said who it was.
+     */
+    const name = r.name ?? trackNames.get(track) ?? null;
     const person = name ?? track;
     if (!trackIds.has(person)) trackIds.set(person, new Set());
     trackIds.get(person).add(track);
@@ -211,14 +224,30 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
     // `!= null` on purpose: `false` is a verdict and must be tallied, while null
     // (older rows, or a Pi with PHONE_ENABLED off) must not become one.
     if (r.phone != null) {
-      b.phone = r.phone;
-      // Only a "yes" can be a guess. pi-vision clears the confidence flag when it
-      // releases the label, so reading `phone_confident` on a "no" would mark every
-      // ordinary not-on-their-phone window as uncertain.
-      b.phoneSure = r.phone ? r.phone_confident === true : true;
+      // ⚠️ **Any "yes" in the bucket wins**, unlike posture/emotion where the last
+      // row decides. A bucket is four 15-second windows and the signal genuinely
+      // alternates inside one: real rows from the Pi read true, false, false, true
+      // for the same person over a single minute as the phone leaves and re-enters
+      // the detector's view. Last-write-wins would answer "was it in view at the
+      // end of the minute", which flickers, when the question being asked is "was
+      // this person on their phone during this minute".
+      // The share-of-time split below is unaffected — it counts every row.
+      if (r.phone) {
+        const sure = r.phone_confident === true;
+        // Confidence rises but never falls, matching pi-vision's PhoneHold: one
+        // window that saw the wrist is not undone by the next one that did not.
+        b.phoneSure = b.phone ? b.phoneSure || sure : sure;
+        b.phone = true;
+      } else if (b.phone == null) {
+        // Only a "yes" can be a guess. pi-vision clears the confidence flag when it
+        // releases the label, so reading `phone_confident` on a "no" would mark every
+        // ordinary not-on-their-phone window as uncertain.
+        b.phone = false;
+        b.phoneSure = true;
+      }
       const verdict = r.phone ? 'on' : 'off';
       b.phones.set(verdict, (b.phones.get(verdict) ?? 0) + 1);
-      if (r.phone && !b.phoneSure) b.unsurePhone++;
+      if (r.phone && r.phone_confident !== true) b.unsurePhone++;
     }
   }
 
@@ -294,7 +323,39 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
     };
   });
 
-  return { labels, series, overflow };
+  /**
+   * Who is on a phone in the newest bucket — **names, not just a count**.
+   *
+   * Built from `persons` rather than `series` on purpose: `series` is capped at
+   * the number of colours the chart can tell apart, and the Pi now tracks more
+   * people than that. Someone past the cap still belongs in this answer — being
+   * the ninth person the chart could not colour is no reason to leave them out
+   * of "who is on their phone".
+   *
+   * `checked` is separate from an empty list: with nobody's verdict known the
+   * honest answer is "not being checked", which is a different statement from
+   * "nobody is on their phone".
+   */
+  const newest = labels[labels.length - 1];
+  const onPhone = [];
+  let phoneChecked = false;
+  persons.forEach(({ person, pts }, index) => {
+    const now = pts.find((b) => b.ts === newest);
+    if (!now || now.phone == null) return;
+    phoneChecked = true;
+    if (!now.phone) return;
+    const name = pts.reduce((found, p) => p.name ?? found, null);
+    onPhone.push({
+      person,
+      label: name ?? `#${person}`,
+      sure: now.phoneSure,
+      // Matches the chart's colour for the first few; past the palette the card
+      // falls back to a neutral swatch rather than repeating someone's hue.
+      slot: index,
+    });
+  });
+
+  return { labels, series, overflow, phone: { on: onPhone, checked: phoneChecked } };
 }
 
 function FocusIdChart({ labels, series, palette, colors, threshold, selected, onSelect, t }) {
@@ -571,7 +632,7 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
   const maxBars = focusCfg?.chartBuckets ?? CLIENT_FALLBACK.focus.chartBuckets;
   const bucketMs = focusCfg?.bucketMs ?? CLIENT_FALLBACK.focus.bucketMs;
 
-  const { labels, series, overflow } = useMemo(
+  const { labels, series, overflow, phone: phoneNow } = useMemo(
     () => buildPersonSeries(rows, bucketMs, maxBars),
     [rows, bucketMs, maxBars]
   );
@@ -585,29 +646,6 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
   const mvPerMin = lastBucket?.movement ?? null;
   const overThreshold = mvPerMin != null && mvPerMin > threshold;
   const faceCount = latest?.face_count ?? null;
-
-  /**
-   * How many people are on a phone in the newest bucket the chart draws.
-   *
-   * Counted from the same series the chart uses, at its last label, so the number
-   * and the lines can never disagree — and counted per *person* rather than per
-   * row, since one person writes several rows a minute.
-   *
-   * `checked` is tracked separately: with nobody's verdict known the answer is
-   * "not being checked", which is a different statement from "nobody is on their
-   * phone" and the one a room without the feature must show.
-   */
-  const phoneNow = useMemo(() => {
-    let people = 0;
-    let checked = false;
-    for (const s of series) {
-      const now = s.points[s.points.length - 1];
-      if (!now || now.phone == null) continue;
-      checked = true;
-      if (now.phone) people++;
-    }
-    return { people, checked };
-  }, [series]);
 
   return (
     <section className="section-gap">
@@ -831,7 +869,7 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
               <span>
                 <Smartphone size={14} strokeWidth={2.2} aria-hidden /> {t('focus.phoneNow')}
               </span>
-              {phoneNow.checked && phoneNow.people > 0 && (
+              {phoneNow.checked && phoneNow.on.length > 0 && (
                 <span className="badge warning">{t('focus.phoneYes')}</span>
               )}
             </div>
@@ -840,21 +878,43 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
             <div
               className="fcard-val"
               style={{
-                color: !phoneNow.checked
-                  ? 'var(--muted)'
-                  : phoneNow.people > 0
+                color:
+                  phoneNow.checked && phoneNow.on.length > 0
                     ? 'var(--lv-warning)'
                     : 'var(--muted)',
               }}
             >
-              {phoneNow.checked ? phoneNow.people : '--'}
+              {phoneNow.checked ? phoneNow.on.length : '--'}
             </div>
+            {/* The count alone answers "how many", which is never the question —
+                naming them is. Swatches match the chart lines so a name here can be
+                found there; the trailing ? carries the same meaning it does
+                everywhere else, that this was a distance match rather than a phone
+                seen in a hand. */}
+            {phoneNow.on.length > 0 && (
+              <div className="id-legend phone-who">
+                {phoneNow.on.map((p) => (
+                  <span key={p.person} className="id-legend-item">
+                    <span
+                      className="id-swatch"
+                      style={{ background: palette[p.slot] ?? colors.tick }}
+                    />
+                    <span className="id-person-name">{p.label}</span>
+                    {!p.sure && (
+                      <span className="pose-unsure" title={t('focus.phoneUnsure')}>
+                        ?
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="fcard-sub">
               {!phoneNow.checked
                 ? t('focus.phoneNowUnknown')
-                : phoneNow.people === 0
+                : phoneNow.on.length === 0
                   ? t('focus.phoneNowNone')
-                  : t('focus.phoneNowSome', { n: phoneNow.people })}
+                  : t('focus.phoneNowSince')}
             </div>
           </div>
         </div>

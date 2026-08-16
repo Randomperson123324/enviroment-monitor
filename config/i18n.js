@@ -409,7 +409,9 @@ const DICT = {
       phoneUnsureCount: 'ใน {n} ครั้งเป็นการจับคู่จากระยะ ไม่ได้เห็นอยู่ในมือ',
       phoneNow: 'กำลังใช้โทรศัพท์',
       phoneNowNone: 'ไม่มีใครใช้โทรศัพท์อยู่',
-      phoneNowSome: '{n} คนกำลังใช้โทรศัพท์',
+      // อธิบายความหมายของ "ล่าสุด" ให้ตรงกับที่คำนวณจริง — นับว่าใช้ถ้ามีสักช่วงย่อย
+      // ในหนึ่งนาทีนั้นที่เจอ ไม่ใช่ต้องใช้ต่อเนื่องทั้งนาที
+      phoneNowSince: 'พบการใช้โทรศัพท์ในช่วงล่าสุด (ราว 1 นาที) ไม่ใช่ตลอดทั้งช่วง',
       // ⚠️ ต่างจาก "ไม่มีใครใช้" โดยสิ้นเชิง — ต้องแยกให้ผู้ใช้เห็น ไม่งั้นห้องที่ยังไม่ได้
       // เปิดฟีเจอร์นี้จะดูเหมือนห้องที่ทุกคนตั้งใจเรียน
       phoneNowUnknown: 'ยังไม่ได้ตรวจ — ต้องใช้ pi-vision โหมดติดตามกิจกรรมที่เปิด PHONE_ENABLED',
@@ -907,7 +909,9 @@ const DICT = {
       phoneUnsureCount: '{n} of these were matched by distance, not seen in hand',
       phoneNow: 'On their phone',
       phoneNowNone: 'Nobody is on their phone',
-      phoneNowSome: '{n} people on their phone',
+      // Spells out what "now" means here — counted as on their phone if any part
+      // of that minute saw one, not only if it was continuous throughout.
+      phoneNowSince: 'Seen on a phone during the latest window (~1 min), not throughout',
       // ⚠️ Not the same claim as "nobody is on their phone" — a room that never
       // ran the check would otherwise read as a room where everyone is focused.
       phoneNowUnknown: 'Not being checked — needs pi-vision activity mode with PHONE_ENABLED',
