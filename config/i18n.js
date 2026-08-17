@@ -29,7 +29,7 @@ const DICT = {
     tabs: {
       menuLabel: 'เลือกหมวดข้อมูล',
       environment: 'สภาพแวดล้อม',
-      focus: 'การจดจ่อ',
+      focus: 'การมีส่วนร่วมในห้องเรียน',
       hydro: 'ความปลอดภัยและสุขภาพ',
     },
 
@@ -169,7 +169,7 @@ const DICT = {
     webcam: {
       noFace: 'ไม่พบใบหน้า', blinking: 'หลับตา', drowsy: 'ง่วง', awake: 'ลืมตา',
       below: 'ต่ำกว่าปกติ', above: 'สูงกว่าปกติ', normal: 'ปกติ',
-      focusScore: 'คะแนนโฟกัส', fromCamera: 'วิเคราะห์จากกล้อง ({backend})',
+      focusScore: 'คะแนนการมีส่วนร่วม', fromCamera: 'วิเคราะห์จากกล้อง ({backend})',
       eyeState: 'สถานะดวงตา', blinkRate: 'อัตรากะพริบตา',
     },
 
@@ -307,7 +307,7 @@ const DICT = {
         get_government_water: 'ข้อมูลน้ำ/ฝนจากหน่วยงานรัฐ',
         get_flood_points: 'จุดวัดระดับน้ำ',
         get_health_risks: 'ประเมินความเสี่ยงสุขภาพ',
-        get_focus_activity: 'ข้อมูลการจดจ่อ (ในเครื่อง)',
+        get_focus_activity: 'ข้อมูลการมีส่วนร่วมในห้องเรียน (ในเครื่อง)',
         web_search: 'ค้นเว็บ',
       },
     },
@@ -363,7 +363,7 @@ const DICT = {
     aiSummary: {
       title: 'สรุปโดย AI',
       titleEnv: 'สรุปสภาพห้องโดย AI',
-      titleFocus: 'สรุปการจดจ่อโดย AI (ประมวลผลในเครื่อง)',
+      titleFocus: 'สรุปการมีส่วนร่วมในห้องเรียนโดย AI (ประมวลผลในเครื่อง)',
       titleHydro: 'สรุปความปลอดภัยและสุขภาพโดย AI',
       loading: '✨ กำลังสรุป...',
       refresh: 'สรุปใหม่ตอนนี้',
@@ -376,7 +376,7 @@ const DICT = {
     },
 
     focus: {
-      title: 'การจดจ่อจากกล้อง',
+      title: 'การมีส่วนร่วมในห้องเรียนจากกล้อง',
       thresholdPre: 'แจ้งเตือนเมื่อขยับเกิน', thresholdPost: 'ครั้ง/นาที',
       over: 'ขยับ {mv} ครั้ง/นาที — เกินที่กำหนดไว้ {th} ครั้ง!',
       chartTitle: 'การเคลื่อนไหวต่อนาที — แยกตามบุคคล',
@@ -432,7 +432,7 @@ const DICT = {
       gPosture: 'ท่าของคนนั้น: ยืน / นั่ง / นอน — มี ? ต่อท้าย = เดาเพราะมองไม่เห็นขา ไม่ได้วัดจริง',
       gEmotion: 'การแสดงออกบนใบหน้า: ยิ้ม / เศร้า / ตกใจ / หงุดหงิด / เฉย ๆ',
       gPhone: 'กำลังใช้โทรศัพท์ไหม — โทรศัพท์ที่กล้องเห็นถูกยกให้คนที่อยู่ใกล้ที่สุด · มี ? ต่อท้าย = แค่อยู่ใกล้ที่สุด ไม่ได้เห็นอยู่ในมือ (เครื่องที่วางบนโต๊ะก็เข้าข่ายนี้) · ว่าง = ไม่ได้ตรวจ (ไม่ใช่แปลว่าไม่ได้ใช้)',
-      gMovement: 'จำนวนครั้งที่หัวหัน/ขยับภายใน 15 วินาที — ค่าสูง = เสียสมาธิ',
+      gMovement: 'จำนวนครั้งที่หัวหัน/ขยับภายใน 15 วินาที — ค่าสูง = มีส่วนร่วมน้อย',
       gDirection: 'ทิศทางที่หัน: Left / Right / Up / Down — ตัวเลขคือจำนวนครั้งต่อ 15s',
       gFaceCount: 'จำนวนใบหน้าที่ตรวจพบในกล้องขณะนั้น — >1 คน = มีคนอื่นในห้อง',
       gCreatedAt: 'เวลาที่บันทึก (ทุก 15 วินาที) — กราฟรวม 4 ช่วง = 1 นาที',
@@ -543,7 +543,7 @@ const DICT = {
     tabs: {
       menuLabel: 'Choose a data section',
       environment: 'Environment',
-      focus: 'Focus',
+      focus: 'Classroom engagement',
       hydro: 'Safety & Health',
     },
 
@@ -681,7 +681,7 @@ const DICT = {
     webcam: {
       noFace: 'No face', blinking: 'Eyes closed', drowsy: 'Drowsy', awake: 'Eyes open',
       below: 'Below normal', above: 'Above normal', normal: 'Normal',
-      focusScore: 'Focus score', fromCamera: 'From camera ({backend})',
+      focusScore: 'Engagement score', fromCamera: 'From camera ({backend})',
       eyeState: 'Eye state', blinkRate: 'Blink rate',
     },
 
@@ -811,7 +811,7 @@ const DICT = {
         get_government_water: 'Government water/rain data',
         get_flood_points: 'Flood gauges',
         get_health_risks: 'Assessing health risks',
-        get_focus_activity: 'Focus data (on-device)',
+        get_focus_activity: 'Engagement data (on-device)',
         web_search: 'Web search',
       },
     },
@@ -863,7 +863,7 @@ const DICT = {
     aiSummary: {
       title: 'AI summary',
       titleEnv: 'AI room summary',
-      titleFocus: 'AI focus summary (on-device)',
+      titleFocus: 'AI engagement summary (on-device)',
       titleHydro: 'AI safety & health summary',
       loading: '✨ Summarizing...',
       refresh: 'Summarize again now',
@@ -876,7 +876,7 @@ const DICT = {
     },
 
     focus: {
-      title: 'Camera focus',
+      title: 'Classroom engagement from camera',
       thresholdPre: 'Alert when movement exceeds', thresholdPost: 'times/min',
       over: 'Movement {mv}/min — over the {th} limit!',
       chartTitle: 'Movement per minute — by person',
@@ -932,7 +932,7 @@ const DICT = {
       gPosture: 'Their posture: standing / sitting / lying — a trailing ? means it was inferred with the legs out of view, not measured',
       gEmotion: 'Facial expression: happy / sad / surprised / annoyed / neutral',
       gPhone: 'Whether they are using a phone — each phone the camera sees is credited to whoever is nearest · a trailing ? means it was only the nearest match, not seen in their hand (a phone left on the desk lands here too) · blank = not checked (which is not the same as not using one)',
-      gMovement: 'Head turns/movements within 15 seconds — high = distracted',
+      gMovement: 'Head turns/movements within 15 seconds — high = less engaged',
       gDirection: 'Facing direction: Left / Right / Up / Down — count per 15s',
       gFaceCount: 'Faces detected on camera at that moment — >1 = others in the room',
       gCreatedAt: 'Recorded time (every 15s) — chart bundles 4 windows = 1 minute',
