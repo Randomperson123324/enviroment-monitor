@@ -536,7 +536,7 @@ const DICT = {
     },
 
     gov: {
-      title: 'ข้อมูลภาครัฐ (TMD · ThaiWater · กรมชลประทาน)',
+      title: 'ข้อมูลภาครัฐ (ThaiWater · กรมชลประทาน)',
       metaErr: 'เชื่อมต่อแหล่งข้อมูลภาครัฐไม่ได้ — แสดงข้อมูลล่าสุดที่มี',
       meta: 'ดึงตรงจากหน่วยงาน · อัปเดต{ago}',
       empty: '⚠️ ยังเชื่อมต่อแหล่งข้อมูลภาครัฐไม่ได้ — จะลองใหม่อัตโนมัติ',
@@ -555,8 +555,6 @@ const DICT = {
       rainTitle: 'ฝนสะสม 24 ชม. สูงสุด', rainNone: 'ไม่มีข้อมูลฝนตกหนัก', mm: 'มม.',
       resTitle: 'อ่างเก็บน้ำ / เขื่อน',
       resTotal: 'ทั้งหมด', resOverCap: 'เกินความจุ', resHigh: 'น้ำมาก',
-      annTitle: 'ประกาศ / พยากรณ์อากาศ (กรมอุตุนิยมวิทยา)',
-      badgeAnn: 'ประกาศ', annRead: 'อ่านประกาศฉบับเต็ม',
     },
   },
 
@@ -1069,7 +1067,7 @@ const DICT = {
     },
 
     gov: {
-      title: 'Government data (TMD · ThaiWater · RID)',
+      title: 'Government data (ThaiWater · RID)',
       metaErr: 'Cannot reach government sources — showing the latest available data',
       meta: 'Fetched directly · updated {ago}',
       empty: '⚠️ Cannot reach government sources yet — retrying automatically',
@@ -1088,8 +1086,6 @@ const DICT = {
       rainTitle: 'Top 24h rainfall', rainNone: 'No heavy-rain data', mm: 'mm',
       resTitle: 'Reservoirs / dams',
       resTotal: 'Total', resOverCap: 'Over capacity', resHigh: 'High',
-      annTitle: 'Announcements / forecast (TMD)',
-      badgeAnn: 'Notice', annRead: 'Read the full announcement',
     },
   },
 };

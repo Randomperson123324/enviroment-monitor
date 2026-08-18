@@ -7,9 +7,7 @@ import {
   Waves,
   CloudRain,
   Droplets,
-  Megaphone,
   ChevronDown,
-  ExternalLink,
   ShieldAlert,
   CircleCheck,
   CircleOff,
@@ -136,8 +134,6 @@ export default function GovPanel({ feed }) {
   const river = data?.riverSituation ?? null;
   const rain = data?.rainfall ?? null;
   const reservoirs = data?.reservoirs ?? null;
-  const announcement = data?.announcements?.[0] ?? null;
-  const forecast = data?.forecast ?? null;
 
   return (
     <section className="section-gap">
@@ -343,41 +339,6 @@ export default function GovPanel({ feed }) {
               </>
             )}
           </GovCard>
-
-          {(announcement || forecast) && (
-            <GovCard Icon={Megaphone} title={t('gov.annTitle')} wide>
-              {announcement && (
-                <div className="gov-ann">
-                  <p className="gov-ann-title">
-                    {announcement.titleThai || announcement.titleEnglish}
-                  </p>
-                  {announcement.webUrlThai && (
-                    <a
-                      className="gov-more"
-                      href={announcement.webUrlThai}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {t('gov.annRead')} <ExternalLink size={12} strokeWidth={2.2} aria-hidden />
-                    </a>
-                  )}
-                </div>
-              )}
-              {forecast?.issuedText && <p className="gov-muted">{forecast.issuedText}</p>}
-              {forecast?.overall?.th && <p className="gov-forecast">{forecast.overall.th}</p>}
-              {forecast?.regions?.length ? (
-                <RowList
-                  items={forecast.regions}
-                  renderRow={(rg, i) => (
-                    <li key={i} className="gov-datarow region">
-                      <p className="gov-datarow-title">{rg.region?.th}</p>
-                      <p className="gov-datarow-sub">{rg.description?.th}</p>
-                    </li>
-                  )}
-                />
-              ) : null}
-            </GovCard>
-          )}
         </div>
       )}
     </section>

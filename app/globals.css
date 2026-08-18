@@ -2051,10 +2051,6 @@ textarea {
   color: var(--muted);
 }
 
-.gov-datarow.region .gov-datarow-sub {
-  padding-inline-start: 0;
-}
-
 /* Chevron + tap-to-expand are mobile affordances; desktop shows everything. */
 .gov-datarow-chev {
   display: none;
@@ -2090,33 +2086,6 @@ textarea {
 
 .gov-empty.ok {
   color: var(--lv-ok);
-}
-
-.gov-ann {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-
-.gov-ann-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.55;
-  color: var(--ink);
-}
-
-.gov-muted {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.gov-forecast {
-  font-size: 13.5px;
-  line-height: 1.7;
-  color: var(--ink-2);
-  margin: 6px 0;
 }
 
 /* ═══ FOCUS ═══ */

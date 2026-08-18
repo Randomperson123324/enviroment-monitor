@@ -76,14 +76,15 @@ const config = {
   },
 
   /**
-   * Government water/weather feeds, fetched directly (ported from StreeFlood's
-   * lib/gov). TMD's demo uid/ukey works but is shared/rate-limited — register
-   * at data.tmd.go.th for your own. Server-side only.
+   * Government water feeds, fetched directly (ported from StreeFlood's
+   * lib/gov). Server-side only.
+   *
+   * The meteorological feeds (TMD announcements and daily forecast) used to sit
+   * here too. They were weather *for the country*, on a page about this room's
+   * water and health — removed along with their uid/ukey, since a key with
+   * nothing to call is just another secret to look after.
    */
   gov: {
-    tmdUid: str('TMD_UID', 'demo'),
-    tmdUkey: str('TMD_UKEY', 'demokey'),
-    tmdBase: str('TMD_BASE_URL', 'https://data.tmd.go.th/api'),
     thaiwaterBase: str(
       'THAIWATER_BASE_URL',
       'https://api-v3.thaiwater.net/api/v1/thaiwater30/public'
