@@ -27,7 +27,22 @@ export default function AiSummary({ data, loading, error, onRefresh, title, styl
   const pinned = data?.pinned?.length ? data.pinned.join(', ') : '';
 
   return (
-    <section className="panel ai-summary section-gap">
+    <section
+      className={`panel ai-summary section-gap ${loading ? 'is-analyzing' : ''}`}
+      aria-busy={loading || undefined}
+    >
+      {/*
+        Light behind the glass while the model is working — see `.ai-aura`.
+        Rendered only while it runs, and only as decoration: the state is
+        already announced by `aria-busy` and by the loading line below, so a
+        screen reader gains nothing from the element itself.
+
+        It also covers the case the text line cannot: a **refresh** with a
+        summary already on screen, where nothing used to change at all and the
+        button looked unresponsive for the several seconds a model takes.
+      */}
+      {loading ? <span className="ai-aura" aria-hidden /> : null}
+
       <div className="subhdr">
         <span className="panel-title ai-float-title">
           <Sparkles size={17} strokeWidth={2.2} aria-hidden /> {title ?? t('aiSummary.title')}

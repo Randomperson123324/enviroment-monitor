@@ -833,6 +833,148 @@ textarea {
 }
 
 /* ═══ AI SUMMARY (top of every tab) ═══ */
+
+/* ─── Analyzing aura ───
+   While the model is writing, the card lights from behind: three soft colour
+   blobs drifting on different periods under the glass the panel already has.
+
+   Why a moving light rather than a spinner: a summary takes several seconds
+   and the wait is not a progress bar — there is nothing to be a fraction of.
+   A light that keeps moving says "still working" without ever implying how
+   much is left, and it lives *behind* the text, so the words you are reading
+   from the previous summary stay readable while the next one is fetched.
+
+   The three periods are deliberately co-prime-ish (11s · 14s · 26s): the
+   combination takes minutes to repeat, so the motion never resolves into a
+   loop the eye can lock onto and start finding annoying.
+
+   Everything here is decoration — `pointer-events: none`, `aria-hidden`, and
+   the panel's own `overflow: hidden` clips it to the rounded card. */
+.ai-aura {
+  position: absolute;
+  /* Overscanned well past the card so a drifting blob never shows its edge. */
+  inset: -45%;
+  z-index: 0;
+  pointer-events: none;
+  filter: blur(44px);
+  opacity: 0;
+  background: radial-gradient(
+    32% 40% at 50% 78%,
+    color-mix(in srgb, var(--c-score) 60%, transparent),
+    transparent 70%
+  );
+  animation:
+    aura-in 900ms ease forwards,
+    aura-spin 26s linear infinite;
+}
+
+.ai-aura::before,
+.ai-aura::after {
+  content: '';
+  position: absolute;
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.ai-aura::before {
+  width: 46%;
+  left: 6%;
+  top: 16%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 72%, transparent),
+    transparent 68%
+  );
+  animation: aura-drift-a 11s ease-in-out infinite alternate;
+}
+
+.ai-aura::after {
+  width: 40%;
+  right: 8%;
+  top: 30%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--c-focus) 68%, transparent),
+    transparent 68%
+  );
+  animation: aura-drift-b 14s ease-in-out infinite alternate;
+}
+
+/* The content rides above the light. */
+.ai-summary.is-analyzing > *:not(.ai-aura) {
+  position: relative;
+  z-index: 1;
+}
+
+.ai-aura {
+  --aura-peak: 0.5;
+}
+
+/* A pale page reflects far more of it, so the same opacity that reads as a
+   glow in the dark theme reads as a stain in the light one. */
+:root[data-theme='light'] .ai-aura {
+  --aura-peak: 0.34;
+}
+
+@keyframes aura-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--aura-peak);
+  }
+}
+
+@keyframes aura-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes aura-drift-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(38%, 14%, 0) scale(1.25);
+  }
+}
+
+@keyframes aura-drift-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.15);
+  }
+  to {
+    transform: translate3d(-30%, -18%, 0) scale(0.9);
+  }
+}
+
+/* Reduced motion: the global rule already stops the drift, which would leave
+   three blobs frozen mid-travel. Hold them where they started and let the card
+   breathe instead — still unmistakably "working", with nothing travelling. */
+@media (prefers-reduced-motion: reduce) {
+  .ai-aura {
+    animation: aura-in 900ms ease forwards !important;
+  }
+
+  .ai-aura::before,
+  .ai-aura::after {
+    animation: none !important;
+  }
+
+  .ai-summary.is-analyzing {
+    animation: aura-breathe 2.4s ease-in-out infinite !important;
+  }
+}
+
+@keyframes aura-breathe {
+  50% {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  }
+}
 .ai-summary-meta {
   display: flex;
   align-items: center;
