@@ -10,6 +10,7 @@ import useLogs from '@/hooks/useLogs';
 import useServerConfig from '@/hooks/useServerConfig';
 import useDashboard from '@/hooks/useDashboard';
 import useAiSummary from '@/hooks/useAiSummary';
+import useOnDeviceSummary from '@/hooks/useOnDeviceSummary';
 import useDataStatus from '@/hooks/useDataStatus';
 import useToasts from '@/hooks/useToasts';
 import useShortcuts from '@/hooks/useShortcuts';
@@ -70,19 +71,65 @@ function DashboardInner({ initialPanel }) {
     settings,
     pollMs: serverCfg.aiSummaryPollMs,
   };
+  /**
+   * Picking the on-device engine in settings moves the summaries here too, not
+   * just the chat: the point of that switch is "my data does not leave this
+   * machine", and a card still asking the server for a summary of the same
+   * readings would quietly undo it.
+   *
+   * The server hooks are disabled outright in that mode rather than left
+   * running as a fallback — a fallback would send the very request the switch
+   * exists to prevent.
+   */
+  const onDevice = browserAi.kind === 'browser';
+  const deviceSummary = useOnDeviceSummary({
+    apiBase: settings.apiBase,
+    deviceId: dash.deviceId,
+    browserAi,
+  });
+
   const envAi = useAiSummary({
     ...summaryArgs,
     scope: 'environment',
     deviceId: dash.deviceId,
-    enabled: tab === 'environment',
+    enabled: tab === 'environment' && !onDevice,
   });
-  const focusAi = useAiSummary({ ...summaryArgs, scope: 'focus', enabled: tab === 'focus' });
+  const focusAi = useAiSummary({
+    ...summaryArgs,
+    scope: 'focus',
+    enabled: tab === 'focus' && !onDevice,
+  });
   const healthAi = useAiSummary({
     ...summaryArgs,
     scope: 'health',
     deviceId: dash.deviceId,
-    enabled: tab === 'health',
+    enabled: tab === 'health' && !onDevice,
   });
+
+  /**
+   * What a summary card is handed, whichever engine is answering. `onRefresh`
+   * means "generate now" in both modes — for the server that is a forced
+   * refresh, on-device it is the only way a run ever starts.
+   */
+  const summaryFor = (scope, serverAi) =>
+    onDevice
+      ? {
+          data: deviceSummary.get(scope),
+          loading: deviceSummary.running === scope,
+          error: '',
+          status: deviceSummary.status,
+          mode: 'device',
+          needsModel: !browserAi.modelId,
+          onOpenSettings: () => openAi('settings'),
+          onRefresh: () => deviceSummary.run(scope),
+        }
+      : {
+          data: serverAi.data,
+          loading: serverAi.loading,
+          error: serverAi.error,
+          mode: 'server',
+          onRefresh: serverAi.refresh,
+        };
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE.activeTab);
@@ -178,15 +225,24 @@ function DashboardInner({ initialPanel }) {
                 freshness, and repeating it made the two disagree while a poll
                 was in flight. */}
             <SectionHeader Icon={Gauge} title={t('env.statusNow')} />
-            <Overview
-              latest={dash.latest}
-              theme={theme}
-              status={status}
-              summary={envAi.data}
-              summaryStyle={settings.aiSummaryStyle}
-              summaryLoading={envAi.loading}
-              onRefreshSummary={envAi.refresh}
-            />
+            {(() => {
+              const env = summaryFor('environment', envAi);
+              return (
+                <Overview
+                  latest={dash.latest}
+                  theme={theme}
+                  status={status}
+                  summary={env.data}
+                  summaryStyle={settings.aiSummaryStyle}
+                  summaryLoading={env.loading}
+                  summaryMode={env.mode}
+                  summaryStatus={env.status}
+                  needsModel={env.needsModel}
+                  onOpenSettings={env.onOpenSettings}
+                  onRefreshSummary={env.onRefresh}
+                />
+              );
+            })()}
             <SensorTiles
               latest={dash.latest}
               histRows={dash.histRows}
@@ -211,11 +267,8 @@ function DashboardInner({ initialPanel }) {
         <>
           <AiSummary
             title={t('aiSummary.titleFocus')}
-            data={focusAi.data}
             style={settings.aiSummaryStyle}
-            loading={focusAi.loading}
-            error={focusAi.error}
-            onRefresh={focusAi.refresh}
+            {...summaryFor('focus', focusAi)}
           />
           <WebcamStrip webcam={dash.latest?.webcam_json} />
           <FocusSection
@@ -231,11 +284,8 @@ function DashboardInner({ initialPanel }) {
         <>
           <AiSummary
             title={t('aiSummary.titleHealth')}
-            data={healthAi.data}
             style={settings.aiSummaryStyle}
-            loading={healthAi.loading}
-            error={healthAi.error}
-            onRefresh={healthAi.refresh}
+            {...summaryFor('health', healthAi)}
           />
           <DiseasePanel latest={dash.latest} />
         </>

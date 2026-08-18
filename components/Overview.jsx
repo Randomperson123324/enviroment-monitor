@@ -1,6 +1,6 @@
 'use client';
 
-import { RotateCw, TriangleAlert } from 'lucide-react';
+import { RotateCw, TriangleAlert, Cpu, Play } from 'lucide-react';
 import { scoreBand } from '@/config/sensors';
 import { SCORE_BAND_COLORS } from '@/config/client';
 import SummaryBody from '@/components/SummaryBody';
@@ -42,6 +42,12 @@ export default function Overview({
   summaryStyle,
   summaryLoading,
   onRefreshSummary,
+  /** 'server' (cached, automatic) or 'device' (this machine's GPU, on request). */
+  summaryMode = 'server',
+  /** The on-device engine's own progress line while it works. */
+  summaryStatus,
+  needsModel = false,
+  onOpenSettings,
 }) {
   const { t, lang } = useLang();
   const ai = latest?.ai_analysis ?? null;
@@ -54,9 +60,19 @@ export default function Overview({
   const recos = aiOk?.recommendations?.length ? aiOk.recommendations : (ai?.recommendations ?? []);
   const aiFailed = summary?.ok === false;
   const stale = status && status.level !== 'live';
+  const onDevice = summaryMode === 'device';
+  /** Nothing generated yet, and nothing will be until the button is pressed. */
+  const idle = onDevice && !summaryLoading && !summary;
 
   return (
-    <section className={`overview ${stale ? 'is-stale' : ''}`}>
+    <section
+      className={`overview ${stale ? 'is-stale' : ''} ${summaryLoading ? 'is-analyzing' : ''}`}
+      aria-busy={summaryLoading || undefined}
+    >
+      {/* The same light the summary cards use while a model writes — see
+          `.ai-aura`. The ring keeps its own colour: it is rule-derived and moves
+          with every reading, so it must not look like it is waiting on the AI. */}
+      {summaryLoading ? <span className="ai-aura" aria-hidden /> : null}
       <div className="ring-wrap">
         <svg viewBox={`0 0 ${RING.size} ${RING.size}`}>
           <circle className="ring-track" cx={RING.size / 2} cy={RING.size / 2} r={RING.radius} />
@@ -84,13 +100,37 @@ export default function Overview({
             <span className="ov-ts">{t('status.at', { ts: status.atLabel })}</span>
           ) : null}
           {stale ? <span className="badge nodata">{t('status.staleTag')}</span> : null}
+          {onDevice ? (
+            <span className="src-tag">
+              <Cpu size={12} strokeWidth={2.4} aria-hidden /> {t('aiSummary.onDevice')}
+            </span>
+          ) : null}
         </div>
 
         {/* In markdown style the summary is part of the rendered document below,
             so a title line here would just repeat it. */}
         {summaryStyle === 'markdown' && aiText ? null : (
-          <div className="ov-title">{aiText ?? t('overview.waiting')}</div>
+          <div className="ov-title">
+            {aiText ?? (idle ? t('aiSummary.deviceIdle') : summaryLoading ? summaryStatus || t('aiSummary.loading') : t('overview.waiting'))}
+          </div>
         )}
+
+        {/* The rule engine's own recommendations still render underneath, so an
+            un-analyzed card is not an empty one — it just has no AI commentary
+            on top of them yet. */}
+        {idle ? (
+          <div className="ai-analyze compact">
+            {needsModel ? (
+              <button className="btn" onClick={onOpenSettings}>
+                {t('aiSummary.deviceChooseModel')}
+              </button>
+            ) : (
+              <button className="btn btn-primary btn-icon" onClick={onRefreshSummary}>
+                <Play size={15} strokeWidth={2.4} aria-hidden /> {t('aiSummary.analyze')}
+              </button>
+            )}
+          </div>
+        ) : null}
 
         <SummaryBody
           summary={summaryStyle === 'markdown' ? aiText : ''}
@@ -114,8 +154,8 @@ export default function Overview({
             className="icon-btn"
             onClick={onRefreshSummary}
             disabled={summaryLoading}
-            title={t('aiSummary.refresh')}
-            aria-label={t('aiSummary.refresh')}
+            title={t(onDevice ? 'aiSummary.analyzeAgain' : 'aiSummary.refresh')}
+            aria-label={t(onDevice ? 'aiSummary.analyzeAgain' : 'aiSummary.refresh')}
           >
             <RotateCw size={14} strokeWidth={2.2} aria-hidden />
           </button>

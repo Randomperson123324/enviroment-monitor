@@ -900,8 +900,9 @@ textarea {
   animation: aura-drift-b 14s ease-in-out infinite alternate;
 }
 
-/* The content rides above the light. */
-.ai-summary.is-analyzing > *:not(.ai-aura) {
+/* The content rides above the light — on the summary cards and on the room
+   score card, which is the same instrument on the environment tab. */
+.is-analyzing > *:not(.ai-aura) {
   position: relative;
   z-index: 1;
 }
@@ -914,6 +915,39 @@ textarea {
    glow in the dark theme reads as a stain in the light one. */
 :root[data-theme='light'] .ai-aura {
   --aura-peak: 0.34;
+}
+
+/* ─── Analyze call-to-action ───
+   The on-device engine never starts by itself, so an un-analyzed card has to
+   offer the run rather than look like it is loading one. Centred and roomy on
+   the summary cards; `compact` where it sits inside the score card's column. */
+.ai-analyze {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 6px;
+  text-align: center;
+}
+
+.ai-analyze.compact {
+  align-items: flex-start;
+  padding: 4px 0 2px;
+  text-align: start;
+}
+
+.ai-analyze-text {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 46ch;
+}
+
+/* A button that leads with an icon — the base .btn has no layout of its own. */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 @keyframes aura-in {

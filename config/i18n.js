@@ -371,6 +371,16 @@ const DICT = {
       failedPinned: 'AI ในเครื่อง ({providers}) ใช้งานไม่ได้: {msg}',
       pinnedNote:
         'หมวดนี้ใช้ AI ในเครื่อง ({providers}) เท่านั้น จะไม่ส่งข้อมูลกล้องไปยัง Cloud AI หรือบริการภายนอก',
+      // ── โหมด AI ในเครื่อง (WebGPU) ──
+      // ⚠️ ต้องบอกให้ชัดว่า "กดเอง" ไม่ใช่ "กำลังโหลด" ไม่งั้นการ์ดที่ยังไม่ได้กด
+      // จะดูเหมือนค้าง ทั้งที่มันแค่รออยู่ว่าจะสั่งเมื่อไหร่
+      onDevice: 'ในเครื่อง',
+      analyze: 'วิเคราะห์ตอนนี้',
+      analyzeAgain: 'วิเคราะห์ใหม่',
+      deviceIdle: 'โหมด AI ในเครื่อง — กดปุ่มเพื่อให้โมเดลในเครื่องวิเคราะห์',
+      deviceManual: 'โหมดในเครื่องจะไม่วิเคราะห์เองอัตโนมัติ — กดปุ่มเมื่อต้องการสรุปใหม่',
+      deviceNoModel: 'ยังไม่ได้เลือกโมเดลสำหรับ AI ในเครื่อง',
+      deviceChooseModel: 'ไปหน้าตั้งค่าเพื่อเลือกโมเดล',
     },
 
     focus: {
@@ -850,6 +860,14 @@ const DICT = {
       failedPinned: 'On-device AI ({providers}) is unavailable: {msg}',
       pinnedNote:
         'This tab uses on-device AI ({providers}) only — camera data is never sent to Cloud AI or any external service.',
+      // ── On-device (WebGPU) mode ──
+      onDevice: 'on-device',
+      analyze: 'Analyze now',
+      analyzeAgain: 'Analyze again',
+      deviceIdle: 'On-device AI — press to let the model on this machine analyze',
+      deviceManual: 'On-device mode never analyzes on its own — press when you want a fresh summary',
+      deviceNoModel: 'No on-device model chosen yet',
+      deviceChooseModel: 'Open settings to choose a model',
     },
 
     focus: {
