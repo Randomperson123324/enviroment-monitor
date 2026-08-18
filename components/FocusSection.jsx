@@ -1,21 +1,24 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Eye, BookOpen, X, TriangleAlert, VideoOff, Smartphone } from 'lucide-react';
 import { Line } from 'react-chartjs-2';
 import '@/components/charts/setup';
 import useFocus, { movementCount } from '@/hooks/useFocus';
+import useLowScoreAlert from '@/hooks/useLowScoreAlert';
 import SectionHeader from '@/components/SectionHeader';
+import FocusOverall from '@/components/FocusOverall';
 import {
   CHART_COLORS,
   CLIENT_FALLBACK,
   FOCUS_THRESHOLD_INPUT,
   FOCUS_MODES,
+  FOCUS_ALERT_REPEAT_MS,
   ID_SERIES_PALETTE,
   withAlpha,
 } from '@/config/client';
 import { tooltipOptions } from '@/lib/chart-utils';
-import { focusModeConfig, focusScore, isFocusGood } from '@/lib/focus-score';
+import { focusModeConfig, focusScore, isFocusGood, overallFocusScore } from '@/lib/focus-score';
 import { useLang } from '@/hooks/useLang';
 
 // [glossary key shown literally, i18n key for its description]
@@ -648,7 +651,7 @@ function PersonOverview({ series, hue, keys, titleKey, t }) {
   );
 }
 
-export default function FocusSection({ focusCfg, addLog, theme }) {
+export default function FocusSection({ focusCfg, addLog, notify, theme }) {
   const { t } = useLang();
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
   const palette = ID_SERIES_PALETTE[theme] ?? ID_SERIES_PALETTE.dark;
@@ -678,6 +681,42 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
   const badState = good === false;
   const score = focusScore(mvPerMin, threshold, mode);
   const faceCount = latest?.face_count ?? null;
+
+  /**
+   * Session score for the window the chart draws — `buckets` runs back over
+   * every row fetched, so it is sliced to the same minutes `series` covers.
+   * Scoring more history than the chart shows would answer a question the page
+   * is not asking, and would move on its own as old rows aged out.
+   */
+  const overall = useMemo(
+    () =>
+      overallFocusScore({
+        buckets: buckets.slice(-maxBars),
+        series,
+        threshold,
+        modeId: mode,
+      }),
+    [buckets, series, threshold, mode, maxBars]
+  );
+
+  // Toast + system log, because they answer different questions: the toast is
+  // seen once by whoever is at the screen, the log is what you scroll back
+  // through afterwards to find when the lesson turned.
+  const onLowScore = useCallback(
+    (value) => {
+      const text = t('focus.lowAlert', { score: value });
+      notify?.(text, 'err');
+      addLog(`[กล้อง] ${text}`, 'warn');
+    },
+    [notify, addLog, t]
+  );
+
+  useLowScoreAlert({
+    low: overall?.low ?? false,
+    score: overall?.score ?? null,
+    onAlert: onLowScore,
+    repeatMs: FOCUS_ALERT_REPEAT_MS,
+  });
 
   return (
     <section className="section-gap">
@@ -717,11 +756,21 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
         </div>
       </SectionHeader>
 
-      {badState && (
+      <FocusOverall overall={overall} theme={theme} t={t} />
+
+      {/* One banner, like the air one: the newest minute wins when both are
+          true, because it is the half you can still act on — a session already
+          scored low is history, and the ring above is already red about it. */}
+      {(badState || overall?.low) && (
         <div className="alert-bar" style={{ marginBottom: 10 }} role="alert">
           <TriangleAlert size={16} strokeWidth={2.4} aria-hidden />
           <span>
-            {t(modeCfg.over === 'gain' ? 'focus.under' : 'focus.over', { mv: mvPerMin, th: threshold })}
+            {badState
+              ? t(modeCfg.over === 'gain' ? 'focus.under' : 'focus.over', {
+                  mv: mvPerMin,
+                  th: threshold,
+                })
+              : t('focus.lowAlert', { score: overall.score })}
           </span>
         </div>
       )}

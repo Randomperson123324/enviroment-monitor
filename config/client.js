@@ -285,6 +285,43 @@ export const FOCUS_MODES = [
 export const FOCUS_MODE_DEFAULT = 'listening';
 
 /**
+ * Overall focus score — the room-health score's counterpart for the camera.
+ *
+ * Same shape as SCORE_PENALTY in config/sensors.js: points subtracted from 100
+ * when a signal is at its worst, and a signal nothing measured is **skipped**,
+ * never scored as a zero. A Pi running without PHONE_ENABLED therefore scores
+ * on movement and posture alone rather than being credited for a phone check
+ * that never happened.
+ *
+ * `label` names the value in that column the penalty is counted against — the
+ * share of the window carrying it scales the penalty linearly. The maxima sum
+ * past 100 on purpose, so a window that is bad on every signal really can
+ * reach 0 instead of bottoming out at "poor".
+ */
+export const FOCUS_SCORE_PENALTY = {
+  /** Movement against the mode's goal — the signal the whole section is built on. */
+  engagement: { max: 55 },
+  /** Share of measured windows where someone was on a phone. */
+  phone: { max: 35, label: 'on' },
+  /** Lying down reads as asleep or slumped over the desk, not as attending. */
+  posture: { max: 20, label: 'lying' },
+};
+
+/**
+ * Score bands (from SCORE_BANDS, shared with the room score) that count as
+ * "low" — the ones that raise the toast. Anything at 'fair' or better is a
+ * session with room to improve, not one worth interrupting the user over.
+ */
+export const FOCUS_LOW_BANDS = ['poor', 'critical'];
+
+/**
+ * How long before a still-low score is allowed to raise a second toast. The
+ * score recomputes on every poll, so without this a bad lesson would stack a
+ * toast every 20 seconds; the alert bar in the section is what stays up.
+ */
+export const FOCUS_ALERT_REPEAT_MS = 600000;
+
+/**
  * Fallbacks if GET /api/config is unreachable (server values win).
  * `focus` mirrors the server-side defaults in config/index.js so components
  * never need their own inline `?? n` fallbacks; without supabaseUrl/key from

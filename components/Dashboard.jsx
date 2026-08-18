@@ -250,7 +250,12 @@ function DashboardInner({ initialPanel }) {
             onRefresh={focusAi.refresh}
           />
           <WebcamStrip webcam={dash.latest?.webcam_json} />
-          <FocusSection focusCfg={serverCfg.focus} addLog={addLog} theme={theme} />
+          <FocusSection
+            focusCfg={serverCfg.focus}
+            addLog={addLog}
+            notify={notify}
+            theme={theme}
+          />
         </>
       )}
 

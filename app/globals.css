@@ -2196,6 +2196,51 @@ textarea {
   gap: 14px;
 }
 
+/* ─── Overall focus score ───
+   Reuses the room score's ring, glass and head row wholesale (.overview and
+   the .ring-* / .ov-* classes) — the two scores are the same instrument
+   pointed at different halves of the room, and a second bespoke card would
+   have made them look like two unrelated numbers. Only the breakdown chips
+   below the band line are new. */
+.focus-overall {
+  margin-bottom: 12px;
+}
+
+.focus-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.focus-part {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 12px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  border: 1px solid var(--line-strong);
+}
+
+/* Only a signal that actually cost points gets colour — a chip saying "clear"
+   is there to prove the signal was measured, not to be looked at. */
+.focus-part.costly {
+  color: var(--lv-warning);
+  border-color: color-mix(in srgb, var(--lv-warning) 35%, transparent);
+  background: color-mix(in srgb, var(--lv-warning) 10%, transparent);
+}
+
+.focus-part-name {
+  color: inherit;
+}
+
+.focus-part-val {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Per-ID legend — doubles as the selector (colour is never identity alone). */
 .id-legend {
   display: flex;
