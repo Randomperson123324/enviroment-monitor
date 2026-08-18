@@ -4,7 +4,7 @@ import { jsonOk, jsonError, query, aiOverridesFrom, withErrors } from '@/lib/api
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/ai/summary?scope=environment|focus|hydro&device_id=&force=1
+ * GET /api/ai/summary?scope=environment|focus|health&device_id=&force=1
  *
  * One cached AI summary per tab, regenerated at most every
  * config.ai.summary.ttlMs. Always 200: a provider failure comes back as

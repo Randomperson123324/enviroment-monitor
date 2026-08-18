@@ -1,10 +1,10 @@
 'use client';
 
-import { Leaf, Eye, Waves } from 'lucide-react';
+import { Leaf, Eye, HeartPulse } from 'lucide-react';
 import { TABS } from '@/config/client';
 import { useLang } from '@/hooks/useLang';
 
-const TAB_ICONS = { environment: Leaf, focus: Eye, hydro: Waves };
+const TAB_ICONS = { environment: Leaf, focus: Eye, health: HeartPulse };
 
 /**
  * Section navigation. Rendered twice — as its own bar below the header on

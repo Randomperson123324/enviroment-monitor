@@ -20,7 +20,6 @@ export const GET = withErrors(async () => {
   return jsonOk({
     ...client,
     geminiEnabled: status.available.includes('gemini'),
-    streefloodUrl: config.streeflood.baseUrl,
     ai: {
       order: status.order,
       available: status.available,

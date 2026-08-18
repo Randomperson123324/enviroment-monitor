@@ -118,8 +118,7 @@ textarea {
 .fcard-val,
 .dir-val,
 .log-ts,
-.data-age,
-.flood-level {
+.data-age {
   font-family: var(--font-mono), 'IBM Plex Mono', monospace;
 }
 
@@ -179,6 +178,18 @@ textarea {
   font-size: 14.5px;
   font-weight: 600;
   color: var(--ink);
+}
+
+/* Panel heading with a leading icon — the focus tab's glossary card. It used
+   to borrow .gov-card-title from the government cards, which have gone. */
+.panel-title-icon {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .panel-meta {
@@ -1497,175 +1508,6 @@ textarea {
   padding: 12px 14px;
 }
 
-/* ═══ HYDRO HERO ═══ */
-.hydro-hero {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.hydro-hero-main {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.hydro-hero-icon {
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  background: color-mix(in srgb, currentColor 12%, transparent);
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-}
-
-.hydro-hero-text {
-  min-width: 0;
-  flex: 1;
-}
-
-.hydro-hero-title {
-  font-size: 19px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-
-.hydro-hero-sub {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
-.hydro-refresh:disabled {
-  opacity: 0.5;
-  cursor: wait;
-}
-
-.spin {
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.hydro-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.hydro-chip {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 8px 16px;
-  border-radius: 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  min-width: 96px;
-}
-
-.hydro-chip-value {
-  font-family: var(--font-mono), monospace;
-  font-size: 17px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.hydro-chip-label {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.hydro-chip.warning {
-  border-color: color-mix(in srgb, var(--lv-warning) 35%, transparent);
-}
-
-.hydro-chip.warning .hydro-chip-value {
-  color: var(--lv-warning);
-}
-
-.hydro-chip.danger {
-  border-color: color-mix(in srgb, var(--lv-danger) 38%, transparent);
-}
-
-.hydro-chip.danger .hydro-chip-value {
-  color: var(--lv-danger);
-}
-
-.hydro-chip.muted .hydro-chip-value {
-  color: var(--muted);
-}
-
-/* ═══ REDIRECT BUTTON (ported from StreeFlood footer) ═══ */
-.hydro-more {
-  display: flex;
-  justify-content: center;
-}
-
-.redirect-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 11px 22px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  backdrop-filter: blur(20px);
-  box-shadow: var(--glass-shadow-sm);
-  color: var(--ink);
-  font-size: 14.5px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease,
-    border-color 0.3s ease;
-}
-
-.redirect-btn:hover {
-  transform: scale(1.03);
-  box-shadow: var(--glass-shadow);
-  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-.redirect-btn:active {
-  transform: scale(0.97);
-}
-
-/* Two stacked arrows in a clipped box: on hover the visible one exits
-   toward its pointing direction (top-right) while the twin slides in from
-   the bottom-left along the same diagonal — the icon flies off and loops. */
-.redirect-arrow {
-  position: relative;
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
-  overflow: hidden;
-  color: var(--accent);
-}
-
-.redirect-arrow-a,
-.redirect-arrow-b {
-  position: absolute;
-  inset: 0;
-  transition: transform 0.3s cubic-bezier(0.15, 0, 0.3, 1);
-}
-
-.redirect-arrow-b {
-  transform: translate(-100%, 100%);
-}
-
-.redirect-btn:hover .redirect-arrow-a {
-  transform: translate(100%, -100%);
-}
-
-.redirect-btn:hover .redirect-arrow-b {
-  transform: translate(0, 0);
-}
-
 /* ═══ SKELETON (loading shimmer) ═══ */
 .skeleton {
   border-radius: 8px;
@@ -1686,406 +1528,6 @@ textarea {
   100% {
     background-position: 200% 0;
   }
-}
-
-/* ═══ FLOOD PANEL (data shared from StreeFlood) ═══ */
-.flood-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 14px;
-}
-
-.flood-empty {
-  color: var(--muted);
-  font-size: 14px;
-  text-align: center;
-}
-
-.flood-card.warning {
-  border-color: color-mix(in srgb, var(--lv-warning) 35%, transparent);
-}
-
-.flood-card.danger {
-  border-color: color-mix(in srgb, var(--lv-danger) 40%, transparent);
-}
-
-.flood-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.flood-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink-2);
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.flood-trend {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.flood-reading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 6px 0 4px;
-}
-
-.flood-level {
-  font-size: 30px;
-  font-weight: 600;
-  color: var(--accent);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
-}
-
-.flood-card.warning .flood-level {
-  color: var(--lv-warning);
-}
-
-.flood-card.danger .flood-level {
-  color: var(--lv-danger);
-}
-
-.flood-level.stale,
-.flood-card.stale .flood-level {
-  color: var(--muted);
-}
-
-.flood-level small {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-.flood-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-  padding-bottom: 3px;
-}
-
-.flood-age {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.flood-age.warn {
-  color: var(--lv-warning);
-}
-
-.flood-spark {
-  position: relative;
-  height: 58px;
-  margin: 4px 0 10px;
-}
-
-.flood-bar-scale {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10.5px;
-  color: var(--muted);
-  margin-top: 5px;
-}
-
-.flood-card.stale {
-  border-style: dashed;
-}
-
-.flood-bar {
-  position: relative;
-  height: 10px;
-  border-radius: 5px;
-  background: var(--grid);
-  overflow: visible;
-}
-
-.flood-bar-fill {
-  height: 100%;
-  border-radius: 5px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, transparent), var(--accent));
-  transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.flood-bar-fill.warning {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--lv-warning) 70%, transparent), var(--lv-warning));
-}
-
-.flood-bar-fill.danger {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--lv-danger) 70%, transparent), var(--lv-danger));
-}
-
-.flood-bar-mark {
-  position: absolute;
-  top: -3px;
-  bottom: -3px;
-  width: 2px;
-  border-radius: 1px;
-  background: var(--lv-warning);
-}
-
-.flood-bar-mark.danger {
-  background: var(--lv-danger);
-  transform: translateX(-2px);
-}
-
-.flood-bar-fill.stale {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--muted) 55%, transparent), var(--muted));
-}
-
-.flood-sub {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 8px;
-}
-
-/* ═══ GOV DATA (shared from StreeFlood /api/gov) ═══ */
-.gov-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 14px;
-}
-
-.gov-card-wide {
-  grid-column: 1 / -1;
-}
-
-.gov-card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink-2);
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.gov-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-/* Headline counts above each list — StreeFlood's `glass-panel-strong px-3 py-1.5`. */
-.gov-chip {
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.gov-chip.danger {
-  color: var(--lv-danger);
-}
-
-.gov-chip.warning {
-  color: var(--lv-warning);
-}
-
-/* Column layout so the row list can absorb whatever height the grid hands the
-   card — without it, a card with no chips row (Top 24h rainfall) stretches to
-   match its neighbours and leaves the extra height as dead space. */
-.gov-card {
-  display: flex;
-  flex-direction: column;
-}
-
-/* Scrolls rather than expands: a feed can carry 60+ alerts, and bounding the
-   height keeps all four cards the same size no matter how many arrive.
-   `flex: 1 1 19rem` makes 19rem the *natural* height rather than a hard cap, so
-   the list still grows to fill a card the grid stretched. min-height:0 is what
-   lets a flex item shrink below its content and actually scroll.
-   padding-inline-end reserves the gutter so the bar never sits on a row. */
-.gov-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  list-style: none;
-  flex: 1 1 19rem;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-inline-end: 6px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
-}
-
-.gov-rows::-webkit-scrollbar {
-  width: 6px;
-}
-
-.gov-rows::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.gov-rows::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
-  border-radius: 999px;
-}
-
-.gov-rows::-webkit-scrollbar-thumb:hover {
-  background: var(--muted);
-}
-
-/* Each station is its own soft card rather than a dense text line. */
-.gov-datarow {
-  padding: 10px 12px;
-  border-radius: 1.125rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-
-.gov-datarow.raw {
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--ink-2);
-}
-
-.gov-datarow-main {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.gov-datarow-left {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  min-width: 0;
-}
-
-.gov-marker {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  color: var(--muted);
-}
-
-.gov-marker.danger {
-  color: var(--lv-danger);
-}
-
-.gov-marker.warning {
-  color: var(--lv-warning);
-}
-
-/* Status family, not a series colour — kept for feeds that really do carry an
-   informational state, never for plain measurements. */
-.gov-marker.info {
-  color: var(--lv-info);
-}
-
-.gov-datarow-title {
-  min-width: 0;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.gov-datarow-right {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  flex-shrink: 0;
-  text-align: right;
-}
-
-.gov-datarow-value {
-  font-size: 13.5px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-2);
-}
-
-.gov-datarow-value.danger {
-  color: var(--lv-danger);
-}
-
-.gov-datarow-value.warning {
-  color: var(--lv-warning);
-}
-
-.gov-datarow-value.info {
-  color: var(--lv-info);
-}
-
-.gov-datarow-label {
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--muted);
-}
-
-.gov-datarow-label.danger {
-  color: var(--lv-danger);
-}
-
-.gov-datarow-sub {
-  margin-top: 3px;
-  padding-inline-start: 30px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--muted);
-}
-
-/* Chevron + tap-to-expand are mobile affordances; desktop shows everything. */
-.gov-datarow-chev {
-  display: none;
-}
-
-/* Accent text link, replacing the old bordered pill toggle. */
-.gov-more {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 10px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.gov-more:hover {
-  text-decoration: underline;
-}
-
-.gov-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 16px 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.gov-empty.ok {
-  color: var(--lv-ok);
 }
 
 /* ═══ FOCUS ═══ */
@@ -4037,8 +3479,7 @@ span.ai-tab {
   }
 
   .tiles,
-  .webcam-strip,
-  .flood-grid {
+  .webcam-strip {
     grid-template-columns: 1fr;
   }
 
@@ -4112,42 +3553,6 @@ span.ai-tab {
   .tab-menu.in-hdr .tab-item.active {
     background: var(--accent);
     color: var(--accent-contrast);
-  }
-
-  /* Gov rows collapse to one line on mobile: the name truncates and the detail
-     hides until tapped, so a long station name can't push the value off-screen. */
-  .gov-datarow {
-    cursor: pointer;
-  }
-
-  .gov-datarow-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .gov-datarow.open .gov-datarow-title {
-    overflow: visible;
-    white-space: normal;
-  }
-
-  .gov-datarow-sub {
-    display: none;
-  }
-
-  .gov-datarow.open .gov-datarow-sub {
-    display: block;
-  }
-
-  .gov-datarow-chev {
-    display: block;
-    margin-top: 3px;
-    color: var(--muted);
-    transition: transform 0.2s ease;
-  }
-
-  .gov-datarow.open .gov-datarow-chev {
-    transform: rotate(180deg);
   }
 
   .hdr-mid {
@@ -4734,7 +4139,6 @@ span.ai-tab {
 .dir-val,
 .log-ts,
 .data-age,
-.flood-level,
 .stats-table td.num,
 .tile-bar-scale {
   font-variant-numeric: tabular-nums;
@@ -4935,45 +4339,6 @@ span.ai-tab {
    status only. */
 
 /* Count chips: figure first, label beneath, zero muted. */
-.gov-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 4px 12px 5px;
-}
-
-.gov-chip b {
-  font-family: var(--font-mono), monospace;
-  font-size: 14px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.gov-chip > span {
-  font-size: 11.5px;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-/* A count of nobody-in-trouble should not shout in red. */
-.gov-chip.zero {
-  color: var(--muted);
-}
-
-.gov-datarow-value {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
-  font-size: var(--num-sm);
-}
-
-.gov-datarow-value small {
-  font-size: 10.5px;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-/* Focus panel readouts join the shared numeric scale. */
 .fcard-val {
   font-size: var(--num-md);
 }
@@ -5302,9 +4667,7 @@ span.ai-tab {
 @media (min-width: 1024px) {
   :root[data-rail-peek] .charts,
   :root[data-rail-peek] .focus-grid,
-  :root[data-rail-peek] .bottom,
-  :root[data-rail-peek] .gov-grid,
-  :root[data-rail-peek] .flood-grid {
+  :root[data-rail-peek] .bottom {
     grid-template-columns: 1fr;
   }
 }
@@ -5349,56 +4712,8 @@ span.ai-tab {
   );
 }
 
-/* ═══ SEGMENTED CONTROL ═══
-   One row, one choice — used by the safety tab to pick which half to show. */
-.seg {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  backdrop-filter: blur(12px);
-}
-
-.seg-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 15px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-2);
-  font-size: 13.5px;
-  font-weight: 500;
-  transition: background-color 0.25s ease, color 0.25s ease;
-}
-
-.seg-item:hover {
-  color: var(--ink);
-  background: var(--accent-soft);
-}
-
-.seg-item.on {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-weight: 600;
-}
-
 @media (max-width: 640px) {
   .page-title {
     font-size: 23px;
-  }
-
-  /* Full width on a phone so both choices stay comfortably tappable. */
-  .seg {
-    display: flex;
-    width: 100%;
-  }
-
-  .seg-item {
-    flex: 1;
-    justify-content: center;
   }
 }

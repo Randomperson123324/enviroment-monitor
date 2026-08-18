@@ -49,60 +49,6 @@ const config = {
   },
 
   /**
-   * Flood-warning data bridge (StreeFlood project). Defaults to this app's
-   * own Supabase, where the shared `sensors` + `water_readings` tables live;
-   * point FLOOD_SUPABASE_URL/KEY at the original StreeFlood project instead
-   * once that database is active again.
-   */
-  flood: {
-    url: str('FLOOD_SUPABASE_URL', str('SUPABASE_URL')),
-    anonKey: str('FLOOD_SUPABASE_ANON_KEY', str('SUPABASE_ANON_KEY')),
-    sensorsTable: str('FLOOD_SENSORS_TABLE', 'sensors'),
-    readingsTable: str('FLOOD_READINGS_TABLE', 'water_readings'),
-    /** Readings pulled per sensor for the trend regression */
-    trendReadings: num('FLOOD_TREND_READINGS', 24),
-    trendWindowHours: num('FLOOD_TREND_WINDOW_HOURS', 3),
-    /** |cm/hour| below this counts as "stable" (mirrors StreeFlood) */
-    stableRateCmPerHour: num('FLOOD_STABLE_RATE', 0.3),
-    /** A latest reading older than this is flagged stale and excluded from the live summary */
-    staleAfterHours: num('FLOOD_STALE_AFTER_HOURS', 6),
-    timeoutMs: num('FLOOD_TIMEOUT_MS', 10000),
-  },
-
-  /** StreeFlood site — only linked from the UI now (its /api/gov cannot be
-   *  proxied server-to-server: Vercel's bot challenge answers with HTTP 429). */
-  streeflood: {
-    baseUrl: str('STREEFLOOD_BASE_URL', 'https://streeflood.vercel.app'),
-  },
-
-  /**
-   * Government water feeds, fetched directly (ported from StreeFlood's
-   * lib/gov). Server-side only.
-   *
-   * The meteorological feeds (TMD announcements and daily forecast) used to sit
-   * here too. They were weather *for the country*, on a page about this room's
-   * water and health — removed along with their uid/ukey, since a key with
-   * nothing to call is just another secret to look after.
-   */
-  gov: {
-    thaiwaterBase: str(
-      'THAIWATER_BASE_URL',
-      'https://api-v3.thaiwater.net/api/v1/thaiwater30/public'
-    ),
-    ridReservoirUrl: str(
-      'RID_RESERVOIR_URL',
-      'https://app.rid.go.th/reservoir/api/reservoir/public'
-    ),
-    /** Upstream cache window — the rain feed is ~4.5 MB; be polite to free gov APIs. */
-    revalidateSeconds: num('GOV_REVALIDATE_SECONDS', 900),
-    rainTopStations: num('GOV_RAIN_TOP_STATIONS', 10),
-    riverStations: num('GOV_RIVER_STATIONS', 8),
-    reservoirTop: num('GOV_RESERVOIR_TOP', 8),
-    /** app.rid.go.th intermittently refuses connections, then works — retry. */
-    ridFetchAttempts: num('GOV_RID_FETCH_ATTEMPTS', 3),
-  },
-
-  /**
    * AI providers, tried in `order` until one answers; if all fail the callers
    * fall back to the local rule engine in lib/analysis.js. Every provider is
    * reachable server-side only — the local endpoint is plain HTTP, so a browser
@@ -240,10 +186,10 @@ const config = {
        * `{{DEVICE_1}}` — which is what lets the model tell two of them apart in
        * a sentence.
        *
-       * `name` is deliberately the neutral NAME rather than PERSON: the same
-       * key carries a recognised face in the camera table and a measuring
-       * station in the government feed, and calling a station a person would be
-       * a worse lie than the one this exists to prevent.
+       * `name` is deliberately the neutral NAME rather than PERSON: the key
+       * carries a recognised face today, but it is the generic label field —
+       * anything named in a future tool arrives through it, and calling every
+       * such thing a person would be a worse lie than the one this prevents.
        */
       fields: [
         { match: '^person$', kind: 'PERSON' },
@@ -389,8 +335,6 @@ const config = {
     pollMsMin: num('CLIENT_POLL_MS_MIN', 3000),
     pollMsMax: num('CLIENT_POLL_MS_MAX', 60000),
     healthPollMs: num('CLIENT_HEALTH_POLL_MS', 30000),
-    floodRefreshMs: num('CLIENT_FLOOD_REFRESH_MS', 60000),
-    govRefreshMs: num('CLIENT_GOV_REFRESH_MS', 300000),
     /** How often a tab re-asks for its summary; the server serves cache until ttlMs is up. */
     aiSummaryPollMs: num('CLIENT_AI_SUMMARY_POLL_MS', 30 * 60 * 1000),
     focus: {

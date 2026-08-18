@@ -34,8 +34,6 @@ export const STORAGE = {
   /** Assistant window: docked/floating, its width, and its floating rect. */
   aiWindow: 'em_ai_window',
   activeTab: 'em_active_tab',
-  /** Which half of the safety tab was last shown (see HYDRO_VIEWS). */
-  hydroView: 'em_hydro_view',
   lang: 'em_lang',
 };
 
@@ -54,15 +52,7 @@ export const STORAGE = {
  * minute, and the reason someone opens the dashboard mid-class. Air moves slowly
  * enough that the alert bar carries it from whichever tab is open.
  */
-export const TABS = [{ id: 'focus' }, { id: 'environment' }, { id: 'hydro' }];
-
-/**
- * The safety tab covers two unrelated questions — the water/weather situation
- * outside, and the illness risk from conditions in the room. They are one tab
- * because both answer "is it safe", but showing both at once made a long scroll
- * of things you were not looking for, so the tab picks one.
- */
-export const HYDRO_VIEWS = [{ id: 'water' }, { id: 'disease' }];
+export const TABS = [{ id: 'focus' }, { id: 'environment' }, { id: 'health' }];
 
 /**
  * The three things that can answer, in the order the settings pane offers them.
@@ -136,21 +126,6 @@ export const CHART_VIEW_DEFAULTS = {
 };
 
 export const LOG_MAX_ROWS = 120;
-/**
- * Classification cutoffs for gov-feed rows, used to tone the UI.
- * These mirror ThaiWater's and RID's official scales and must stay in step with
- * the server-side constants in lib/gov.js, which do the actual counting —
- * lib/gov.js can't be imported here because it pulls in server config.
- */
-export const GOV_LEVELS = {
-  /** ThaiWater situation scale: 4 = high (น้ำมาก), 5 = overflowing (ล้นตลิ่ง) */
-  riverHigh: 4,
-  riverOverflow: 5,
-  /** RID storage: >100% of capacity = over capacity, 81–100% = high */
-  reservoirHighPercent: 81,
-  reservoirOverPercent: 100,
-};
-
 export const CHAT_MAX_TURNS = 20;
 
 /**
@@ -332,8 +307,6 @@ export const CLIENT_FALLBACK = {
   pollMsMin: 3000,
   pollMsMax: 60000,
   healthPollMs: 30000,
-  floodRefreshMs: 60000,
-  govRefreshMs: 300000,
   aiSummaryPollMs: 1800000,
   geminiEnabled: false,
   ai: {
@@ -355,7 +328,6 @@ export const CLIENT_FALLBACK = {
     bucketMs: 60000,
     chartBuckets: 30,
   },
-  streefloodUrl: '',
 };
 
 /**

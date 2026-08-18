@@ -833,7 +833,7 @@ export default function FocusSection({ focusCfg, addLog, notify, theme }) {
           </div>
 
           <div className="panel">
-            <div className="panel-title gov-card-title">
+            <div className="panel-title panel-title-icon">
               <BookOpen size={15} strokeWidth={2.2} aria-hidden /> {t('focus.glossaryTitle')}
             </div>
             <div className="glossary">

@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Gauge, Waves, HeartPulse } from 'lucide-react';
-import { STORAGE, TABS, HYDRO_VIEWS } from '@/config/client';
+import { Gauge } from 'lucide-react';
+import { STORAGE, TABS } from '@/config/client';
 import { LanguageProvider, useLang } from '@/hooks/useLang';
 import useTheme from '@/hooks/useTheme';
 import useSettings from '@/hooks/useSettings';
@@ -31,7 +31,6 @@ import ChartsSection from '@/components/ChartsSection';
 import StatsTable from '@/components/StatsTable';
 import DiseasePanel from '@/components/DiseasePanel';
 import FocusSection from '@/components/FocusSection';
-import HydroSection from '@/components/HydroSection';
 import LogPanel from '@/components/LogPanel';
 import FloatingAi from '@/components/FloatingAi';
 
@@ -63,8 +62,6 @@ function DashboardInner({ initialPanel }) {
   const browserAi = useBrowserAi({ enabled: serverCfg.ai?.browserEnabled !== false });
   const [helpOpen, setHelpOpen] = useState(false);
   const [tab, setTab] = useState(TABS[0].id);
-  /** Which half of the safety tab is showing — water/weather or disease risk. */
-  const [hydroView, setHydroView] = useState(HYDRO_VIEWS[0].id);
 
   // One cached summary per tab, generated server-side at most every 30 min.
   // Only the visible tab polls — a hidden tab shouldn't hold a refresh timer.
@@ -80,24 +77,17 @@ function DashboardInner({ initialPanel }) {
     enabled: tab === 'environment',
   });
   const focusAi = useAiSummary({ ...summaryArgs, scope: 'focus', enabled: tab === 'focus' });
-  const hydroAi = useAiSummary({
+  const healthAi = useAiSummary({
     ...summaryArgs,
-    scope: 'hydro',
+    scope: 'health',
     deviceId: dash.deviceId,
-    enabled: tab === 'hydro',
+    enabled: tab === 'health',
   });
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE.activeTab);
     if (TABS.some((t) => t.id === saved)) setTab(saved);
-    const savedView = localStorage.getItem(STORAGE.hydroView);
-    if (HYDRO_VIEWS.some((v) => v.id === savedView)) setHydroView(savedView);
   }, []);
-
-  const switchHydroView = (id) => {
-    setHydroView(id);
-    localStorage.setItem(STORAGE.hydroView, id);
-  };
 
   const switchTab = useCallback((id) => {
     setTab(id);
@@ -178,30 +168,8 @@ function DashboardInner({ initialPanel }) {
       <TabMenu active={tab} onSelect={switchTab} className="standalone" />
 
       {/* Names the open section where the content is, not only in the rail —
-          which on a wide screen sits far from what it labels. The safety tab
-          hangs its own view switch in here. */}
-      <PageTitle title={t(`tabs.${tab}`)}>
-        {tab === 'hydro' && (
-          <div className="seg" role="tablist" aria-label={t('hydro.viewLabel')}>
-            {HYDRO_VIEWS.map((v) => {
-              const Icon = v.id === 'water' ? Waves : HeartPulse;
-              const on = hydroView === v.id;
-              return (
-                <button
-                  key={v.id}
-                  role="tab"
-                  aria-selected={on}
-                  className={`seg-item ${on ? 'on' : ''}`}
-                  onClick={() => switchHydroView(v.id)}
-                >
-                  <Icon size={15} strokeWidth={2.2} aria-hidden />
-                  <span>{t(`hydro.view.${v.id}`)}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </PageTitle>
+          which on a wide screen sits far from what it labels. */}
+      <PageTitle title={t(`tabs.${tab}`)} />
 
       {tab === 'environment' && (
         <>
@@ -259,23 +227,17 @@ function DashboardInner({ initialPanel }) {
         </>
       )}
 
-      {tab === 'hydro' && (
+      {tab === 'health' && (
         <>
           <AiSummary
-            title={t('aiSummary.titleHydro')}
-            data={hydroAi.data}
+            title={t('aiSummary.titleHealth')}
+            data={healthAi.data}
             style={settings.aiSummaryStyle}
-            loading={hydroAi.loading}
-            error={hydroAi.error}
-            onRefresh={hydroAi.refresh}
+            loading={healthAi.loading}
+            error={healthAi.error}
+            onRefresh={healthAi.refresh}
           />
-          {/* The AI summary covers both halves, so it stays put; only the data
-              below it follows the switch. */}
-          {hydroView === 'disease' ? (
-            <DiseasePanel latest={dash.latest} />
-          ) : (
-            <HydroSection apiBase={settings.apiBase} serverCfg={serverCfg} addLog={addLog} theme={theme} />
-          )}
+          <DiseasePanel latest={dash.latest} />
         </>
       )}
 

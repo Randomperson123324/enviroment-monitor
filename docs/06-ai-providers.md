@@ -197,12 +197,12 @@ engine. Several gigabytes is not something to start on someone's behalf.
 
 The assistant is no longer handed a pre-rendered sentence of the latest reading.
 It is given tools and asks for what a question needs — `get_sensor_latest`,
-`get_sensor_history`, `get_government_water`, `get_flood_points`,
-`get_health_risks`, `get_focus_activity`, `web_search` (see `lib/ai/tools.js`).
+`get_sensor_history`, `get_health_risks`, `get_focus_activity`,
+`analyze_correlation`, `web_search` (see `lib/ai/tools.js`).
 
 The old shape could only answer questions about the sentence it was given. Asked
-about last night's humidity or the rainfall upstream, it had to guess or decline
-— the data was one call away and nothing could ask for it.
+about last night's humidity or which disease risk is raised, it had to guess or
+decline — the data was one call away and nothing could ask for it.
 
 **Camera data is the exception, and it is enforced three times.** Only providers
 in `AI_FOCUS_PROVIDERS` (default `local`) may read it:
