@@ -217,6 +217,50 @@ const config = {
     focusProviders: FOCUS_PROVIDERS,
 
     /**
+     * Pseudonymisation of identifiers sent to a provider that is not on
+     * FOCUS_PROVIDERS — i.e. anything that leaves this machine (lib/ai/aliases.js).
+     *
+     * Names are replaced with `{{NAME_1}}`-style variables on the way out and
+     * restored on the way back, so the model reasons about the same data while
+     * the provider never learns who was in the room. The user sees real names
+     * throughout; nothing about the answer changes except who can read it.
+     *
+     * ⚠️ This is not what keeps camera data off the cloud — the `local_only`
+     * gate in lib/ai/tools.js does that, and still refuses. Masking covers the
+     * paths where an identifier legitimately travels: the user's own words, a
+     * device id, a summary line.
+     */
+    aliases: {
+      enabled: bool('AI_ALIAS_ENABLED', true),
+      /**
+       * Fields whose value is an identifier rather than a measurement, matched
+       * on the field name so a tool added later is covered without touching
+       * this file. `kind` only names the variable — `{{NAME_1}}` vs
+       * `{{DEVICE_1}}` — which is what lets the model tell two of them apart in
+       * a sentence.
+       *
+       * `name` is deliberately the neutral NAME rather than PERSON: the same
+       * key carries a recognised face in the camera table and a measuring
+       * station in the government feed, and calling a station a person would be
+       * a worse lie than the one this exists to prevent.
+       */
+      fields: [
+        { match: '^person$', kind: 'PERSON' },
+        { match: '^(name|person_name|student|subject)$', kind: 'NAME' },
+        { match: '^device(_id)?$', kind: 'DEVICE' },
+      ],
+      /**
+       * Shortest value that may be hunted for inside free text. Below this a
+       * "match" is far more likely to be a coincidence in ordinary prose than
+       * the identifier — see `searchable()` in lib/ai/aliases.js.
+       */
+      minTextLength: num('AI_ALIAS_MIN_TEXT_LENGTH', 3),
+      /** Rows scanned for the live name roster, and how long it is cached. */
+      rosterRows: num('AI_ALIAS_ROSTER_ROWS', 500),
+      rosterTtlMs: num('AI_ALIAS_ROSTER_TTL_MS', 5 * 60 * 1000),
+    },
+
+    /**
      * Tool calling. The assistant is given tools instead of a prompt with data
      * pasted into it, so it can ask for what a question actually needs.
      *
