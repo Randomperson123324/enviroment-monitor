@@ -1,7 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { STORAGE, CLIENT_FALLBACK, FOCUS_THRESHOLD_INPUT } from '@/config/client';
+import {
+  STORAGE,
+  CLIENT_FALLBACK,
+  FOCUS_THRESHOLD_INPUT,
+  FOCUS_MODES,
+  FOCUS_MODE_DEFAULT,
+} from '@/config/client';
 
 /** Normalize movement whether stored as a number or an object of counts. */
 export function movementCount(m) {
@@ -39,6 +45,7 @@ function bucketize(rows, bucketMs) {
 export default function useFocus({ focusCfg, addLog }) {
   const [rows, setRows] = useState([]);
   const [threshold, setThresholdState] = useState(null);
+  const [mode, setModeState] = useState(FOCUS_MODE_DEFAULT);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef(null);
   const stopped = useRef(false);
@@ -46,6 +53,8 @@ export default function useFocus({ focusCfg, addLog }) {
   useEffect(() => {
     const saved = Number(localStorage.getItem(STORAGE.focusThreshold));
     if (Number.isFinite(saved) && saved > 0) setThresholdState(saved);
+    const savedMode = localStorage.getItem(STORAGE.focusMode);
+    if (FOCUS_MODES.some((m) => m.id === savedMode)) setModeState(savedMode);
   }, []);
 
   const effectiveThreshold =
@@ -58,6 +67,12 @@ export default function useFocus({ focusCfg, addLog }) {
     const clamped = Math.min(FOCUS_THRESHOLD_INPUT.max, Math.max(FOCUS_THRESHOLD_INPUT.min, n));
     setThresholdState(clamped);
     localStorage.setItem(STORAGE.focusThreshold, String(clamped));
+  }, []);
+
+  const setMode = useCallback((id) => {
+    if (!FOCUS_MODES.some((m) => m.id === id)) return;
+    setModeState(id);
+    localStorage.setItem(STORAGE.focusMode, id);
   }, []);
 
   const mergeRows = useCallback((incoming, keepLimit) => {
@@ -189,6 +204,8 @@ export default function useFocus({ focusCfg, addLog }) {
     latest: rows[0] ?? null,
     threshold: effectiveThreshold,
     setThreshold,
+    mode,
+    setMode,
     connected,
   };
 }

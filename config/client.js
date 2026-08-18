@@ -30,6 +30,7 @@ export const STORAGE = {
   chartHours: 'em_chart_hours',
   chartSmooth: 'em_chart_smooth',
   focusThreshold: 'em_focus_threshold',
+  focusMode: 'em_focus_mode',
   /** Assistant window: docked/floating, its width, and its floating rect. */
   aiWindow: 'em_ai_window',
   activeTab: 'em_active_tab',
@@ -267,6 +268,21 @@ export const AI_WINDOW = {
 
 /** Bounds for the focus "movement per minute" threshold input. */
 export const FOCUS_THRESHOLD_INPUT = { min: 1, max: 99 };
+
+/**
+ * Which side of the movement threshold counts as "good", per focus mode.
+ * `over: 'gain'` — an activity session: reaching/passing the threshold earns
+ * score (you're supposed to move). `over: 'lose'` — a listening session:
+ * passing the threshold costs score (movement reads as lost concentration).
+ * Every place that scores or badges a movement reading reads this one flag
+ * off the selected mode rather than special-casing mode ids, so a third mode
+ * is just another row here — see lib/focus-score.js.
+ */
+export const FOCUS_MODES = [
+  { id: 'listening', key: 'listening', over: 'lose' },
+  { id: 'activity', key: 'activity', over: 'gain' },
+];
+export const FOCUS_MODE_DEFAULT = 'listening';
 
 /**
  * Fallbacks if GET /api/config is unreachable (server values win).

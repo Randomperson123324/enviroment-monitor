@@ -10,10 +10,12 @@ import {
   CHART_COLORS,
   CLIENT_FALLBACK,
   FOCUS_THRESHOLD_INPUT,
+  FOCUS_MODES,
   ID_SERIES_PALETTE,
   withAlpha,
 } from '@/config/client';
 import { tooltipOptions } from '@/lib/chart-utils';
+import { focusModeConfig, focusScore, isFocusGood } from '@/lib/focus-score';
 import { useLang } from '@/hooks/useLang';
 
 // [glossary key shown literally, i18n key for its description]
@@ -358,7 +360,19 @@ function buildPersonSeries(rows, bucketMs, maxBars) {
   return { labels, series, overflow, phone: { on: onPhone, checked: phoneChecked } };
 }
 
-function FocusIdChart({ labels, series, palette, colors, threshold, selected, onSelect, t }) {
+/** Badge text for a movement reading's good/bad side, worded for the active mode. */
+function statusLabel(modeCfg, good, t) {
+  if (good == null) return '—';
+  if (modeCfg.over === 'gain') return good ? t('focus.metGoal') : t('focus.belowGoal');
+  return good ? t('focus.normal') : t('focus.high');
+}
+
+function FocusIdChart({ labels, series, palette, colors, threshold, modeCfg, selected, onSelect, t }) {
+  // What crossing the line means depends on the mode: a goal to reach in
+  // activity mode (score colour), a ceiling not to cross in listening mode
+  // (the existing warning colour).
+  const lineColor = modeCfg.over === 'gain' ? colors.score : colors.focusOver;
+
   const data = useMemo(() => {
     const dimmed = selected != null;
     const lines = series.map((s) => {
@@ -380,12 +394,12 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
         order: s.person === selected ? 0 : 1,
       };
     });
-    // เส้นเกณฑ์แจ้งเตือน (คงที่) — เป็น dataset ท้ายสุด ไม่นับใน onClick/legend
+    // เส้นเกณฑ์ (คงที่) — เป็น dataset ท้ายสุด ไม่นับใน onClick/legend
     lines.push({
       _threshold: true,
       label: 'threshold',
       data: labels.map(() => threshold),
-      borderColor: withAlpha(colors.focusOver, 0.7),
+      borderColor: withAlpha(lineColor, 0.7),
       borderWidth: 1.25,
       borderDash: [6, 6],
       pointRadius: 0,
@@ -394,7 +408,7 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
       order: 5,
     });
     return { labels: labels.map(hhmm), datasets: lines };
-  }, [labels, series, palette, colors, threshold, selected]);
+  }, [labels, series, palette, colors, threshold, selected, lineColor]);
 
   const options = useMemo(
     () => ({
@@ -413,6 +427,10 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
       },
       scales: {
         x: {
+          // `labels` (built in buildPersonSeries) is sorted oldest → newest, and
+          // Chart.js's category axis draws index 0 at the left — so this always
+          // reads left (oldest) to right (newest); never set `reverse` here.
+          reverse: false,
           grid: { display: false },
           border: { display: false },
           ticks: { color: colors.tick, maxTicksLimit: 10, maxRotation: 35, minRotation: 20 },
@@ -436,8 +454,10 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
               const s = series[ctx.datasetIndex];
               if (!s) return null;
               const b = s.points[ctx.dataIndex];
+              const bad =
+                modeCfg.over === 'gain' ? ctx.parsed.y < threshold : ctx.parsed.y > threshold;
               const lines = [
-                `${personLabel(s)} · ${t('focus.tipMove', { y: ctx.parsed.y })}${ctx.parsed.y > threshold ? ' ⚠' : ''}`,
+                `${personLabel(s)} · ${t('focus.tipMove', { y: ctx.parsed.y })}${bad ? ' ⚠' : ''}`,
               ];
               if (b?.direction) {
                 const d = b.direction;
@@ -460,15 +480,17 @@ function FocusIdChart({ labels, series, palette, colors, threshold, selected, on
         },
       },
     }),
-    [series, colors, threshold, labels, selected, onSelect, t]
+    [series, colors, threshold, modeCfg, labels, selected, onSelect, t]
   );
 
   return <Line data={data} options={options} />;
 }
 
-function IdDetail({ series, palette, colors, threshold, onClose, t }) {
+function IdDetail({ series, palette, colors, threshold, modeCfg, onClose, t }) {
   const hue = palette[series.slot] ?? colors.tick;
-  const over = series.latest != null && series.latest > threshold;
+  const good = isFocusGood(series.latest, threshold, modeCfg.id);
+  const bad = good === false;
+  const score = focusScore(series.latest, threshold, modeCfg.id);
   const dir = series.latestDirection;
   const dirTotal = dir ? DIRECTIONS.reduce((a, [k]) => a + (Number(dir[k]) || 0), 0) || 1 : 1;
 
@@ -485,15 +507,19 @@ function IdDetail({ series, palette, colors, threshold, onClose, t }) {
           <X size={15} strokeWidth={2.4} aria-hidden />
         </button>
       </div>
-      <div className="fcard-val" style={{ color: over ? 'var(--lv-danger)' : hue }}>
+      <div className="fcard-val" style={{ color: bad ? 'var(--lv-danger)' : hue }}>
         {series.latest ?? '--'}
-        <span className={`badge ${over ? 'danger' : ''}`} style={{ marginLeft: 10, verticalAlign: 'middle' }}>
-          {series.latest == null ? '—' : over ? t('focus.high') : t('focus.normal')}
+        <span className={`badge ${bad ? 'danger' : ''}`} style={{ marginLeft: 10, verticalAlign: 'middle' }}>
+          {statusLabel(modeCfg, good, t)}
         </span>
       </div>
       <div className="fcard-sub">{t('focus.latestMove', { th: threshold })}</div>
 
       <div className="id-stat-grid">
+        <div>
+          <div className="dir-label">{t('focus.score')}</div>
+          <div className="dir-val">{score ?? '--'}</div>
+        </div>
         <div>
           <div className="dir-label">{t('focus.avg')}</div>
           <div className="dir-val">{series.avg.toFixed(1)}</div>
@@ -626,7 +652,11 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
   const { t } = useLang();
   const colors = CHART_COLORS[theme] ?? CHART_COLORS.dark;
   const palette = ID_SERIES_PALETTE[theme] ?? ID_SERIES_PALETTE.dark;
-  const { rows, buckets, latest, threshold, setThreshold, connected } = useFocus({ focusCfg, addLog });
+  const { rows, buckets, latest, threshold, setThreshold, mode, setMode, connected } = useFocus({
+    focusCfg,
+    addLog,
+  });
+  const modeCfg = focusModeConfig(mode);
   const [selected, setSelected] = useState(null);
 
   const maxBars = focusCfg?.chartBuckets ?? CLIENT_FALLBACK.focus.chartBuckets;
@@ -644,15 +674,35 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
 
   const lastBucket = buckets[buckets.length - 1] ?? null;
   const mvPerMin = lastBucket?.movement ?? null;
-  const overThreshold = mvPerMin != null && mvPerMin > threshold;
+  const good = isFocusGood(mvPerMin, threshold, mode);
+  const badState = good === false;
+  const score = focusScore(mvPerMin, threshold, mode);
   const faceCount = latest?.face_count ?? null;
 
   return (
     <section className="section-gap">
       <SectionHeader Icon={Eye} title={t('focus.title')} live={connected}>
         <div className="focus-controls">
+          <div className="range-row" role="radiogroup" aria-label={t('focus.modeLabel')}>
+            {FOCUS_MODES.map((m) => {
+              const cap = m.key.charAt(0).toUpperCase() + m.key.slice(1);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === m.id}
+                  className={`range-pill ${mode === m.id ? 'active' : ''}`}
+                  title={t(`focus.mode${cap}Hint`)}
+                  onClick={() => setMode(m.id)}
+                >
+                  {t(`focus.mode${cap}`)}
+                </button>
+              );
+            })}
+          </div>
           <label>
-            {t('focus.thresholdPre')}{' '}
+            {t(modeCfg.over === 'gain' ? 'focus.thresholdPreActivity' : 'focus.thresholdPre')}{' '}
             <input
               type="number"
               className="threshold-input"
@@ -667,10 +717,12 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
         </div>
       </SectionHeader>
 
-      {overThreshold && (
+      {badState && (
         <div className="alert-bar" style={{ marginBottom: 10 }} role="alert">
           <TriangleAlert size={16} strokeWidth={2.4} aria-hidden />
-          <span>{t('focus.over', { mv: mvPerMin, th: threshold })}</span>
+          <span>
+            {t(modeCfg.over === 'gain' ? 'focus.under' : 'focus.over', { mv: mvPerMin, th: threshold })}
+          </span>
         </div>
       )}
 
@@ -692,6 +744,7 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                   palette={palette}
                   colors={colors}
                   threshold={threshold}
+                  modeCfg={modeCfg}
                   selected={activeSel}
                   onSelect={setSelected}
                   t={t}
@@ -753,6 +806,7 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
                 palette={palette}
                 colors={colors}
                 threshold={threshold}
+                modeCfg={modeCfg}
                 onClose={() => setSelected(null)}
                 t={t}
               />
@@ -816,16 +870,33 @@ export default function FocusSection({ focusCfg, addLog, theme }) {
           <div className="panel">
             <div className="fcard-label">
               <span>{t('focus.totalMove')}</span>
-              <span className={`badge ${overThreshold ? 'danger' : mvPerMin != null ? '' : 'nodata'}`}>
-                {mvPerMin == null ? '—' : overThreshold ? t('focus.high') : t('focus.normal')}
+              <span className={`badge ${badState ? 'danger' : mvPerMin != null ? '' : 'nodata'}`}>
+                {statusLabel(modeCfg, good, t)}
               </span>
             </div>
             <div className="fcard-val">{mvPerMin ?? '--'}</div>
             <div className="fcard-sub">
               {t('focus.totalSub')}
               <br />
-              {t('focus.thresholdInfo', { th: threshold })}
+              {t(modeCfg.over === 'gain' ? 'focus.thresholdInfoActivity' : 'focus.thresholdInfo', {
+                th: threshold,
+              })}
             </div>
+          </div>
+
+          <div className="panel">
+            <div className="fcard-label">
+              <span>{t('focus.scoreTitle')}</span>
+              <span
+                className={`badge ${
+                  score == null ? 'nodata' : score >= 70 ? '' : score >= 40 ? 'warning' : 'danger'
+                }`}
+              >
+                {statusLabel(modeCfg, good, t)}
+              </span>
+            </div>
+            <div className="fcard-val">{score ?? '--'}</div>
+            <div className="fcard-sub">{t('focus.scoreSub', { th: threshold })}</div>
           </div>
 
           <div className="panel">
