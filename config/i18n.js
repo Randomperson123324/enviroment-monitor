@@ -371,6 +371,8 @@ const DICT = {
       failedPinned: 'AI ในเครื่อง ({providers}) ใช้งานไม่ได้: {msg}',
       pinnedNote:
         'หมวดนี้ใช้ AI ในเครื่อง ({providers}) เท่านั้น จะไม่ส่งข้อมูลกล้องไปยัง Cloud AI หรือบริการภายนอก',
+      // ขึ้นเฉพาะสรุปที่มีชื่อคนอยู่ในข้อมูลจริง ๆ — บอกว่าโมเดลอ่านเป็นตัวแปร ไม่ได้อ่านชื่อ
+      masked: 'ชื่อส่งเป็นตัวแปร',
       // ── โหมด AI ในเครื่อง (WebGPU) ──
       // ⚠️ ต้องบอกให้ชัดว่า "กดเอง" ไม่ใช่ "กำลังโหลด" ไม่งั้นการ์ดที่ยังไม่ได้กด
       // จะดูเหมือนค้าง ทั้งที่มันแค่รออยู่ว่าจะสั่งเมื่อไหร่
@@ -860,6 +862,7 @@ const DICT = {
       failedPinned: 'On-device AI ({providers}) is unavailable: {msg}',
       pinnedNote:
         'This tab uses on-device AI ({providers}) only — camera data is never sent to Cloud AI or any external service.',
+      masked: 'names sent as variables',
       // ── On-device (WebGPU) mode ──
       onDevice: 'on-device',
       analyze: 'Analyze now',

@@ -24,9 +24,9 @@ const list = (key, fallback) => {
 };
 
 /**
- * Which providers may see camera/focus data at all — the app's one hard data
- * boundary. Read by both the per-tab summaries and the chat tools, so there is a
- * single list to change and no way for the two to disagree.
+ * Which providers may see camera/focus data **with real identities attached**.
+ * Read by both the per-tab summaries and the chat tools, so there is a single
+ * list to change and no way for the two to disagree.
  *
  * The old name is still honoured: this rule started life as a summary-only
  * setting, and an existing deployment must not silently widen when it upgrades.
@@ -38,6 +38,25 @@ const list = (key, fallback) => {
  * actually want is "camera data stays on the Pi and the server".
  */
 const FOCUS_PROVIDERS = list('AI_FOCUS_PROVIDERS', list('AI_SUMMARY_FOCUS_PROVIDERS', ['local', 'browser']));
+
+/**
+ * May a provider *outside* that list read camera data once every identifier in
+ * it has been replaced by a variable?
+ *
+ * The two questions are separate, and conflating them is what used to make this
+ * an all-or-nothing switch. "ปุณณ์ ขยับ 12 ครั้ง/นาที" and "{{NAME_1}} ขยับ 12
+ * ครั้ง/นาที" ask a cloud model the same question about the room; only the first
+ * one tells Google who was in it. What the boundary is actually protecting is
+ * the identity, not the arithmetic — so the identity is what gets withheld, and
+ * the question gets answered.
+ *
+ * What still leaves the network when this is on: per-person movement counts,
+ * face directions, postures, head counts — behaviour, under a variable name that
+ * means nothing outside the one request that issued it. Turn it off (or set
+ * AI_ALIAS_ENABLED=false, which fails this closed on its own) to go back to
+ * "camera data reaches nothing but the on-device engines".
+ */
+const FOCUS_VIA_ALIAS = bool('AI_FOCUS_VIA_ALIAS', true);
 
 const config = {
   supabase: {
@@ -134,8 +153,9 @@ const config = {
       /** Look-back window for the environment trend line */
       envHours: num('AI_SUMMARY_ENV_HOURS', 6),
       /**
-       * Focus is pinned to the on-device endpoint: camera data never leaves the
-       * network, so a failure is reported rather than retried against Gemini.
+       * Providers this scope may fall back to, narrowed by the same focus gate
+       * the chat tools use (lib/ai/summaries.js computes the list). Kept here so
+       * an old deployment reading this key still sees its trusted set.
        */
       focusProviders: FOCUS_PROVIDERS,
     },
@@ -160,8 +180,10 @@ const config = {
      */
     modelRetryMax: num('AI_MODEL_RETRY_MAX', 3),
 
-    /** Providers allowed to hold camera data — see FOCUS_PROVIDERS above. */
+    /** Providers allowed to hold camera data unmasked — see FOCUS_PROVIDERS. */
     focusProviders: FOCUS_PROVIDERS,
+    /** …and whether the rest may hold it pseudonymised — see FOCUS_VIA_ALIAS. */
+    focusViaAlias: FOCUS_VIA_ALIAS,
 
     /**
      * Pseudonymisation of identifiers sent to a provider that is not on
@@ -172,10 +194,10 @@ const config = {
      * the provider never learns who was in the room. The user sees real names
      * throughout; nothing about the answer changes except who can read it.
      *
-     * ⚠️ This is not what keeps camera data off the cloud — the `local_only`
-     * gate in lib/ai/tools.js does that, and still refuses. Masking covers the
-     * paths where an identifier legitimately travels: the user's own words, a
-     * device id, a summary line.
+     * ⚠️ With FOCUS_VIA_ALIAS on, this layer *is* the boundary rather than an
+     * extra over one: `mayReadFocus()` in lib/ai/tools.js opens the camera tools
+     * to a cloud provider only while masking is enabled, so switching this off
+     * closes that door again rather than quietly sending real names.
      */
     aliases: {
       enabled: bool('AI_ALIAS_ENABLED', true),

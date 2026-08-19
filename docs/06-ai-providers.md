@@ -204,20 +204,58 @@ The old shape could only answer questions about the sentence it was given. Asked
 about last night's humidity or which disease risk is raised, it had to guess or
 decline — the data was one call away and nothing could ask for it.
 
-**Camera data is the exception, and it is enforced three times.** Only providers
-in `AI_FOCUS_PROVIDERS` (default `local`) may read it:
+**Camera data is the exception, and the gate on it has two settings rather than
+one:**
 
-1. `toolsFor(provider)` never offers `get_focus_activity` to anyone else, so the
-   model cannot call what it cannot see.
-2. That model's system instruction says outright that it has no camera access —
-   so it says so instead of reaching for the sensor data and answering as though
-   it had looked.
+- providers in `AI_FOCUS_PROVIDERS` (default `local,browser`) read it as it is
+  stored, names and all — the engines that send nothing anywhere;
+- everyone else reads it **pseudonymised**, while `AI_FOCUS_VIA_ALIAS` (default
+  on) and the alias layer are both enabled.
+
+The second setting is what lets Gemini answer a question about the classroom.
+"ปุณณ์ ขยับ 12 ครั้ง/นาที" and "{{NAME_1}} ขยับ 12 ครั้ง/นาที" ask a cloud model
+exactly the same question about the room, and only the first tells Google who was
+in it — so what travels is the behaviour, under a variable that means nothing
+outside the one request that issued it. `lib/ai/aliases.js` swaps every name and
+device id on the way out, the system prompt tells the model to echo the variables
+back verbatim, and the answer is mapped back before it reaches the screen. The
+user reads real names throughout and never sees a placeholder.
+
+Whichever setting applies, it is enforced three times:
+
+1. `toolsFor(provider)` never offers `get_focus_activity` to a provider that may
+   not read it, so the model cannot call what it cannot see.
+2. That model's system instruction says what it has — no camera access at all, or
+   camera access whose names are variables. Without the first it reaches for the
+   sensor data and answers as though it had looked; without the second it reports
+   the placeholders as corrupt data or guesses who they are.
 3. `runTool()` re-checks the provider before touching the database, so a
    hallucinated call to a tool that was never offered is refused.
 
 (3) is what makes the guarantee real; (1) and (2) shape what the model is likely
-to do, and only (3) decides what happens. Adding a cloud provider to
-`AI_FOCUS_PROVIDERS` sends camera-derived data off the network.
+to do, and only (3) decides what happens.
+
+Two things follow, and both are deliberate:
+
+- **`AI_ALIAS_ENABLED=false` closes the cloud out of camera data again.** The
+  permission is conditional on the masking being in force, so the unsafe
+  combination — cloud access with the pseudonymisation off — cannot be
+  configured. The same is true of `AI_FOCUS_VIA_ALIAS=false`, which is the switch
+  to use if the policy you want is "camera data reaches nothing but the on-device
+  engines".
+- **Adding a cloud provider to `AI_FOCUS_PROVIDERS` is a different decision.**
+  That list means "may hold raw identities", so a name put on it is a name sent
+  off the network unmasked.
+
+What still never leaves: raw frames. The camera is processed on the Pi and only
+counts, directions and postures per person are stored at all (`pi-vision/`).
+
+Masking is structural where it can be — a field named `person`, `name` or
+`device_id` is replaced whatever it holds — and roster-driven in free text, so a
+name typed into the chat box is masked too. Because that roster is cached for
+five minutes, a builder that assembles its own prose (the focus summary) hands
+its identities over explicitly rather than trusting the cache to be current; see
+`focusContext()` in `lib/ai/summaries.js`.
 
 Bounds: `AI_TOOLS_MAX_ROUNDS` caps the model→tool→model loop (a model that
 misreads a result will otherwise ask forever) and `AI_TOOLS_MAX_CALLS` caps calls
@@ -326,10 +364,11 @@ Details that are not decoration:
   machine did not ask for it to be quietly sent to a provider. In the other
   direction, reaching it as a fallback asks before downloading anything.
 
-Camera data: `browser` is in the default `AI_FOCUS_PROVIDERS` because the rule is
-about data leaving the device, and this engine sends nothing anywhere — the focus
-rows are already in that browser, fetched by the Focus tab. Drop it from the list
-if the policy you want is "camera data stays on the Pi and the server".
+Camera data: `browser` is in the default `AI_FOCUS_PROVIDERS` — the list of
+engines trusted with real names — because the rule is about data leaving the
+device, and this engine sends nothing anywhere; the focus rows are already in
+that browser, fetched by the Focus tab. Drop it from the list if the policy you
+want is "camera data stays on the Pi and the server".
 
 ## Routes
 

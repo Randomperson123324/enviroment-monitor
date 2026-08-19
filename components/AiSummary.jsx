@@ -77,6 +77,14 @@ export default function AiSummary({
           {data?.model || data?.provider ? (
             <span className="src-tag">{data.model || data.provider}</span>
           ) : null}
+          {/*
+            Names went out as variables. Worth a tag rather than silence: a
+            teacher reading a cloud model's sentence about their classroom is
+            entitled to know the cloud model never read a name — and it is only
+            shown on the scopes that actually carry names, so it stays a fact
+            about this summary instead of a badge on everything.
+          */}
+          {data?.masked ? <span className="src-tag">{t('aiSummary.masked')}</span> : null}
           {/* Says where the work happens, because it changes what pressing the
               button costs: a server summary is a cached request, this one is
               this machine's GPU for as long as it takes. */}
