@@ -17,7 +17,7 @@ import {
   ID_SERIES_PALETTE,
   withAlpha,
 } from '@/config/client';
-import { tooltipOptions } from '@/lib/chart-utils';
+import { formatTooltipTime, tooltipOptions } from '@/lib/chart-utils';
 import { focusModeConfig, focusScore, isFocusGood, overallFocusScore } from '@/lib/focus-score';
 import { useLang } from '@/hooks/useLang';
 
@@ -452,7 +452,13 @@ function FocusIdChart({ labels, series, palette, colors, threshold, modeCfg, sel
           ...tooltipOptions(colors, labels),
           filter: (item) => !item.dataset._threshold,
           callbacks: {
-            title: (items) => `🕐 ${items[0]?.label ?? ''}`,
+            // The axis label is the clock alone, which on a chart read later —
+            // or screenshotted into a report — is a time on an unknown day.
+            // The bucket keeps its own timestamp, and that one carries the date.
+            title: (items) => {
+              const ts = labels[items[0]?.dataIndex];
+              return `🕐 ${ts ? formatTooltipTime(ts, { seconds: false }) : items[0]?.label ?? ''}`;
+            },
             label: (ctx) => {
               const s = series[ctx.datasetIndex];
               if (!s) return null;
