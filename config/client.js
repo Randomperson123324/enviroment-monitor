@@ -283,6 +283,20 @@ export const FOCUS_SCORE_PENALTY = {
 };
 
 /**
+ * Display rules for the "?" that explains a tile's weight (ScoreWeightHint).
+ *
+ * `zeroBelow` is where a live penalty stops being worth a number: the score is
+ * rounded to whole points, so anything under this rounds away and reporting
+ * "−0.02" would claim a precision the ring does not have. It is not zero,
+ * because a sensor a hair outside its band genuinely costs a fraction and
+ * "costing nothing" is the honest reading of a cost that never reaches a point.
+ */
+export const SCORE_WEIGHT_HINT = {
+  zeroBelow: 0.05,
+  decimals: 1,
+};
+
+/**
  * Score bands (from SCORE_BANDS, shared with the room score) that count as
  * "low" — the ones that raise the toast. Anything at 'fair' or better is a
  * session with room to improve, not one worth interrupting the user over.

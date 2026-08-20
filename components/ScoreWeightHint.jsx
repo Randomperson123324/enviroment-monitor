@@ -1,10 +1,11 @@
 'use client';
 
+import { SCORE_WEIGHT_HINT } from '@/config/client';
 import { scoreWeight } from '@/lib/analysis';
 import { useLang } from '@/hooks/useLang';
 
 /** −4.2, but −4 when it is whole: a trailing ".0" reads as false precision. */
-const pts = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+const pts = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(SCORE_WEIGHT_HINT.decimals));
 
 /**
  * The "?" on a sensor tile: how much this reading is worth to the room score.
@@ -36,7 +37,7 @@ export default function ScoreWeightHint({ sensor, latest }) {
           : t('sensor.weight.ladder2', { warn: w.warn, danger: w.danger }),
         w.now == null
           ? t('sensor.weight.noReading')
-          : w.now < 0.05
+          : w.now < SCORE_WEIGHT_HINT.zeroBelow
             ? t('sensor.weight.nowClear')
             : t('sensor.weight.now', { n: pts(w.now) }),
       ];
