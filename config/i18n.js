@@ -102,6 +102,7 @@ const DICT = {
       hum: { label: 'ความชื้น', stat: 'ความชื้น',
         dry2: 'แห้งมาก', dry: 'ค่อนข้างแห้ง', wet2: 'ชื้นเกิน', wet: 'ชื้น', ok: 'เหมาะสม' },
       pm1: { label: 'ฝุ่น PM1', stat: 'PM1',
+        weightNote: 'ไม่คิดคะแนน — PM1 เป็นส่วนย่อยของ PM2.5 ถ้านับด้วยจะเป็นการหักฝุ่นก้อนเดียวกันสองครั้ง',
         crit: '⚠️ อันตราย', bad2: 'แย่มาก', bad: 'ไม่ดี', okish: 'พอใช้', ok: 'สะอาด' },
       pm25: { label: 'ฝุ่น PM2.5', stat: 'PM2.5',
         crit: '⚠️ อันตราย', bad2: 'แย่มาก', bad: 'เกินมาตรฐาน', okish: 'พอใช้', ok: 'สะอาด' },
@@ -112,12 +113,30 @@ const DICT = {
       co2: { label: 'คาร์บอนไดออกไซด์ (CO2)', stat: 'CO2',
         crit: '⚠️ อันตราย', bad2: 'สูงมาก', bad: 'สูง', okish: 'เริ่มสูง', ok: 'ปกติ' },
       eco2: { label: 'eCO2 (ประเมินจาก VOC)', stat: 'eCO2',
+        weightNote: 'ไม่คิดคะแนน — eCO2 เป็นค่าประเมินจาก VOC ไม่ใช่การวัดจริง และ CO2 ตัวจริงหักไปแล้ว',
         crit: '⚠️ อันตราย', bad2: 'สูงมาก', bad: 'สูง', okish: 'เริ่มสูง', ok: 'ปกติ' },
       tvoc: { label: 'สารอินทรีย์ระเหยง่ายรวม (TVOC)', stat: 'TVOC',
+        weightNote: 'ไม่คิดคะแนน — TVOC มาจากสัญญาณ VOC เส้นเดียวกับ eCO2 นับด้วยจะหักสัญญาณเดียวซ้ำสอง',
         crit: '⚠️ อันตราย', bad2: 'สูงมาก', bad: 'สูง', okish: 'เริ่มสูง', ok: 'ปกติ' },
       air: {
         label: 'คุณภาพอากาศ',
         show: 'แสดง{label}',
+      },
+      /**
+       * ป้าย "?" บนการ์ด — น้ำหนักของค่านั้นต่อคะแนนห้อง
+       *
+       * ต้องบอกทั้งเพดานและค่าปัจจุบัน: เพดานตอบว่า "ค่านี้สำคัญแค่ไหน"
+       * ส่วนค่าปัจจุบันตอบว่า "แล้วตอนนี้มันทำให้เสียไปเท่าไร" — คนละคำถามกัน
+       * และคำถามที่สองคือคำถามที่คนดูวงคะแนนอยากรู้จริง ๆ
+       */
+      weight: {
+        title: 'น้ำหนักต่อคะแนนห้อง',
+        max: 'หักได้สูงสุด −{max} คะแนน',
+        ladder2: 'เกินเกณฑ์เตือน −{warn} · อันตราย −{danger}',
+        ladder3: 'เตือน −{warn} · อันตราย −{danger} · วิกฤต −{critical}',
+        now: 'ตอนนี้หัก −{n}',
+        nowClear: 'ตอนนี้ไม่หัก — อยู่ในเกณฑ์',
+        noReading: 'ตอนนี้ไม่มีค่า จึงไม่ถูกนำมาคิด',
       },
       tile: {
         barTitle: 'แถบแสดงค่าปัจจุบันเทียบกับช่วงที่เหมาะสม',
@@ -605,6 +624,7 @@ const DICT = {
       hum: { label: 'Humidity', stat: 'Humidity',
         dry2: 'Very dry', dry: 'Dry', wet2: 'Too humid', wet: 'Humid', ok: 'Ideal' },
       pm1: { label: 'PM1 dust', stat: 'PM1',
+        weightNote: 'Not scored — PM1 sits inside PM2.5, and counting both would penalise the same dust twice',
         crit: '⚠️ Dangerous', bad2: 'Very poor', bad: 'Poor', okish: 'Fair', ok: 'Clean' },
       pm25: { label: 'PM2.5 dust', stat: 'PM2.5',
         crit: '⚠️ Dangerous', bad2: 'Very poor', bad: 'Over standard', okish: 'Fair', ok: 'Clean' },
@@ -615,12 +635,23 @@ const DICT = {
       co2: { label: 'Carbon dioxide (CO2)', stat: 'CO2',
         crit: '⚠️ Dangerous', bad2: 'Very high', bad: 'High', okish: 'Elevated', ok: 'Normal' },
       eco2: { label: 'eCO2 (VOC estimate)', stat: 'eCO2',
+        weightNote: 'Not scored — eCO2 is estimated from VOC rather than measured, and real CO2 is already counted',
         crit: '⚠️ Dangerous', bad2: 'Very high', bad: 'High', okish: 'Elevated', ok: 'Normal' },
       tvoc: { label: 'Total VOC (TVOC)', stat: 'TVOC',
+        weightNote: 'Not scored — TVOC comes off the same VOC signal as eCO2, so scoring it would count one signal twice',
         crit: '⚠️ Dangerous', bad2: 'Very high', bad: 'High', okish: 'Elevated', ok: 'Normal' },
       air: {
         label: 'Air quality',
         show: 'Show {label}',
+      },
+      weight: {
+        title: 'Weight in the room score',
+        max: 'Can cost up to −{max} points',
+        ladder2: 'Past the warning line −{warn} · danger −{danger}',
+        ladder3: 'Warning −{warn} · danger −{danger} · critical −{critical}',
+        now: 'Costing −{n} right now',
+        nowClear: 'Costing nothing right now — inside the range',
+        noReading: 'No reading right now, so it is not counted',
       },
       tile: {
         barTitle: 'Current value vs. the ideal band',

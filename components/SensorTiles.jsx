@@ -15,6 +15,7 @@ import {
 } from '@/lib/chart-utils';
 import { useLang } from '@/hooks/useLang';
 import SensorDetail from '@/components/SensorDetail';
+import ScoreWeightHint from '@/components/ScoreWeightHint';
 import SlidingNumber from '@/components/SlidingNumber';
 
 // Mini sparklines read as a trend, not a data table — smooth harder than the
@@ -208,6 +209,7 @@ function SensorTile({ sensor, latest, view, smooth, colors, onExpand }) {
         <span className="tile-label">
           <span className="tile-dot" />
           {label}
+          <ScoreWeightHint sensor={sensor} latest={latest} />
           <Maximize2 className="tile-grow" size={13} strokeWidth={2.4} aria-hidden />
         </span>
         <TileValue sensor={sensor} value={state.value} />
@@ -266,6 +268,9 @@ function AirQualityTile({ latest, view, smooth, colors, onExpand }) {
           <span className="tile-dot" />
           {t('sensor.air.label')}
           <span className="air-chan">{t(`sensor.${active.id}.stat`)}</span>
+          {/* Follows the rotation: this card is three sensors taking turns, and
+              they are not worth the same — PM2.5 can cost 60, PM1 nothing. */}
+          <ScoreWeightHint sensor={active} latest={latest} />
           <Maximize2 className="tile-grow" size={13} strokeWidth={2.4} aria-hidden />
         </span>
         <TileValue sensor={active} value={activeState.value} />

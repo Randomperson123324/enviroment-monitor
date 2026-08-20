@@ -1210,6 +1210,8 @@ textarea {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
+  /* The box `.hint-pop` measures itself against — see it above. */
+  position: relative;
 }
 
 .tile-label {
@@ -1219,6 +1221,90 @@ textarea {
   display: flex;
   align-items: center;
   gap: 7px;
+}
+
+/* ── The "?" that explains a tile's weight in the room score ───────────────────
+   Hover *and* focus open it: a control only a mouse can reach is not a control
+   everyone has. The card around it is itself a button, so the hint's own events
+   stop in ScoreWeightHint — CSS only decides what is visible.
+
+   Positioned against the tile's header row rather than the "?" itself: a 16px
+   anchor cannot hold a 250px panel without it hanging off the card edge in the
+   right-hand column, and the header is the widest thing it can align to. It
+   drops just under the label, over the sparkline — anchoring to the whole card
+   would have put it below the card, half of it behind the next row. */
+.hint {
+  position: static;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.hint-btn {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  display: grid;
+  place-items: center;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.hint-btn:hover,
+.hint:focus-within .hint-btn {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--tile-accent, var(--accent)) 60%, var(--line));
+  background: color-mix(in srgb, var(--tile-accent, var(--accent)) 14%, transparent);
+}
+
+.hint-pop {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 0.9rem;
+  border: 1px solid var(--line);
+  /* The glass tint over an opaque base, not the tint alone: this floats above
+     a sparkline, and a translucent panel would let the chart line run
+     straight through the text. */
+  background: linear-gradient(var(--surface-2), var(--surface-2)), var(--page);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.28);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--ink-2);
+  text-align: left;
+  white-space: normal;
+  /* Invisible *and* inert until asked for: a pointer-events:none popup cannot
+     swallow a click meant for the card underneath it. */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+}
+
+.hint-pop strong {
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+.hint-btn:hover + .hint-pop,
+.hint:focus-within .hint-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .tile-dot {
